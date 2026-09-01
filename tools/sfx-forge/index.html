@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SFX Forge — ESP32 Buzzer Composer</title>
+<meta name="description" content="Compose buzzer melodies and sound effects, export as C arrays.">
+<meta name="theme-color" content="#0a0d0a">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<!-- These two webfonts come from Google. They are the one thing here that
+     needs the network: offline the page still works, it just falls back to
+     the system monospace and loses the pixel-font title. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d0a;
+    --panel:#10150f;
+    --panel2:#141a12;
+    --grid-line:#1c2718;
+    --grid-line-strong:#26351f;
+    --green:#5eff8f;
+    --green-dim:#2c5a3d;
+    --amber:#ffb648;
+    --amber-dim:#5a4322;
+    --text:#eafbea;
+    --text-dim:#6b7a6e;
+    --danger:#ff5e5e;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+    overscroll-behavior:none;}
+  body{padding:14px 12px 40px;min-height:100vh;}
+
+  .title{
+    font-family:'Press Start 2P',monospace;
+    font-size:13px;
+    color:var(--green);
+    text-shadow:0 0 8px rgba(94,255,143,.55);
+    letter-spacing:1px;
+    margin:4px 0 2px;
+  }
+  .subtitle{font-size:11px;color:var(--text-dim);margin-bottom:16px;}
+
+  .tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .tab{
+    flex:1;text-align:center;padding:10px 6px;border-radius:6px;
+    font-size:11px;letter-spacing:.5px;font-weight:700;
+    background:var(--panel);border:1px solid var(--grid-line-strong);
+    color:var(--text-dim);cursor:pointer;user-select:none;
+  }
+  .tab.active.melody{color:var(--green);border-color:var(--green-dim);box-shadow:inset 0 0 12px rgba(94,255,143,.12);}
+  .tab.active.sfx{color:var(--amber);border-color:var(--amber-dim);box-shadow:inset 0 0 12px rgba(255,182,72,.12);}
+
+  .panel{background:var(--panel);border:1px solid var(--grid-line-strong);border-radius:8px;padding:12px;margin-bottom:12px;}
+  .panel-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .row:last-child{margin-bottom:0;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field label{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+  input[type=number]{
+    width:64px;background:var(--panel2);border:1px solid var(--grid-line-strong);
+    color:var(--text);padding:6px 7px;border-radius:5px;font-family:inherit;font-size:12px;
+  }
+  select{
+    background:var(--panel2);border:1px solid var(--grid-line-strong);color:var(--text);
+    padding:6px 7px;border-radius:5px;font-family:inherit;font-size:12px;
+  }
+  button{
+    font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.5px;
+    border-radius:6px;border:1px solid var(--grid-line-strong);
+    background:var(--panel2);color:var(--text);padding:9px 12px;cursor:pointer;
+  }
+  button.primary.melody{color:var(--bg);background:var(--green);border-color:var(--green);}
+  button.primary.sfx{color:var(--bg);background:var(--amber);border-color:var(--amber);}
+  button.ghost{color:var(--text-dim);}
+  button.danger{color:var(--danger);border-color:#3a1e1e;}
+  button:active{transform:scale(.97);}
+
+  /* ---- Piano roll ---- */
+  #rollWrap{
+    overflow-x:auto;overflow-y:auto;max-height:46vh;border:1px solid var(--grid-line-strong);
+    border-radius:6px;background:var(--panel2);
+  }
+  #rollGrid{position:relative;}
+  .roll-row{display:flex;}
+  .key-label{
+    position:sticky;left:0;z-index:2;
+    width:38px;flex:none;font-size:9px;display:flex;align-items:center;justify-content:center;
+    background:var(--panel2);border-right:1px solid var(--grid-line-strong);
+    color:var(--text-dim);
+  }
+  .key-label.sharp{color:#48533f;background:#0e120c;}
+  .cell{
+    width:22px;height:16px;flex:none;border-right:1px solid var(--grid-line);border-bottom:1px solid var(--grid-line);
+  }
+  .cell.beat{border-right:1px solid var(--grid-line-strong);}
+  .cell.on{
+    background:var(--green);box-shadow:0 0 6px rgba(94,255,143,.8), inset 0 0 2px rgba(0,0,0,.4);
+  }
+  .cell.playing{outline:2px solid #fff;outline-offset:-2px;}
+  .step-header{display:flex;position:sticky;top:0;z-index:3;background:var(--panel2);}
+  .step-num{
+    width:22px;flex:none;text-align:center;font-size:8px;color:var(--text-dim);padding:3px 0;
+    border-right:1px solid var(--grid-line);
+  }
+  .step-num.beat{border-right:1px solid var(--grid-line-strong);color:var(--green);}
+
+  /* ---- SFX canvas ---- */
+  #sfxCanvasWrap{border:1px solid var(--grid-line-strong);border-radius:6px;background:var(--panel2);overflow:hidden;}
+  #sfxCanvas{display:block;width:100%;height:220px;touch-action:none;}
+
+  .presets{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .presets button{font-size:10px;padding:7px 10px;}
+
+  textarea{
+    width:100%;min-height:160px;background:var(--panel2);border:1px solid var(--grid-line-strong);
+    color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.5;
+    border-radius:6px;padding:10px;resize:vertical;
+  }
+  .hint{font-size:10px;color:var(--text-dim);margin-top:6px;line-height:1.5;}
+  .hidden{display:none !important;}
+  .toast{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    background:var(--panel2);border:1px solid var(--green-dim);color:var(--green);
+    padding:8px 14px;border-radius:20px;font-size:11px;opacity:0;pointer-events:none;
+    transition:opacity .2s;z-index:50;
+  }
+  .toast.show{opacity:1;}
+
+  /* ---- Library ---- */
+  #patchList{margin-top:4px;}
+  .patch{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--grid-line);}
+  .patch:first-child{border-top:none;}
+  .patch .pname{flex:1;min-width:0;font-size:11px;color:var(--text);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .patch .pkind{font-size:9px;letter-spacing:.5px;padding:2px 6px;border-radius:4px;
+    border:1px solid var(--grid-line-strong);color:var(--text-dim);flex:none;}
+  .patch button{font-size:10px;padding:5px 9px;flex:none;}
+  #patchName{flex:1;min-width:140px;background:var(--panel2);
+    border:1px solid var(--grid-line-strong);color:var(--text);
+    padding:6px 7px;border-radius:5px;font-family:inherit;font-size:12px;}
+
+  /* Phone first. On a desktop window, stop the content sprawling the full
+     width of a monitor and give the piano roll more vertical room. */
+  @media (min-width:820px){
+    body{max-width:980px;margin:0 auto;padding:24px 20px 56px;}
+    #rollWrap{max-height:58vh;}
+    .title{font-size:16px;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="title">SFX FORGE</div>
+  <div class="subtitle">buzzer melody &amp; sound-effect composer → C array export</div>
+
+  <div class="tabs">
+    <div class="tab active melody" id="tabMelodyBtn" onclick="switchTab('melody')">♪ MELODY</div>
+    <div class="tab sfx" id="tabSfxBtn" onclick="switchTab('sfx')">⚡ SFX</div>
+  </div>
+
+  <!-- ================= MELODY TAB ================= -->
+  <div id="melodyTab">
+    <div class="panel">
+      <div class="row">
+        <div class="field">
+          <label>Tempo (BPM)</label>
+          <input type="number" id="bpm" value="120" min="30" max="300" onchange="updateStepMs()">
+        </div>
+        <div class="field">
+          <label>Step</label>
+          <select id="stepDiv" onchange="updateStepMs()">
+            <option value="4">Quarter</option>
+            <option value="8" selected>Eighth</option>
+            <option value="16">Sixteenth</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Step ms</label>
+          <input type="number" id="stepMs" value="250" min="10" onchange="renderRoll()">
+        </div>
+        <div class="field">
+          <label>Steps</label>
+          <input type="number" id="numSteps" value="32" min="4" max="128" onchange="renderRoll()">
+        </div>
+      </div>
+      <div class="row">
+        <button class="primary melody" id="playMelodyBtn" onclick="playMelody()">▶ PLAY</button>
+        <button class="ghost" onclick="stopPlayback()">■ STOP</button>
+        <button class="ghost" onclick="octaveShift(1)">OCT ▲</button>
+        <button class="ghost" onclick="octaveShift(-1)">OCT ▼</button>
+        <button class="danger" onclick="clearMelody()">CLEAR</button>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <div id="rollWrap">
+        <div id="rollGrid"></div>
+      </div>
+    </div>
+    <div class="hint">Tap a cell to place a note in that step (one pitch per step — matches a passive buzzer's monophonic output). Tap again to clear it. Scroll to see more pitches/steps.</div>
+  </div>
+
+  <!-- ================= SFX TAB ================= -->
+  <div id="sfxTab" class="hidden">
+    <div class="panel">
+      <div class="row">
+        <div class="field">
+          <label>Duration (ms)</label>
+          <input type="number" id="sfxDuration" value="600" min="50" max="5000" onchange="renderSfxAxes()">
+        </div>
+        <div class="field">
+          <label>Min Hz</label>
+          <input type="number" id="sfxMinHz" value="200" min="20" onchange="renderSfxAxes()">
+        </div>
+        <div class="field">
+          <label>Max Hz</label>
+          <input type="number" id="sfxMaxHz" value="3000" min="100" onchange="renderSfxAxes()">
+        </div>
+        <div class="field">
+          <label>Points</label>
+          <input type="number" id="sfxPoints" value="24" min="4" max="64">
+        </div>
+      </div>
+      <div class="row">
+        <button class="primary sfx" onclick="playSfx()">▶ PLAY</button>
+        <button class="ghost" onclick="stopPlayback()">■ STOP</button>
+        <button class="danger" onclick="clearSfx()">CLEAR</button>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Input mode</label>
+          <select id="sfxMode" onchange="onSfxModeChange()">
+            <option value="draw">Freehand draw</option>
+            <option value="points">Tap points (straight lines)</option>
+          </select>
+        </div>
+        <button class="ghost" id="undoPointBtn" onclick="undoSfxPoint()">UNDO POINT</button>
+      </div>
+      <div class="presets">
+        <button onclick="loadPreset('coin')">Coin</button>
+        <button onclick="loadPreset('laser')">Laser</button>
+        <button onclick="loadPreset('powerup')">Power-Up</button>
+        <button onclick="loadPreset('alarm')">Alarm</button>
+        <button onclick="loadPreset('explosion')">Explosion (jitter)</button>
+        <button onclick="loadPreset('blip')">UI Blip</button>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0;">
+      <div id="sfxCanvasWrap">
+        <canvas id="sfxCanvas"></canvas>
+      </div>
+    </div>
+    <div class="hint">Drag across the canvas to draw a frequency-over-time curve. Y = pitch (log scale), X = time. This gets sampled into discrete freq/duration segments on export.</div>
+  </div>
+
+  <!-- ================= LIBRARY ================= -->
+  <div class="panel">
+    <div class="panel-label">Library &mdash; saved on this device</div>
+    <div class="row">
+      <input type="text" id="patchName" placeholder="name this patch">
+      <button class="ghost" onclick="savePatch()">SAVE</button>
+    </div>
+    <div id="patchList" class="hint">Nothing saved yet.</div>
+  </div>
+
+  <!-- ================= EXPORT ================= -->
+  <div class="panel">
+    <div class="panel-label">Export (matches cpp/fantoma/sound.h)</div>
+    <div class="row">
+      <div class="field">
+        <label>Effect name</label>
+        <input type="text" id="arrName" value="select" style="width:120px;">
+      </div>
+      <div class="field">
+        <label>Priority</label>
+        <input type="number" id="priority" value="1" min="0" max="255" style="width:64px;">
+      </div>
+      <button class="ghost" onclick="generateExport()">GENERATE</button>
+      <button class="ghost" onclick="copyExport()">COPY</button>
+      <button class="ghost" onclick="downloadExport()">DOWNLOAD .h</button>
+    </div>
+    <textarea id="exportBox" readonly placeholder="Press GENERATE to build the SoundStep array from the current tab..."></textarea>
+    <div id="melodyWarning" class="hint hidden" style="color:var(--amber);">⚠ Melodies aren't playable on-device yet — the player only holds one pending slot and can't resume an interrupted tune. Safe to compose and store, not yet safe to wire up to a scene.</div>
+    <div class="hint">Struct is <code>SoundStep { uint16_t freq_hz; uint16_t ms; }</code>, freq 0 = rest, max 255 steps/effect. Registry line included below the array — paste both into <code>sound.h</code>.</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script src="../../shared/storage.js"></script>
+<script src="../../shared/app.js"></script>
+<script>
+/* ============================= STATE ============================= */
+let currentTab = 'melody';
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+let baseOctaveLow = 3;   // lowest octave shown
+let octaveSpan = 3;      // number of octaves visible (rows = span*12 + 1)
+let melodyNotes = {};    // stepIndex -> midiNumber (or absent = rest)
+let audioCtx = null;
+let activeOsc = null;
+let playToken = 0;
+
+function midiToFreq(midi){ return 440 * Math.pow(2, (midi-69)/12); }
+function midiName(midi){
+  const n = NOTE_NAMES[midi%12];
+  const oct = Math.floor(midi/12)-1;
+  return n+oct;
+}
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._h);
+  toast._h=setTimeout(()=>t.classList.remove('show'),1400);
+}
+
+/* ============================= TABS ============================= */
+function switchTab(tab){
+  currentTab = tab;
+  document.getElementById('melodyTab').classList.toggle('hidden', tab!=='melody');
+  document.getElementById('sfxTab').classList.toggle('hidden', tab!=='sfx');
+  document.getElementById('tabMelodyBtn').classList.toggle('active', tab==='melody');
+  document.getElementById('tabSfxBtn').classList.toggle('active', tab==='sfx');
+  if(tab==='sfx') requestAnimationFrame(setupSfxCanvas);
+}
+
+/* ============================= MELODY: STEP MS ============================= */
+function updateStepMs(){
+  const bpm = parseFloat(document.getElementById('bpm').value)||120;
+  const div = parseFloat(document.getElementById('stepDiv').value)||8;
+  // ms per step = (60000 / bpm) * (4/div)
+  const ms = Math.round((60000/bpm)*(4/div));
+  document.getElementById('stepMs').value = ms;
+  renderRoll();
+}
+
+/* ============================= MELODY: PIANO ROLL ============================= */
+function octaveShift(dir){
+  baseOctaveLow = Math.max(0, Math.min(7, baseOctaveLow+dir));
+  renderRoll();
+}
+function clearMelody(){
+  melodyNotes = {};
+  renderRoll();
+  toast('Melody cleared');
+}
+function renderRoll(){
+  const numSteps = Math.max(4, parseInt(document.getElementById('numSteps').value)||32);
+  const rows = [];
+  const highMidi = (baseOctaveLow+octaveSpan+1)*12; // e.g. top C
+  const lowMidi = baseOctaveLow*12;
+  for(let m=highMidi; m>=lowMidi; m--) rows.push(m);
+
+  const grid = document.getElementById('rollGrid');
+  grid.innerHTML='';
+
+  // step header
+  const header = document.createElement('div');
+  header.className='step-header';
+  const spacer = document.createElement('div');
+  spacer.className='key-label';
+  spacer.textContent='';
+  header.appendChild(spacer);
+  for(let s=0;s<numSteps;s++){
+    const sn=document.createElement('div');
+    sn.className='step-num'+((s%4===0)?' beat':'');
+    sn.textContent = (s%4===0)? (s+1) : '';
+    header.appendChild(sn);
+  }
+  grid.appendChild(header);
+
+  rows.forEach(midi=>{
+    const r = document.createElement('div');
+    r.className='roll-row';
+    const label = document.createElement('div');
+    const isSharp = NOTE_NAMES[midi%12].includes('#');
+    label.className='key-label'+(isSharp?' sharp':'');
+    label.textContent = midiName(midi);
+    r.appendChild(label);
+    for(let s=0;s<numSteps;s++){
+      const c = document.createElement('div');
+      c.className='cell'+((s%4===0)?' beat':'');
+      if(melodyNotes[s]===midi) c.classList.add('on');
+      c.dataset.step=s; c.dataset.midi=midi;
+      c.onclick=()=>toggleCell(s, midi);
+      r.appendChild(c);
+    }
+    grid.appendChild(r);
+  });
+}
+function toggleCell(step, midi){
+  if(melodyNotes[step]===midi){ delete melodyNotes[step]; }
+  else{ melodyNotes[step]=midi; playPreviewNote(midi); }
+  renderRoll();
+}
+function playPreviewNote(midi){
+  const ctx = ensureAudio();
+  const stepMs = parseFloat(document.getElementById('stepMs').value)||250;
+  const dur = Math.min(180, stepMs)/1000;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type='square';
+  osc.frequency.value = midiToFreq(midi);
+  gain.gain.value = 0.15;
+  osc.connect(gain).connect(ctx.destination);
+  const t0 = ctx.currentTime;
+  osc.start(t0);
+  osc.stop(t0+dur);
+}
+
+/* ============================= MELODY: PLAYBACK ============================= */
+function stopPlayback(){
+  playToken++; // invalidates any pending scheduled callbacks
+  if(activeOsc){ try{activeOsc.stop();}catch(e){} activeOsc=null; }
+  document.querySelectorAll('.cell.playing').forEach(c=>c.classList.remove('playing'));
+}
+function playMelody(){
+  stopPlayback();
+  const myToken = playToken;
+  const ctx = ensureAudio();
+  const numSteps = Math.max(4, parseInt(document.getElementById('numSteps').value)||32);
+  const stepMs = parseFloat(document.getElementById('stepMs').value)||250;
+  let t = ctx.currentTime + 0.05;
+  for(let s=0;s<numSteps;s++){
+    const midi = melodyNotes[s];
+    if(midi!==undefined){
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type='square';
+      osc.frequency.value = midiToFreq(midi);
+      gain.gain.value = 0.15;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t+stepMs/1000*0.92);
+      const cellEl = ()=>document.querySelector(`.cell[data-step="${s}"][data-midi="${midi}"]`);
+      setTimeout(()=>{ if(playToken!==myToken)return; const el=cellEl(); if(el)el.classList.add('playing'); }, (t-ctx.currentTime)*1000);
+      setTimeout(()=>{ if(playToken!==myToken)return; const el=cellEl(); if(el)el.classList.remove('playing'); }, (t-ctx.currentTime)*1000+stepMs*0.92);
+    }
+    t += stepMs/1000;
+  }
+}
+
+/* ============================= SFX: CANVAS ============================= */
+let sfxPath = []; // array of {x:0..1, y:0..1} y=0 top(max hz), y=1 bottom(min hz)
+let sfxCanvasEl, sfxCtx, sfxDrawing=false;
+let sfxMode = 'draw';
+function onSfxModeChange(){
+  sfxMode = document.getElementById('sfxMode').value;
+  toast(sfxMode==='points' ? 'Tap to place points' : 'Drag to draw freehand');
+}
+function undoSfxPoint(){
+  sfxPath.pop();
+  drawSfxCanvas();
+}
+
+function setupSfxCanvas(){
+  sfxCanvasEl = document.getElementById('sfxCanvas');
+  const wrap = document.getElementById('sfxCanvasWrap');
+  const dpr = window.devicePixelRatio||1;
+  const w = wrap.clientWidth, h = 220;
+  sfxCanvasEl.width = w*dpr; sfxCanvasEl.height = h*dpr;
+  sfxCanvasEl.style.width=w+'px'; sfxCanvasEl.style.height=h+'px';
+  sfxCtx = sfxCanvasEl.getContext('2d');
+  sfxCtx.scale(dpr,dpr);
+  drawSfxCanvas();
+
+  sfxCanvasEl.onpointerdown = (e)=>{
+    if(sfxMode==='points'){ addSfxPointTap(e); }
+    else { sfxDrawing=true; addSfxPoint(e); }
+  };
+  sfxCanvasEl.onpointermove = (e)=>{ if(sfxMode==='draw' && sfxDrawing) addSfxPoint(e); };
+  window.onpointerup = ()=>{ sfxDrawing=false; };
+  sfxCanvasEl.onpointerleave = ()=>{};
+}
+function addSfxPoint(e){
+  const rect = sfxCanvasEl.getBoundingClientRect();
+  const x = Math.min(1,Math.max(0,(e.clientX-rect.left)/rect.width));
+  const y = Math.min(1,Math.max(0,(e.clientY-rect.top)/rect.height));
+  // enforce increasing x (drawing left to right); if user goes backward, overwrite nearest
+  sfxPath = sfxPath.filter(p=>p.x < x-0.002);
+  sfxPath.push({x,y});
+  drawSfxCanvas();
+}
+function addSfxPointTap(e){
+  const rect = sfxCanvasEl.getBoundingClientRect();
+  const x = Math.min(1,Math.max(0,(e.clientX-rect.left)/rect.width));
+  const y = Math.min(1,Math.max(0,(e.clientY-rect.top)/rect.height));
+  sfxPath.push({x,y});
+  drawSfxCanvas();
+}
+function clearSfx(){ sfxPath=[]; drawSfxCanvas(); toast('SFX cleared'); }
+function renderSfxAxes(){ drawSfxCanvas(); }
+function drawSfxCanvas(){
+  if(!sfxCtx) return;
+  const w = sfxCanvasEl.clientWidth, h = sfxCanvasEl.clientHeight;
+  sfxCtx.clearRect(0,0,w,h);
+  sfxCtx.fillStyle = '#141a12';
+  sfxCtx.fillRect(0,0,w,h);
+  // grid
+  sfxCtx.strokeStyle = '#1c2718';
+  sfxCtx.lineWidth = 1;
+  for(let i=0;i<=8;i++){
+    const gx = w*i/8;
+    sfxCtx.beginPath(); sfxCtx.moveTo(gx,0); sfxCtx.lineTo(gx,h); sfxCtx.stroke();
+  }
+  for(let i=0;i<=4;i++){
+    const gy = h*i/4;
+    sfxCtx.beginPath(); sfxCtx.moveTo(0,gy); sfxCtx.lineTo(w,gy); sfxCtx.stroke();
+  }
+  // path — always connect in time (x) order, so tap order doesn't matter
+  if(sfxPath.length>1){
+    const sorted = [...sfxPath].sort((a,b)=>a.x-b.x);
+    sfxCtx.strokeStyle = '#ffb648';
+    sfxCtx.shadowColor = 'rgba(255,182,72,.7)';
+    sfxCtx.shadowBlur = 6;
+    sfxCtx.lineWidth = 3;
+    sfxCtx.beginPath();
+    sorted.forEach((p,i)=>{
+      const px=p.x*w, py=p.y*h;
+      if(i===0) sfxCtx.moveTo(px,py); else sfxCtx.lineTo(px,py);
+    });
+    sfxCtx.stroke();
+    sfxCtx.shadowBlur = 0;
+    if(sfxMode==='points'){
+      sfxCtx.fillStyle = '#ffb648';
+      sorted.forEach(p=>{
+        sfxCtx.beginPath();
+        sfxCtx.arc(p.x*w, p.y*h, 4, 0, Math.PI*2);
+        sfxCtx.fill();
+      });
+    }
+  } else {
+    sfxCtx.fillStyle = '#3d4a37';
+    sfxCtx.font = '11px monospace';
+    sfxCtx.fillText(sfxMode==='points' ? 'tap to place points' : 'drag to draw a frequency curve', 10, h/2);
+  }
+}
+function yToFreq(y){
+  const minHz = parseFloat(document.getElementById('sfxMinHz').value)||100;
+  const maxHz = parseFloat(document.getElementById('sfxMaxHz').value)||2500;
+  // y=0 -> maxHz (top), y=1 -> minHz (bottom), log scale
+  const t = 1-y;
+  const logMin = Math.log(minHz), logMax = Math.log(maxHz);
+  return Math.exp(logMin + t*(logMax-logMin));
+}
+function sampleSfxPath(numPoints){
+  if(sfxPath.length<2) return [];
+  const sorted = [...sfxPath].sort((a,b)=>a.x-b.x);
+  const out=[];
+  for(let i=0;i<numPoints;i++){
+    const x = i/(numPoints-1);
+    // find surrounding points, interpolate y
+    let y;
+    if(x<=sorted[0].x) y=sorted[0].y;
+    else if(x>=sorted[sorted.length-1].x) y=sorted[sorted.length-1].y;
+    else{
+      let j=0;
+      while(j<sorted.length-1 && sorted[j+1].x<x) j++;
+      const a=sorted[j], b=sorted[j+1];
+      const frac = (b.x-a.x)<1e-6? 0 : (x-a.x)/(b.x-a.x);
+      y = a.y + frac*(b.y-a.y);
+    }
+    out.push(yToFreq(y));
+  }
+  return out;
+}
+
+/* SFX presets: define as normalized {x,y} curves */
+function loadPreset(name){
+  const presets = {
+    coin: [{x:0,y:0.65},{x:0.15,y:0.65},{x:0.2,y:0.05},{x:1,y:0.05}],
+    laser: [{x:0,y:0.02},{x:1,y:0.95}],
+    powerup: [{x:0,y:0.9},{x:0.3,y:0.6},{x:0.6,y:0.35},{x:1,y:0.05}],
+    alarm: [{x:0,y:0.2},{x:0.25,y:0.7},{x:0.5,y:0.2},{x:0.75,y:0.7},{x:1,y:0.2}],
+    blip: [{x:0,y:0.3},{x:0.5,y:0.3},{x:1,y:0.3}],
+    explosion: (()=>{ const p=[]; for(let i=0;i<=30;i++){ p.push({x:i/30, y: 0.6+Math.random()*0.4}); } return p; })()
+  };
+  sfxPath = presets[name] || [];
+  document.getElementById('sfxDuration').value = name==='blip'?150:(name==='explosion'?500:600);
+  drawSfxCanvas();
+}
+
+/* ============================= SFX: PLAYBACK ============================= */
+function playSfx(){
+  stopPlayback();
+  const myToken = playToken;
+  const ctx = ensureAudio();
+  const numPoints = Math.max(4, parseInt(document.getElementById('sfxPoints').value)||24);
+  const duration = parseFloat(document.getElementById('sfxDuration').value)||600;
+  const freqs = sampleSfxPath(numPoints);
+  if(freqs.length===0){ toast('Draw a curve first'); return; }
+  const segMs = duration/numPoints;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type='square';
+  gain.gain.value=0.15;
+  osc.connect(gain).connect(ctx.destination);
+  const t0 = ctx.currentTime+0.05;
+  freqs.forEach((f,i)=>{
+    osc.frequency.setValueAtTime(f, t0 + (i*segMs)/1000);
+  });
+  osc.start(t0);
+  osc.stop(t0+duration/1000+0.05);
+  activeOsc = osc;
+}
+
+/* ============================= EXPORT ============================= */
+function sanitizeName(n){
+  return (n||'my_sound').trim().replace(/[^a-zA-Z0-9_]/g,'_').replace(/^(\d)/,'_$1') || 'my_sound';
+}
+function generateExport(){
+  const name = sanitizeName(document.getElementById('arrName').value);
+  const priority = Math.max(0, Math.min(255, parseInt(document.getElementById('priority').value)||0));
+  let notes = [];
+  let headerComment = '';
+  const warnEl = document.getElementById('melodyWarning');
+
+  if(currentTab==='melody'){
+    warnEl.classList.remove('hidden');
+    const numSteps = Math.max(4, parseInt(document.getElementById('numSteps').value)||32);
+    const stepMs = Math.round(parseFloat(document.getElementById('stepMs').value)||250);
+    const bpm = document.getElementById('bpm').value;
+    for(let s=0;s<numSteps;s++){
+      const midi = melodyNotes[s];
+      const freq = midi!==undefined ? Math.round(midiToFreq(midi)) : 0;
+      notes.push({freq, ms:stepMs});
+    }
+    notes = mergeNotes(notes);
+    headerComment = `/* Melody "${name}" — ${bpm} BPM, ${stepMs} ms/step, ${numSteps} steps. NOT YET PLAYABLE: player has no resume, see sound-format.md */`;
+  } else {
+    warnEl.classList.add('hidden');
+    const numPoints = Math.max(4, parseInt(document.getElementById('sfxPoints').value)||24);
+    const duration = parseFloat(document.getElementById('sfxDuration').value)||600;
+    const freqs = sampleSfxPath(numPoints);
+    if(freqs.length===0){ toast('Draw an SFX curve first'); return; }
+    const segMs = Math.round(duration/numPoints);
+    notes = freqs.map(f=>({freq:Math.round(f), ms:segMs}));
+    notes = mergeNotes(notes);
+    headerComment = `/* SFX "${name}" — ${duration} ms total, ${numPoints} segments */`;
+  }
+
+  if(notes.length>255){
+    toast(`Too many steps after merge: ${notes.length} (max 255)`);
+    return;
+  }
+
+  const stepsVar = `sfx_${name}_steps`;
+  const lines = notes.map(n=>`    { ${n.freq}, ${n.ms} },`).join('\n');
+  const code =
+`${headerComment}
+static const SoundStep ${stepsVar}[] = {
+${lines}
+};
+
+/* SFX_${name.toUpperCase()} */ { ${stepsVar}, ${notes.length}, ${priority} },   /* steps, count, priority */
+`;
+  document.getElementById('exportBox').value = code;
+  toast('Export generated');
+}
+function mergeNotes(notes){
+  if(notes.length===0) return notes;
+  const out=[{...notes[0]}];
+  for(let i=1;i<notes.length;i++){
+    const n=notes[i];
+    const last=out[out.length-1];
+    if(n.freq===last.freq){ last.ms += n.ms; }
+    else out.push({...n});
+  }
+  return out;
+}
+function copyExport(){
+  const box = document.getElementById('exportBox');
+  if(!box.value){ toast('Nothing to copy — generate first'); return; }
+  box.select(); box.setSelectionRange(0,999999);
+  try{ document.execCommand('copy'); toast('Copied to clipboard'); }
+  catch(e){
+    navigator.clipboard?.writeText(box.value).then(()=>toast('Copied to clipboard'));
+  }
+}
+function downloadExport(){
+  const box = document.getElementById('exportBox');
+  if(!box.value){ toast('Nothing to download — generate first'); return; }
+  const name = sanitizeName(document.getElementById('arrName').value);
+  const blob = new Blob([box.value], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name+'.h';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Downloaded '+name+'.h');
+}
+
+/* ============================= PERSISTENCE =============================
+ * This tool originally kept nothing at all -- every melody and every drawn
+ * curve died on reload. Everything below exists to fix that.
+ *
+ * Two layers:
+ *   current  -- an autosaved snapshot, so closing the app and coming back
+ *               lands you exactly where you were.
+ *   patches  -- an explicit named library you save into deliberately.
+ */
+const store = Fantoma.store('sfx-forge');
+let booted = false;
+
+// Every <input>/<select> whose value is part of the document.
+const FIELDS = ['bpm','stepDiv','stepMs','numSteps','sfxDuration','sfxMinHz',
+                'sfxMaxHz','sfxPoints','sfxMode','arrName','priority'];
+
+function snapshot(){
+  const fields = {};
+  FIELDS.forEach(id=>{ const el=document.getElementById(id); if(el) fields[id]=el.value; });
+  return {
+    v: 1,
+    tab: currentTab,
+    baseOctaveLow: baseOctaveLow,
+    melodyNotes: melodyNotes,
+    sfxPath: sfxPath,
+    fields: fields
+  };
+}
+
+function applySnapshot(snap){
+  if(!snap || typeof snap!=='object') return false;
+  booted = false;                       // suppress autosave while restoring
+  try{
+    if(snap.fields){
+      FIELDS.forEach(id=>{
+        const el = document.getElementById(id);
+        if(el && snap.fields[id]!==undefined) el.value = snap.fields[id];
+      });
+    }
+    if(typeof snap.baseOctaveLow==='number') baseOctaveLow = snap.baseOctaveLow;
+    melodyNotes = (snap.melodyNotes && typeof snap.melodyNotes==='object') ? snap.melodyNotes : {};
+    sfxPath = Array.isArray(snap.sfxPath) ? snap.sfxPath : [];
+    sfxMode = document.getElementById('sfxMode').value;
+    switchTab(snap.tab==='sfx' ? 'sfx' : 'melody');
+    renderRoll();
+    drawSfxCanvas();
+  } finally {
+    booted = true;
+  }
+  return true;
+}
+
+let saveTimer = null;
+function scheduleSave(){
+  if(!booted) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ store.set('current', snapshot()); }, 250);
+}
+
+/* Every melody edit funnels through renderRoll(), and every curve edit
+ * through drawSfxCanvas(). Wrapping those two is enough to autosave the
+ * whole tool without touching a dozen individual call sites. */
+(function(){
+  const _renderRoll = renderRoll;
+  renderRoll = function(){ _renderRoll.apply(this, arguments); scheduleSave(); };
+  const _drawSfxCanvas = drawSfxCanvas;
+  drawSfxCanvas = function(){ _drawSfxCanvas.apply(this, arguments); scheduleSave(); };
+})();
+
+['input','change'].forEach(evt=>{
+  document.addEventListener(evt, e=>{
+    if(e.target && e.target.matches && e.target.matches('input,select')) scheduleSave();
+  });
+});
+
+/* ---- named library ---- */
+
+function loadPatches(){
+  const p = store.get('patches', []);
+  return Array.isArray(p) ? p : [];
+}
+
+function savePatch(){
+  const input = document.getElementById('patchName');
+  const name = (input.value||'').trim();
+  if(!name){ toast('Give it a name first'); input.focus(); return; }
+  const patches = loadPatches();
+  const entry = { id:'p'+Date.now(), name:name, kind:currentTab,
+                  savedAt:Date.now(), state:snapshot() };
+  const at = patches.findIndex(x=>x.name===name && x.kind===currentTab);
+  if(at>=0){
+    if(!confirm('Overwrite "'+name+'"?')) return;
+    entry.id = patches[at].id;
+    patches[at] = entry;
+  } else {
+    patches.unshift(entry);
+  }
+  if(store.set('patches', patches)){
+    renderPatches();
+    toast('Saved "'+name+'"');
+  } else {
+    toast('Out of storage space');
+  }
+}
+
+function loadPatch(id){
+  const patch = loadPatches().find(x=>x.id===id);
+  if(!patch) return;
+  applySnapshot(patch.state);
+  document.getElementById('patchName').value = patch.name;
+  scheduleSave();
+  toast('Loaded "'+patch.name+'"');
+}
+
+function deletePatch(id){
+  const patches = loadPatches();
+  const patch = patches.find(x=>x.id===id);
+  if(!patch) return;
+  if(!confirm('Delete "'+patch.name+'"?')) return;
+  store.set('patches', patches.filter(x=>x.id!==id));
+  renderPatches();
+}
+
+function renderPatches(){
+  const wrap = document.getElementById('patchList');
+  const patches = loadPatches();
+  if(!patches.length){
+    wrap.className = 'hint';
+    wrap.textContent = 'Nothing saved yet. Compose something, name it, press SAVE.';
+    return;
+  }
+  wrap.className = '';
+  wrap.innerHTML = '';
+  patches.forEach(patch=>{
+    const row = document.createElement('div');
+    row.className = 'patch';
+
+    const kind = document.createElement('span');
+    kind.className = 'pkind';
+    kind.textContent = patch.kind==='sfx' ? 'SFX' : 'MEL';
+
+    const name = document.createElement('span');
+    name.className = 'pname';
+    name.textContent = patch.name;
+
+    const load = document.createElement('button');
+    load.className = 'ghost';
+    load.textContent = 'LOAD';
+    load.onclick = ()=>loadPatch(patch.id);
+
+    const del = document.createElement('button');
+    del.className = 'danger';
+    del.textContent = 'DEL';
+    del.onclick = ()=>deletePatch(patch.id);
+
+    row.appendChild(kind); row.appendChild(name);
+    row.appendChild(load); row.appendChild(del);
+    wrap.appendChild(row);
+  });
+}
+
+/* ============================= INIT ============================= */
+updateStepMs();
+renderRoll();
+window.addEventListener('resize', ()=>{ if(currentTab==='sfx') setupSfxCanvas(); });
+
+// updateStepMs() above derives stepMs from BPM, so the restore has to come
+// after it -- otherwise a saved stepMs is overwritten on every boot.
+booted = true;
+applySnapshot(store.get('current'));
+renderPatches();
+
+FantomaApp.init({
+  toolId: 'sfx-forge',
+  store: store,
+  accent: '#ffb648',
+  onImport: function(){
+    applySnapshot(store.get('current'));
+    renderPatches();
+    toast('Backup imported');
+  }
+});
+</script>
+</body>
+</html>

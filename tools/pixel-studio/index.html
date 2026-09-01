@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Pixel Studio</title>
+<meta name="description" content="Draw pixel-art sprites and export them as PNG.">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: #0d0d12;
+    color: #f4f4f2;
+    font-family: 'Courier New', ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: flex;
+    justify-content: center;
+    padding: 20px 14px 40px;
+  }
+  .wrap { width: 100%; max-width: 420px; }
+
+  /* Phone first: one column, everything stacked. On anything wider than a
+     phone the canvas and the controls sit side by side, so a desktop window
+     is not a 420px ribbon of content in a sea of black. */
+  @media (min-width: 760px) {
+    .wrap { max-width: 900px; }
+    .cols {
+      display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 22px; align-items: start;
+    }
+    .col-side > .row:first-child { margin-top: 0; }
+    #grid { cursor: crosshair; }
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+  }
+  h1 {
+    font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
+    margin: 0; text-transform: uppercase; color: #5ee88f; display: inline-block;
+  }
+  .headrow { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: #6b6b76; margin-bottom: 16px; }
+  .row { display: flex; gap: 6px; margin-top: 10px; }
+  button, .btn {
+    border: 1px solid #2b2b36; background: #17171f; color: #f4f4f2;
+    border-radius: 6px; padding: 8px 12px; font-size: 13px; letter-spacing: 0.03em;
+    cursor: pointer; font-family: inherit; text-align: center; text-decoration: none; display: inline-block;
+  }
+  button:active, .btn:active { transform: translateY(1px); }
+  button.active { background: #5ee88f; color: #0d0d12; border-color: #5ee88f; }
+  button.flex1, .btn.flex1 { flex: 1; }
+  input, textarea {
+    background: #17171f; border: 1px solid #2b2b36; border-radius: 6px;
+    color: #f4f4f2; padding: 8px 10px; font-size: 13px; font-family: inherit;
+  }
+  #grid {
+    width: 100%; aspect-ratio: 1 / 1; display: grid;
+    background: repeating-conic-gradient(#3a3a48 0% 25%, #26262f 0% 50%) 0 0 / 16px 16px;
+    border: 1px solid #2b2b36; border-radius: 8px; overflow: hidden;
+    touch-action: none; user-select: none; margin-top: 10px;
+  }
+  #grid div { outline: 0.5px solid rgba(255,255,255,0.04); }
+  #palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 16px; }
+  #palette button { aspect-ratio: 1 / 1; padding: 0; border-radius: 6px; }
+  .status { text-align: center; font-size: 12px; color: #5ee88f; margin-top: 10px; min-height: 16px; }
+  .hint { font-size: 11px; color: #9a9aa4; margin-bottom: 8px; text-align: center; }
+  .card { margin-top: 14px; border: 1px solid #2b2b36; border-radius: 8px; padding: 12px; text-align: center; }
+  .card img { max-width: 60%; image-rendering: pixelated; border: 1px solid #2b2b36; border-radius: 4px; }
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .cell { border: 1px solid #2b2b36; border-radius: 8px; padding: 6px; }
+  .cell .mini { display: grid; aspect-ratio: 1/1; background: #1b1b24; border-radius: 4px; overflow: hidden; cursor: pointer; }
+  .cell .name { font-size: 10px; color: #9a9aa4; margin-top: 4px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell button { width: 100%; margin-top: 4px; padding: 4px 8px; font-size: 10px; color: #ff4d5e; }
+  .sizes { display: flex; gap: 6px; margin-top: 12px; }
+  .sizes button { flex: 1; }
+  .autosave-note { font-size: 10px; color: #6b6b76; text-align: center; margin-top: 6px; }
+  .checkrow {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    font-size: 11px; color: #9a9aa4; cursor: pointer;
+  }
+  .checkrow input { width: 16px; height: 16px; accent-color: #5ee88f; margin: 0; padding: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="headrow">
+    <h1>Pixel Studio</h1>
+    <span id="sizeLabel" style="font-size:11px;color:#6b6b76;"></span>
+  </div>
+  <div class="sub">finger-draw · tap to place · hold and drag to paint</div>
+
+  <div class="cols">
+   <div class="col-canvas">
+    <div class="sizes" id="sizes"></div>
+
+    <div id="grid"></div>
+
+    <div id="palette"></div>
+   </div>
+
+   <div class="col-side">
+  <div class="row">
+    <button id="eraseBtn" class="flex1">Eraser</button>
+    <button id="clearBtn" class="flex1">Clear</button>
+  </div>
+
+  <div class="row">
+    <input id="nameInput" class="flex1" placeholder="name this sketch">
+    <button id="saveImgBtn" class="active">Save PNG</button>
+  </div>
+  <label class="checkrow">
+    <input type="checkbox" id="transparentBg">
+    <span>transparent background (leave off to save to Photos)</span>
+  </label>
+
+  <button id="codeToggle" style="width:100%; margin-top:10px;">Backup code ▾</button>
+  <div id="codeBox" style="display:none;">
+    <div class="hint" style="text-align:left; margin-top:8px;">
+      A text version of this sketch. Copy it somewhere safe, paste it back to restore.
+    </div>
+    <textarea id="codeText" readonly style="width:100%; height:70px;"></textarea>
+    <div class="row">
+      <button id="copyCodeBtn" class="flex1">Copy to clipboard</button>
+    </div>
+    <div class="row">
+      <input id="importInput" class="flex1" placeholder="paste a code here">
+      <button id="importBtn">Restore</button>
+    </div>
+  </div>
+
+  <button id="galleryToggle" style="width:100%; margin-top:10px;">Show saved (0)</button>
+  <div class="autosave-note">work auto-saves in this browser as you draw</div>
+
+  <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+  <div class="status" id="status"></div>
+
+  <div id="exportCard" class="card" style="display:none;">
+    <div class="hint">if the share sheet didn't open: <b>press and hold</b> the image below → "Add to Photos"</div>
+    <img id="exportImg" alt="pixel art export">
+    <div class="row">
+      <a id="downloadLink" class="btn flex1" download="pixel-art.png">Download</a>
+      <button id="closeExportBtn" class="flex1">Close</button>
+    </div>
+  </div>
+
+  <div id="galleryWrap" style="display:none;">
+    <div class="gallery" id="gallery"></div>
+  </div>
+   </div>
+  </div>
+</div>
+
+<script src="../../shared/storage.js"></script>
+<script src="../../shared/app.js"></script>
+<script>
+const PALETTE = ["#0d0d12","#f4f4f2","#ff4d5e","#ffb84d","#ffe94d","#5ee88f","#4dd8ff","#5c7dff","#b45cff","#ff5cd6","#7a5230","#8a8a94"];
+const GRID_SIZES = [8, 16, 32];
+// Nothing here touches localStorage directly. The shared Store namespaces
+// every key as fantoma:pixel-studio:<name>, because localStorage is scoped to
+// the origin and every tool on this domain shares one bucket.
+const store = Fantoma.store("pixel-studio");
+store.adoptLegacyKeys({
+  pixelstudio_current: "current",
+  pixelstudio_saves: "saves"
+});
+
+let gridSize = 16;
+let pixels = makeGrid(gridSize);
+let color = PALETTE[2];
+let tool = "draw";
+let drawing = false;
+let lastIndex = -1;
+let saves = [];
+
+function makeGrid(size, fill = null) {
+  return Array.from({ length: size * size }, () => fill);
+}
+
+function flash(msg) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => { el.textContent = ""; }, 1800);
+}
+
+function loadSaves() {
+  saves = store.get("saves", []);
+  if (!Array.isArray(saves)) saves = [];
+}
+
+function persistSaves() {
+  store.set("saves", saves);
+}
+
+function autoSaveCurrent() {
+  store.set("current", { gridSize, pixels });
+}
+
+function restoreCurrent() {
+  const data = store.get("current");
+  if (data && data.gridSize && data.pixels) {
+    gridSize = data.gridSize;
+    pixels = data.pixels;
+  }
+}
+
+function renderSizes() {
+  const wrap = document.getElementById("sizes");
+  wrap.innerHTML = "";
+  GRID_SIZES.forEach(s => {
+    const b = document.createElement("button");
+    b.textContent = `${s}×${s}`;
+    b.className = s === gridSize ? "active" : "";
+    b.onclick = () => { gridSize = s; pixels = makeGrid(s); autoSaveCurrent(); renderAll(); };
+    wrap.appendChild(b);
+  });
+}
+
+function renderPalette() {
+  const wrap = document.getElementById("palette");
+  wrap.innerHTML = "";
+  PALETTE.forEach(c => {
+    const b = document.createElement("button");
+    b.style.background = c;
+    b.style.border = (color === c && tool === "draw") ? "2px solid #5ee88f" : "1px solid #2b2b36";
+    b.onclick = () => { color = c; tool = "draw"; renderTools(); renderPalette(); };
+    wrap.appendChild(b);
+  });
+}
+
+function renderTools() {
+  document.getElementById("eraseBtn").className = tool === "erase" ? "flex1 active" : "flex1";
+}
+
+function indexFromPoint(clientX, clientY, el) {
+  const rect = el.getBoundingClientRect();
+  const cell = rect.width / gridSize;
+  const col = Math.floor((clientX - rect.left) / cell);
+  const row = Math.floor((clientY - rect.top) / cell);
+  if (col < 0 || row < 0 || col >= gridSize || row >= gridSize) return -1;
+  return row * gridSize + col;
+}
+
+function paintAt(index) {
+  if (index === lastIndex) return;
+  lastIndex = index;
+  pixels[index] = tool === "erase" ? null : color;
+  const cellEl = document.getElementById("grid").children[index];
+  if (cellEl) cellEl.style.background = pixels[index] || "transparent";
+  autoSaveCurrent();
+}
+
+function renderGrid() {
+  const grid = document.getElementById("grid");
+  grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+  grid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+  grid.innerHTML = "";
+  pixels.forEach((c) => {
+    const d = document.createElement("div");
+    d.style.background = c || "transparent";
+    grid.appendChild(d);
+  });
+  document.getElementById("sizeLabel").textContent = `${gridSize}×${gridSize}`;
+}
+
+function attachGridEvents() {
+  const grid = document.getElementById("grid");
+  grid.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    drawing = true;
+    const idx = indexFromPoint(e.clientX, e.clientY, grid);
+    if (idx >= 0) paintAt(idx);
+  });
+  grid.addEventListener("pointermove", (e) => {
+    if (!drawing) return;
+    e.preventDefault();
+    const idx = indexFromPoint(e.clientX, e.clientY, grid);
+    if (idx >= 0) paintAt(idx);
+  });
+  const end = () => { drawing = false; lastIndex = -1; };
+  grid.addEventListener("pointerup", end);
+  grid.addEventListener("pointerleave", end);
+  grid.addEventListener("pointercancel", end);
+}
+
+function renderAll() {
+  renderSizes();
+  renderGrid();
+  renderPalette();
+  renderTools();
+}
+
+// Buttons
+document.getElementById("eraseBtn").onclick = () => { tool = "erase"; renderTools(); renderPalette(); };
+document.getElementById("clearBtn").onclick = () => {
+  pixels = makeGrid(gridSize);
+  autoSaveCurrent();
+  renderGrid();
+  flash("");
+};
+
+function sanitizeKey(s) {
+  return (s || "").trim().replace(/[\s/\\'"]+/g, "-").replace(/-+/g, "-").slice(0, 60) || "sketch";
+}
+
+// Synchronous dataURL -> Blob. Keeps us inside the user-gesture window,
+// which iOS requires for navigator.share() to be allowed.
+function dataURLtoBlob(dataURL) {
+  const [header, b64] = dataURL.split(",");
+  const mime = header.match(/:(.*?);/)[1];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+// Renders the grid to a PNG data URL. Synchronous on purpose.
+function renderPNG() {
+  const scale = 24;
+  const canvas = document.getElementById("hiddenCanvas");
+  canvas.width = gridSize * scale;
+  canvas.height = gridSize * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Opaque background unless the user wants transparency — a mostly
+  // transparent PNG shows up blank in the phone's photo gallery.
+  if (!document.getElementById("transparentBg").checked) {
+    ctx.fillStyle = "#0d0d12";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  pixels.forEach((c, i) => {
+    if (!c) return;
+    const row = Math.floor(i / gridSize);
+    const col = i % gridSize;
+    ctx.fillStyle = c;
+    ctx.fillRect(col * scale, row * scale, scale, scale);
+  });
+  return canvas.toDataURL("image/png");
+}
+
+document.getElementById("saveImgBtn").onclick = () => {
+  const name = document.getElementById("nameInput").value.trim() || "pixel-art";
+  const filename = `${sanitizeKey(name)}.png`;
+  const dataURL = renderPNG();
+
+  // Preview uses the data URL directly — those are reliably long-pressable
+  // on iOS, unlike blob: URLs.
+  document.getElementById("exportImg").src = dataURL;
+  const dl = document.getElementById("downloadLink");
+  dl.href = dataURL;
+  dl.download = filename;
+  document.getElementById("exportCard").style.display = "block";
+
+  // Keep a copy in the local gallery.
+  saves.unshift({ key: `${sanitizeKey(name)}-${Date.now()}`, name, gridSize, pixels: pixels.slice(), savedAt: Date.now() });
+  persistSaves();
+  renderGallery();
+
+  // Try the native share sheet immediately, still inside this gesture.
+  try {
+    const file = new File([dataURLtoBlob(dataURL)], filename, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: name })
+        .then(() => flash("Saved via share sheet"))
+        .catch(() => flash("Long-press the image below to save it"));
+      return;
+    }
+  } catch (e) { /* fall through to manual save */ }
+  flash("Long-press the image below to save it");
+};
+
+document.getElementById("closeExportBtn").onclick = () => {
+  document.getElementById("exportCard").style.display = "none";
+};
+
+function currentCode() {
+  const name = document.getElementById("nameInput").value.trim() || "sketch";
+  return btoa(JSON.stringify({ n: name, g: gridSize, p: pixels }));
+}
+
+document.getElementById("codeToggle").onclick = () => {
+  const box = document.getElementById("codeBox");
+  const show = box.style.display === "none";
+  box.style.display = show ? "block" : "none";
+  document.getElementById("codeToggle").textContent = show ? "Backup code ▴" : "Backup code ▾";
+  if (show) document.getElementById("codeText").value = currentCode();
+};
+
+document.getElementById("copyCodeBtn").onclick = async () => {
+  const ta = document.getElementById("codeText");
+  ta.value = currentCode();
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    flash("Code copied");
+  } catch (e) {
+    // Clipboard API is blocked in some in-app browsers — select it so the
+    // user can copy manually with the native menu.
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    flash("Text selected — use Copy from the popup menu");
+  }
+};
+
+document.getElementById("importBtn").onclick = () => {
+  const raw = document.getElementById("importInput").value.trim();
+  try {
+    const data = JSON.parse(atob(raw));
+    if (!data.p || !data.g) throw new Error("bad");
+    gridSize = data.g;
+    pixels = data.p;
+    document.getElementById("nameInput").value = data.n || "";
+    document.getElementById("importInput").value = "";
+    autoSaveCurrent();
+    renderAll();
+    flash(`Loaded "${data.n || "sketch"}"`);
+  } catch (e) {
+    flash("That code didn't look right");
+  }
+};
+
+document.getElementById("galleryToggle").onclick = () => {
+  const wrap = document.getElementById("galleryWrap");
+  const show = wrap.style.display === "none";
+  wrap.style.display = show ? "block" : "none";
+  document.getElementById("galleryToggle").textContent = `${show ? "Hide" : "Show"} saved (${saves.length})`;
+};
+
+function renderGallery() {
+  document.getElementById("galleryToggle").textContent = `${document.getElementById("galleryWrap").style.display === "block" ? "Hide" : "Show"} saved (${saves.length})`;
+  const gallery = document.getElementById("gallery");
+  gallery.innerHTML = "";
+  saves.forEach((s) => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const mini = document.createElement("div");
+    mini.className = "mini";
+    mini.style.gridTemplateColumns = `repeat(${s.gridSize}, 1fr)`;
+    mini.style.gridTemplateRows = `repeat(${s.gridSize}, 1fr)`;
+    s.pixels.forEach((c) => {
+      const d = document.createElement("div");
+      d.style.background = c || "transparent";
+      mini.appendChild(d);
+    });
+    mini.onclick = () => {
+      gridSize = s.gridSize;
+      pixels = s.pixels.slice();
+      document.getElementById("nameInput").value = s.name;
+      autoSaveCurrent();
+      renderAll();
+      flash(`Loaded "${s.name}"`);
+    };
+    const nameEl = document.createElement("div");
+    nameEl.className = "name";
+    nameEl.textContent = s.name;
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "delete";
+    delBtn.onclick = () => {
+      saves = saves.filter((x) => x.key !== s.key);
+      persistSaves();
+      renderGallery();
+    };
+    cell.appendChild(mini);
+    cell.appendChild(nameEl);
+    cell.appendChild(delBtn);
+    gallery.appendChild(cell);
+  });
+}
+
+// init
+restoreCurrent();
+loadSaves();
+renderAll();
+attachGridEvents();
+renderGallery();
+
+// Service worker, persistent-storage request, and the Export/Import panel.
+// Mounted inside .wrap because <body> is a centring flexbox -- appended to
+// the body it would land beside the tool instead of under it.
+FantomaApp.init({
+  toolId: "pixel-studio",
+  store: store,
+  accent: "#5ee88f",
+  mountInto: document.querySelector(".wrap"),
+  onImport: function () {
+    restoreCurrent();
+    loadSaves();
+    renderAll();
+    renderGallery();
+    flash("Backup imported");
+  }
+});
+</script>
+</body>
+</html>

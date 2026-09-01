@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Fantoma Tools</title>
+<meta name="description" content="Build tools for the Fantoma project.">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./shared/theme.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <img src="./icons/icon-192.png" alt="">
+    <div>
+      <h1>Fantoma Tools</h1>
+      <p>build tools for the Fantoma project</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <a class="tile" href="./tools/pixel-studio/">
+      <img src="./tools/pixel-studio/icons/icon-192.png" alt="">
+      <div>
+        <h2>Pixel Studio</h2>
+        <p>Draw sprites on an 8/16/32 grid. Exports PNG.</p>
+      </div>
+    </a>
+    <a class="tile" href="./tools/sfx-forge/">
+      <img src="./tools/sfx-forge/icons/icon-192.png" alt="">
+      <div>
+        <h2>SFX Forge</h2>
+        <p>Buzzer melodies and sweeps. Exports a C array.</p>
+      </div>
+    </a>
+  </div>
+
+  <section class="card">
+    <h2>Install a tool</h2>
+    <p>Each tool installs separately, so you get one icon per tool rather than
+      a folder of bookmarks. Open the tool first, then:</p>
+    <ol>
+      <li><b>Android (Chrome):</b> menu <b>⋮</b> → <b>Add to Home screen</b> → <b>Install</b>.</li>
+      <li><b>Windows (Chrome / Edge):</b> the install icon at the right of the
+        address bar, or menu → <b>Cast, save and share</b> → <b>Install page as app</b>.</li>
+    </ol>
+    <p>Installed tools open in their own window with no browser chrome, keep
+      working with no signal, and appear in the app drawer or Start menu like
+      anything else.</p>
+    <p><button type="button" id="fantoma-install" hidden>Install this launcher</button></p>
+  </section>
+
+  <section class="card">
+    <h2>About your saved work</h2>
+    <p>Each tool saves into this browser on this device. <b>Phone and computer
+      keep entirely separate copies</b> — there is no sync, by design, because
+      syncing would mean handing an account token to a web page.</p>
+    <p>To move work between devices, or to keep a real backup, use
+      <b>Export backup</b> at the bottom of any tool and <b>Import backup</b> on
+      the other one. Clearing site data erases everything a tool has saved, so
+      export anything you would be sad to lose.</p>
+  </section>
+
+  <footer>Fantoma Tools · served from GitHub Pages · no accounts, no tracking</footer>
+
+</div>
+
+<script>
+// The hub only needs the install prompt and its own service worker; it has
+// nothing of its own to save, so it skips the storage layer entirely.
+var deferredInstall = null;
+var installBtn = document.getElementById('fantoma-install');
+
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  deferredInstall = e;
+  installBtn.hidden = false;
+});
+
+installBtn.onclick = function () {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  deferredInstall.userChoice.then(function () {
+    deferredInstall = null;
+    installBtn.hidden = true;
+  });
+};
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .catch(function (err) { console.warn('[fantoma] sw registration failed', err); });
+  });
+}
+</script>
+</body>
+</html>

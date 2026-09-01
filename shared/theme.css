@@ -1,0 +1,77 @@
+/* Fantoma Tools — shared look for the hub.
+ *
+ * Deliberately NOT applied to the tools themselves. Each tool keeps the
+ * design it was built with; this only makes the launcher feel like it
+ * belongs to the same set. */
+
+:root {
+  --bg: #0d0d12;
+  --panel: #17171f;
+  --line: #2b2b36;
+  --text: #f4f4f2;
+  --dim: #9a9aa4;
+  --faint: #6b6b76;
+  --green: #5ee88f;
+  --amber: #ffb648;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  margin: 0;
+  padding: 28px 16px 56px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace;
+  line-height: 1.5;
+}
+
+.wrap { max-width: 920px; margin: 0 auto; }
+
+.masthead { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.masthead img { width: 52px; height: 52px; border-radius: 12px; flex: none; }
+.masthead h1 {
+  font-size: 17px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--green); margin: 0; font-weight: 700;
+}
+.masthead p { margin: 2px 0 0; font-size: 12px; color: var(--faint); }
+
+.grid {
+  display: grid; gap: 12px; margin-top: 26px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 860px) { .grid { grid-template-columns: 1fr 1fr 1fr; } }
+
+.tile {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); color: inherit; text-decoration: none;
+}
+.tile:hover { border-color: var(--green); }
+.tile img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+.tile h2 { margin: 0; font-size: 13px; letter-spacing: .04em; }
+.tile p { margin: 4px 0 0; font-size: 11px; color: var(--dim); }
+
+.card {
+  margin-top: 26px; border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px; background: rgba(255, 255, 255, .02);
+}
+.card h2 {
+  margin: 0 0 10px; font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--green);
+}
+.card p { margin: 0 0 10px; font-size: 12px; color: var(--dim); }
+.card p:last-child { margin-bottom: 0; }
+.card b { color: var(--text); font-weight: 700; }
+.card ol { margin: 0 0 10px; padding-left: 20px; font-size: 12px; color: var(--dim); }
+.card li { margin-bottom: 4px; }
+
+#fantoma-install {
+  font: inherit; font-size: 12px; cursor: pointer; padding: 9px 14px;
+  border-radius: 6px; border: 1px solid var(--green);
+  background: transparent; color: var(--green);
+}
+#fantoma-install:active { transform: translateY(1px); }
+
+footer { margin-top: 30px; font-size: 11px; color: var(--faint); text-align: center; }
