@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-06 21:00 UTC",
+  "generated": "2026-09-06 22:10 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -35,7 +35,7 @@
       "depth": 104.4030650891055
     },
     "minWeb": 10.0,
-    "flange": 3.0,
+    "flange": 5.0,
     "render": {
       "panel": "#2c2a2b",
       "mount": "#993233"
@@ -231,7 +231,7 @@
         "features": [
           {
             "dx": 0,
-            "dy": 17.0,
+            "dy": -24.0,
             "dia": 14.0
           }
         ],
@@ -346,21 +346,417 @@
       }
     ]
   },
+  "variantAxes": [
+    {
+      "id": "panel",
+      "name": "Panel construction",
+      "default": "modular",
+      "options": [
+        {
+          "id": "modular",
+          "name": "Frame + modules",
+          "note": "Four plates drop into rebates. A standoff change costs a coupon, not a whole panel."
+        },
+        {
+          "id": "mono",
+          "name": "One piece",
+          "note": "Simpler to assemble, nothing to align \u2014 but any change means reprinting all of it."
+        }
+      ]
+    }
+  ],
   "groups": [
     {
       "id": "control-panel",
       "name": "Control Panel",
       "parts": [
         {
+          "id": "panel-frame",
+          "name": "Panel frame",
+          "note": "The panel with its controls taken out: outline, four rebated openings, and ribs underneath.",
+          "versions": [
+            {
+              "id": "panel-frame",
+              "label": "Panel frame",
+              "file": "panel-frame.stl",
+              "bytes": 201484,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                3.0,
+                99.137956,
+                52.873479,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "panel-frame",
+          "visible": true,
+          "template": "panel_template.svg",
+          "when": {
+            "panel": "modular"
+          }
+        },
+        {
+          "id": "module-joystick",
+          "name": "Joystick module",
+          "note": "Drops into the frame's joystick opening.",
+          "versions": [
+            {
+              "id": "module-joystick-13mm",
+              "label": "13 mm standoff",
+              "file": "module-joystick-13mm.stl",
+              "bytes": 121184,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                16.9,
+                57.469577,
+                40.372965,
+                1.0
+              ]
+            },
+            {
+              "id": "module-joystick-14mm",
+              "label": "14 mm standoff",
+              "file": "module-joystick-14mm.stl",
+              "bytes": 121184,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                16.9,
+                57.469577,
+                40.372965,
+                1.0
+              ]
+            },
+            {
+              "id": "module-joystick-15mm",
+              "label": "15 mm standoff",
+              "file": "module-joystick-15mm.stl",
+              "bytes": 121184,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                16.9,
+                57.469577,
+                40.372965,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "module-joystick-14mm",
+          "visible": true,
+          "template": null,
+          "when": {
+            "panel": "modular"
+          }
+        },
+        {
+          "id": "module-buttons",
+          "name": "Action buttons module",
+          "note": "Drops into the frame's button opening.",
+          "versions": [
+            {
+              "id": "module-buttons-4mm",
+              "label": "4 mm standoff",
+              "file": "module-buttons-4mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                116.78,
+                57.450421,
+                40.367218,
+                1.0
+              ]
+            },
+            {
+              "id": "module-buttons-5mm",
+              "label": "5 mm standoff",
+              "file": "module-buttons-5mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                116.78,
+                57.450421,
+                40.367218,
+                1.0
+              ]
+            },
+            {
+              "id": "module-buttons-6mm",
+              "label": "6 mm standoff",
+              "file": "module-buttons-6mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                116.78,
+                57.450421,
+                40.367218,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "module-buttons-5mm",
+          "visible": true,
+          "template": null,
+          "when": {
+            "panel": "modular"
+          }
+        },
+        {
+          "id": "module-aux",
+          "name": "Options strip module",
+          "note": "Six screws, not four \u2014 it is 94 mm long and would flex in the middle.",
+          "versions": [
+            {
+              "id": "module-aux-4mm",
+              "label": "4 mm standoff",
+              "file": "module-aux-4mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                77.9,
+                93.962759,
+                51.32092,
+                1.0
+              ]
+            },
+            {
+              "id": "module-aux-5mm",
+              "label": "5 mm standoff",
+              "file": "module-aux-5mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                77.9,
+                93.962759,
+                51.32092,
+                1.0
+              ]
+            },
+            {
+              "id": "module-aux-6mm",
+              "label": "6 mm standoff",
+              "file": "module-aux-6mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                77.9,
+                93.962759,
+                51.32092,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "module-aux-5mm",
+          "visible": true,
+          "template": null,
+          "when": {
+            "panel": "modular"
+          }
+        },
+        {
+          "id": "module-buzzer",
+          "name": "Buzzer module",
+          "note": "Three pocket walls stop the board pivoting on its single screw.",
+          "versions": [
+            {
+              "id": "module-buzzer-9mm",
+              "label": "9 mm standoff",
+              "file": "module-buzzer-9mm.stl",
+              "bytes": 131684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                116.935,
+                94.005861,
+                51.33385,
+                1.0
+              ]
+            },
+            {
+              "id": "module-buzzer-10mm",
+              "label": "10 mm standoff",
+              "file": "module-buzzer-10mm.stl",
+              "bytes": 131684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                116.935,
+                94.005861,
+                51.33385,
+                1.0
+              ]
+            },
+            {
+              "id": "module-buzzer-11mm",
+              "label": "11 mm standoff",
+              "file": "module-buzzer-11mm.stl",
+              "bytes": 131684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                116.935,
+                94.005861,
+                51.33385,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "module-buzzer-10mm",
+          "visible": true,
+          "template": null,
+          "when": {
+            "panel": "modular"
+          }
+        },
+        {
           "id": "control-panel",
-          "name": "Control panel",
-          "note": "The whole panel as one print. Still monolithic \u2014 the modular frame is not modelled yet.",
+          "name": "Control panel (one piece)",
+          "note": "The whole panel as one print, controls and all.",
           "versions": [
             {
               "id": "control-panel",
-              "label": "Control panel",
+              "label": "Control panel (one piece)",
               "file": "control-panel.stl",
-              "bytes": 950484,
+              "bytes": 315784,
               "matrix": [
                 1.0,
                 0.0,
@@ -383,7 +779,10 @@
           ],
           "defaultVersion": "control-panel",
           "visible": true,
-          "template": "panel_template.svg"
+          "template": "panel_template.svg",
+          "when": {
+            "panel": "mono"
+          }
         }
       ]
     },
@@ -400,7 +799,7 @@
               "id": "io-plate",
               "label": "I/O plate",
               "file": "io-plate.stl",
-              "bytes": 155084,
+              "bytes": 54284,
               "matrix": [
                 -1.0,
                 0.0,
@@ -423,7 +822,8 @@
           ],
           "defaultVersion": "io-plate",
           "visible": true,
-          "template": "io_plate_template.svg"
+          "template": "io_plate_template.svg",
+          "when": null
         }
       ]
     },
@@ -440,7 +840,7 @@
               "id": "joystick-module-13mm",
               "label": "13 mm standoff",
               "file": "joystick-module-13mm.stl",
-              "bytes": 268484,
+              "bytes": 86784,
               "matrix": [
                 1,
                 0,
@@ -464,7 +864,7 @@
               "id": "joystick-module-14mm",
               "label": "14 mm standoff",
               "file": "joystick-module-14mm.stl",
-              "bytes": 268484,
+              "bytes": 86784,
               "matrix": [
                 1,
                 0,
@@ -488,7 +888,7 @@
               "id": "joystick-module-15mm",
               "label": "15 mm standoff",
               "file": "joystick-module-15mm.stl",
-              "bytes": 268484,
+              "bytes": 86784,
               "matrix": [
                 1,
                 0,
@@ -511,7 +911,8 @@
           ],
           "defaultVersion": "joystick-module-14mm",
           "visible": false,
-          "template": null
+          "template": null,
+          "when": null
         },
         {
           "id": "button-module",
@@ -522,7 +923,7 @@
               "id": "button-module-4mm",
               "label": "4 mm standoff",
               "file": "button-module-4mm.stl",
-              "bytes": 304084,
+              "bytes": 102484,
               "matrix": [
                 1,
                 0,
@@ -546,7 +947,7 @@
               "id": "button-module-5mm",
               "label": "5 mm standoff",
               "file": "button-module-5mm.stl",
-              "bytes": 304084,
+              "bytes": 102484,
               "matrix": [
                 1,
                 0,
@@ -570,7 +971,7 @@
               "id": "button-module-6mm",
               "label": "6 mm standoff",
               "file": "button-module-6mm.stl",
-              "bytes": 304084,
+              "bytes": 102484,
               "matrix": [
                 1,
                 0,
@@ -593,7 +994,8 @@
           ],
           "defaultVersion": "button-module-5mm",
           "visible": false,
-          "template": null
+          "template": null,
+          "when": null
         },
         {
           "id": "aux-module",
@@ -604,7 +1006,7 @@
               "id": "aux-module-4mm",
               "label": "4 mm standoff",
               "file": "aux-module-4mm.stl",
-              "bytes": 253284,
+              "bytes": 85284,
               "matrix": [
                 1,
                 0,
@@ -628,7 +1030,7 @@
               "id": "aux-module-5mm",
               "label": "5 mm standoff",
               "file": "aux-module-5mm.stl",
-              "bytes": 253284,
+              "bytes": 85284,
               "matrix": [
                 1,
                 0,
@@ -652,7 +1054,7 @@
               "id": "aux-module-6mm",
               "label": "6 mm standoff",
               "file": "aux-module-6mm.stl",
-              "bytes": 253284,
+              "bytes": 85284,
               "matrix": [
                 1,
                 0,
@@ -675,7 +1077,8 @@
           ],
           "defaultVersion": "aux-module-5mm",
           "visible": false,
-          "template": null
+          "template": null,
+          "when": null
         },
         {
           "id": "buzzer-module",
@@ -686,7 +1089,7 @@
               "id": "buzzer-module-9mm",
               "label": "9 mm standoff",
               "file": "buzzer-module-9mm.stl",
-              "bytes": 282084,
+              "bytes": 97284,
               "matrix": [
                 1,
                 0,
@@ -710,7 +1113,7 @@
               "id": "buzzer-module-10mm",
               "label": "10 mm standoff",
               "file": "buzzer-module-10mm.stl",
-              "bytes": 282084,
+              "bytes": 97284,
               "matrix": [
                 1,
                 0,
@@ -734,7 +1137,7 @@
               "id": "buzzer-module-11mm",
               "label": "11 mm standoff",
               "file": "buzzer-module-11mm.stl",
-              "bytes": 282084,
+              "bytes": 97284,
               "matrix": [
                 1,
                 0,
@@ -757,18 +1160,19 @@
           ],
           "defaultVersion": "buzzer-module-10mm",
           "visible": false,
-          "template": null
+          "template": null,
+          "when": null
         },
         {
-          "id": "panel-coupon",
-          "name": "Fit coupon",
-          "note": "Strip for checking hole sizes against real parts in the hand. Never part of the machine.",
+          "id": "rebate-frame",
+          "name": "Rebate test \u2014 frame corner",
+          "note": "One opening with its rebate. Prints with the module below; they must fit each other.",
           "versions": [
             {
-              "id": "panel-coupon",
-              "label": "Fit coupon",
-              "file": "panel-coupon.stl",
-              "bytes": 203284,
+              "id": "rebate-frame",
+              "label": "Rebate test \u2014 frame corner",
+              "file": "rebate-frame.stl",
+              "bytes": 45684,
               "matrix": [
                 1,
                 0,
@@ -783,6 +1187,76 @@
                 1,
                 0,
                 341.93,
+                -161.0,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "rebate-frame",
+          "visible": false,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "rebate-module",
+          "name": "Rebate test \u2014 button module",
+          "note": "Drops into the frame corner. The action buttons are used because they are the ones a hand pushes, so this is the only piece that tests the ledge under load.",
+          "versions": [
+            {
+              "id": "rebate-module-5mm",
+              "label": "5 mm standoff",
+              "file": "rebate-module-5mm.stl",
+              "bytes": 136884,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                459.93,
+                -141.0,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "rebate-module-5mm",
+          "visible": false,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "panel-coupon",
+          "name": "Fit coupon",
+          "note": "Strip for checking hole sizes against real parts in the hand. Never part of the machine.",
+          "versions": [
+            {
+              "id": "panel-coupon",
+              "label": "Fit coupon",
+              "file": "panel-coupon.stl",
+              "bytes": 68884,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                557.93,
                 -141.0,
                 0.0,
                 1
@@ -791,7 +1265,8 @@
           ],
           "defaultVersion": "panel-coupon",
           "visible": false,
-          "template": null
+          "template": null,
+          "when": null
         }
       ]
     }
