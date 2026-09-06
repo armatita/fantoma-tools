@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Model Viewer</title>
+<meta name="description" content="View the Fantoma case parts assembled, and download any of them ready to print.">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+/* Palette is Pedro's, and arrives in the manifest too — these are only the
+   chrome colours, which are not part-colours and never get picked. */
+:root {
+  --bg: #14141a;  --panel: #1c1c24;  --panel-2: #24242e;
+  --line: #33333f; --ink: #e8e6e7;  --ink-dim: #a2a2a4;
+  --accent: #6cbfaf;
+}
+:root[data-bg="light"] {
+  --bg: #e8e6e7;  --panel: #f4f3f4;  --panel-2: #ffffff;
+  --line: #c8c6c9; --ink: #2c2a2b;  --ink-dim: #787677;
+}
+* { box-sizing: border-box; }
+/* Several panels here are display:flex, which beats the `hidden` attribute
+   on its own. Without this the tabs would show both views at once. */
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--panel);
+  border-bottom: 1px solid var(--line); flex: none;
+}
+header img { width: 24px; height: 24px; border-radius: 5px; }
+header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+header .gen { margin-left: auto; color: var(--ink-dim); font-size: 11px; }
+header button.chip {
+  background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+}
+header button.chip:hover { border-color: var(--accent); }
+
+main { flex: 1; display: flex; min-height: 0; }
+#side {
+  width: 288px; flex: none; background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+}
+#tree { overflow-y: auto; padding: 8px 0 12px; flex: 1; }
+#stage { flex: 1; position: relative; min-width: 0; }
+#stage canvas { display: block; }
+
+.grp { margin: 4px 0 10px; }
+.grp > .grp-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; font-size: 11px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim);
+}
+.row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 22px; cursor: pointer; border-left: 2px solid transparent;
+}
+.row:hover { background: var(--panel-2); }
+.row.sel { background: var(--panel-2); border-left-color: var(--accent); }
+.row .sw {
+  width: 11px; height: 11px; border-radius: 3px; flex: none;
+  border: 1px solid rgba(128,128,128,.5);
+}
+.row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.off .nm { color: var(--ink-dim); }
+.row .vtag { font-size: 10px; color: var(--ink-dim); flex: none; }
+input[type=checkbox] { accent-color: var(--accent); cursor: pointer; margin: 0; flex: none; }
+
+#edit {
+  border-top: 1px solid var(--line); background: var(--panel-2);
+  padding: 10px 12px 12px; flex: none; max-height: 56%; overflow-y: auto;
+}
+#edit.empty { color: var(--ink-dim); font-size: 12px; }
+#edit h2 { font-size: 13px; margin: 0 0 2px; font-weight: 600; }
+#edit .note { font-size: 11px; color: var(--ink-dim); margin: 0 0 10px; }
+#edit label { display: block; font-size: 10px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-dim); margin: 10px 0 4px; }
+select, button.act {
+  width: 100%; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 7px 8px; font: inherit; font-size: 13px; cursor: pointer;
+}
+button.act { margin-top: 8px; text-align: center; }
+button.act.primary { background: var(--accent); color: #14141a; border-color: var(--accent); font-weight: 600; }
+button.act:disabled { opacity: .45; cursor: default; }
+.sws { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.sws button {
+  aspect-ratio: 1; border-radius: 4px; border: 2px solid transparent;
+  cursor: pointer; padding: 0;
+}
+.sws button.on { border-color: var(--ink); }
+#hint { font-size: 11px; color: var(--ink-dim); margin-top: 9px; }
+
+#toast {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  padding: 7px 13px; border-radius: 7px; font-size: 12px; pointer-events: none;
+  opacity: 0; transition: opacity .18s;
+}
+#toast.on { opacity: 1; }
+#load {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--ink-dim); font-size: 13px; pointer-events: none;
+}
+
+/* ---- tabs ---- */
+#tabs { display: flex; gap: 2px; margin-left: 6px; }
+.tab {
+  background: none; border: 1px solid transparent; border-radius: 6px;
+  color: var(--ink-dim); padding: 4px 11px; font: inherit; font-size: 12.5px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--ink); }
+.tab.on { background: var(--panel-2); border-color: var(--line); color: var(--ink); font-weight: 600; }
+
+/* ---- layout tab ---- */
+#layoutView { flex: 1; display: flex; min-height: 0; min-width: 0; }
+#layoutView[hidden] { display: none; }
+#lside {
+  width: 300px; flex: none; background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0; overflow-y: auto;
+}
+#lstage { flex: 1; min-width: 0; display: grid; place-items: stretch; padding: 14px; }
+#lsvg { width: 100%; height: 100%; touch-action: none; }
+
+#lmodebar {
+  display: flex; gap: 2px; padding: 9px 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+#lmodebar .tab { flex: 1; text-align: center; }
+#lglobal:not(:empty) { padding: 9px 12px 4px; border-bottom: 1px solid var(--line); }
+.swrow { margin-bottom: 8px; }
+.swrow > span {
+  display: block; font-size: 10px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px;
+}
+.swrow .sws { grid-template-columns: repeat(15, 1fr); gap: 2px; }
+.swrow .sws button { border-width: 1.5px; border-radius: 3px; }
+#lgroups { padding: 8px 0 4px; }
+.lg { padding: 7px 12px; border-left: 2px solid transparent; }
+.lg.sel { background: var(--panel-2); border-left-color: var(--accent); }
+.lg .lg-top { display: flex; align-items: baseline; gap: 8px; }
+.lg .lg-nm { font-weight: 600; font-size: 13px; flex: 1; }
+.lg .lg-xy { font-size: 11.5px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.lg .lg-why { font-size: 11px; color: var(--ink-dim); margin-top: 3px; line-height: 1.4; }
+.lg .lg-link { font-size: 11px; color: var(--accent); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+
+#lrules { padding: 4px 12px 10px; font-size: 11.5px; line-height: 1.5; }
+#lrules .ok { color: #428d38; }
+#lrules .bad { color: #b74858; }
+#lrules .dimline { color: var(--ink-dim); }
+.lg .lg-warn {
+  font-size: 11px; color: #d8a309; margin-top: 4px; line-height: 1.4;
+}
+.rotbtn {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 5px;
+  color: var(--ink-dim); font: inherit; font-size: 10.5px; padding: 2px 6px;
+  cursor: pointer; flex: none; font-variant-numeric: tabular-nums;
+}
+.rotbtn:hover { border-color: var(--accent); color: var(--ink); }
+.rotbtn.warn { color: #d8a309; border-color: #d8a309; }
+#lrules div { margin: 2px 0; }
+#lout { border-top: 1px solid var(--line); padding: 10px 12px 14px; margin-top: auto; }
+#lsnippet {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 9px; font: 11.5px/1.55 ui-monospace, Consolas, monospace;
+  color: var(--ink); overflow-x: auto; margin: 0 0 4px; white-space: pre;
+}
+
+#dataFold { flex: none; border-top: 1px solid var(--line); background: var(--panel); }
+#dataFold > summary {
+  padding: 7px 12px; cursor: pointer; font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-dim); list-style: none;
+}
+#dataFold > summary::-webkit-details-marker { display: none; }
+#dataFold > summary::before { content: '▸ '; }
+#dataFold[open] > summary::before { content: '▾ '; }
+#dataFold #fantoma-panel { margin: 0 10px 10px; border-radius: 6px; }
+
+@media (max-width: 720px) {
+  main { flex-direction: column-reverse; }
+  #side { width: 100%; max-height: 46%; border-right: 0; border-top: 1px solid var(--line); }
+  #stage { min-height: 240px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <img src="./icons/icon-192.png" alt="">
+  <h1>Model Viewer</h1>
+  <nav id="tabs">
+    <button class="tab on" data-view="assembly" type="button">Assembly</button>
+    <button class="tab" data-view="layout" type="button">Layout</button>
+  </nav>
+  <button class="chip" id="bgBtn" type="button" title="Light / dark background">◐</button>
+  <button class="chip" id="fitBtn" type="button" title="Frame everything">Fit</button>
+  <span class="gen" id="gen"></span>
+</header>
+
+<main>
+  <div id="side">
+    <div id="tree"></div>
+    <div id="edit" class="empty">Select a part to choose a version, set its colour, or download it for printing.</div>
+  </div>
+  <div id="stage">
+    <div id="load">loading models…</div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="layoutView" hidden>
+    <div id="lside">
+      <div id="lmodebar">
+        <button class="tab on" data-mode="plan" type="button">Plan</button>
+        <button class="tab" data-mode="render" type="button">Render</button>
+      </div>
+      <div id="lglobal"></div>
+      <div id="lgroups"></div>
+      <div id="lrules"></div>
+      <div id="lout">
+        <label>Paste into case_params.py</label>
+        <pre id="lsnippet"></pre>
+        <button class="act primary" id="lcopy" type="button">Copy these four lines</button>
+        <button class="act" id="lprint" type="button">Download 1:1 paper template</button>
+        <button class="act" id="lreset" type="button">Reset to the exported layout</button>
+      </div>
+    </div>
+    <div id="lstage">
+      <svg id="lsvg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</main>
+
+<script src="../../shared/storage.js"></script>
+<script src="../../shared/app.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const store = Fantoma.store('model-viewer');
+
+/* ------------------------------------------------------------------ *
+ * State that survives a reload. Colours and chosen versions are the
+ * whole point of the tool, so they are saved per part id — not per
+ * index, which would silently reassign everything the moment a part
+ * is added to the manifest.
+ * ------------------------------------------------------------------ */
+let prefs = store.get('prefs', { colors: {}, versions: {}, hidden: {}, bg: 'dark' });
+if (!prefs.colors) prefs.colors = {};
+if (!prefs.versions) prefs.versions = {};
+if (!prefs.hidden) prefs.hidden = {};
+
+let manifest = null;
+let parts = [];              // flat list, in tree order
+const byId = new Map();
+const rawCache = new Map();  // file -> ArrayBuffer (also feeds the merger)
+let selection = [];          // part ids
+
+/* ------------------------------------------------------------------ *
+ * Scene. The cabinet is modelled Z-up in millimetres, so the camera's
+ * up vector is Z. Getting this wrong is the classic way a CAD scene
+ * ends up lying on its side in three.js.
+ * ------------------------------------------------------------------ */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 8000);
+camera.up.set(0, 0, 1);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.09;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const key = new THREE.DirectionalLight(0xffffff, 1.5);
+key.position.set(-260, -420, 560); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.5);
+fill.position.set(420, 260, -180); scene.add(fill);
+
+const partsRoot = new THREE.Group();
+scene.add(partsRoot);
+let refRoot = new THREE.Group();
+scene.add(refRoot);
+
+function themeColors() {
+  const dark = (prefs.bg !== 'light');
+  return {
+    dark,
+    clear: dark ? 0x14141a : 0xe8e6e7,
+    grid1: dark ? 0x3a3a48 : 0xb4b2b5,
+    grid2: dark ? 0x272733 : 0xcfcdd0,
+    box:   dark ? 0x4a4a5c : 0x9c9a9d
+  };
+}
+
+/* The cabinet's footprint and volume, drawn as a wireframe. Without it the
+   two parts we have really do just hang in space with nothing to read their
+   position against — which was the objection to showing them at all. */
+function buildReference() {
+  refRoot.clear();
+  const t = themeColors();
+  const b = manifest.bounds;
+
+  const grid = new THREE.GridHelper(Math.max(b.width, b.depth), 12, t.grid1, t.grid2);
+  grid.rotation.x = Math.PI / 2;
+  grid.position.set(b.width / 2, b.depth / 2, 0);
+  refRoot.add(grid);
+
+  const box = new THREE.Box3(
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(b.width, b.depth, b.height));
+  const helper = new THREE.Box3Helper(box, new THREE.Color(t.box));
+  helper.material.transparent = true;
+  helper.material.opacity = 0.55;
+  refRoot.add(helper);
+}
+
+/* ------------------------------------------------------------------ *
+ * Binary STL -> BufferGeometry.
+ *
+ * Written here rather than pulled from STLLoader because the raw bytes
+ * are needed anyway for the multi-part download, and parsing them once
+ * beats parsing them twice. build123d always writes binary STL.
+ * ------------------------------------------------------------------ */
+function parseSTL(buf) {
+  const dv = new DataView(buf);
+  const tris = dv.getUint32(80, true);
+  if (84 + tris * 50 !== buf.byteLength) {
+    throw new Error('not a binary STL, or truncated');
+  }
+  const pos = new Float32Array(tris * 9);
+  const nor = new Float32Array(tris * 9);
+  for (let i = 0; i < tris; i++) {
+    const o = 84 + i * 50;
+    const nx = dv.getFloat32(o, true), ny = dv.getFloat32(o + 4, true), nz = dv.getFloat32(o + 8, true);
+    for (let v = 0; v < 3; v++) {
+      const p = o + 12 + v * 12, k = i * 9 + v * 3;
+      pos[k]     = dv.getFloat32(p, true);
+      pos[k + 1] = dv.getFloat32(p + 4, true);
+      pos[k + 2] = dv.getFloat32(p + 8, true);
+      nor[k] = nx; nor[k + 1] = ny; nor[k + 2] = nz;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return g;
+}
+
+async function rawBytes(file) {
+  if (rawCache.has(file)) return rawCache.get(file);
+  const res = await fetch('./models/' + file);
+  if (!res.ok) throw new Error(file + ': ' + res.status);
+  const buf = await res.arrayBuffer();
+  rawCache.set(file, buf);
+  return buf;
+}
+
+/* ------------------------------------------------------------------ *
+ * Parts
+ * ------------------------------------------------------------------ */
+function chosenVersion(part) {
+  const want = prefs.versions[part.id] || part.defaultVersion;
+  return part.versions.find(v => v.id === want) || part.versions[0];
+}
+
+function partColor(part) {
+  return prefs.colors[part.id] ||
+    (prefs.bg === 'light' ? manifest.defaultColor.light : manifest.defaultColor.dark);
+}
+
+async function loadPart(part) {
+  const v = chosenVersion(part);
+  if (part.mesh && part.mesh.userData.version === v.id) return;
+
+  if (part.mesh) { partsRoot.remove(part.mesh); part.mesh.geometry.dispose(); }
+
+  const geo = parseSTL(await rawBytes(v.file));
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(partColor(part)),
+    metalness: 0.06, roughness: 0.62,
+    // Printed parts are solid; showing backfaces makes an open pocket read
+    // as a hole rather than as a cavity.
+    side: THREE.FrontSide
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  // The matrix belongs to the version: the STL is stored in PRINT
+  // orientation, and undoing that depends on the part's bounding box, which
+  // changes with the standoff.
+  mesh.applyMatrix4(new THREE.Matrix4().fromArray(v.matrix));
+  mesh.userData.version = v.id;
+  mesh.visible = !prefs.hidden[part.id];
+  part.mesh = mesh;
+  partsRoot.add(mesh);
+}
+
+function applyColors() {
+  parts.forEach(p => {
+    if (p.mesh) p.mesh.material.color.set(partColor(p));
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Downloads
+ *
+ * A download hands over the file exactly as exported — in the part's own
+ * print coordinates, with the assembly transform NOT applied. The matrix
+ * lives only in the viewer. That is the whole reason it was kept out of
+ * the STL in the first place.
+ * ------------------------------------------------------------------ */
+function saveBlob(name, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function stlBounds(buf) {
+  const dv = new DataView(buf);
+  const tris = dv.getUint32(80, true);
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < tris; i++) {
+    for (let v = 0; v < 3; v++) {
+      const p = 84 + i * 50 + 12 + v * 12;
+      for (let c = 0; c < 3; c++) {
+        const val = dv.getFloat32(p + c * 4, true);
+        if (val < lo[c]) lo[c] = val;
+        if (val > hi[c]) hi[c] = val;
+      }
+    }
+  }
+  return { lo, hi };
+}
+
+/* Lay several parts out side by side on one plate with a 6 mm gap, so the
+   merged file can go straight to the slicer without dragging anything. */
+async function mergedSTL(list) {
+  const bufs = [];
+  for (const p of list) bufs.push(await rawBytes(chosenVersion(p).file));
+
+  const boxes = bufs.map(stlBounds);
+  const GAP = 6;
+  let cursor = 0;
+  const offsets = boxes.map(b => {
+    const off = [cursor - b.lo[0], -b.lo[1], -b.lo[2]];
+    cursor += (b.hi[0] - b.lo[0]) + GAP;
+    return off;
+  });
+
+  const total = bufs.reduce((n, b) => n + new DataView(b).getUint32(80, true), 0);
+  const out = new ArrayBuffer(84 + total * 50);
+  const ov = new DataView(out);
+  new Uint8Array(out).set(
+    new TextEncoder().encode('Fantoma model-viewer merged plate'), 0);
+  ov.setUint32(80, total, true);
+
+  let w = 84;
+  bufs.forEach((buf, i) => {
+    const dv = new DataView(buf);
+    const tris = dv.getUint32(80, true);
+    const [ox, oy, oz] = offsets[i];
+    for (let t = 0; t < tris; t++) {
+      const src = 84 + t * 50;
+      for (let f = 0; f < 3; f++) ov.setFloat32(w + f * 4, dv.getFloat32(src + f * 4, true), true);
+      for (let v = 0; v < 3; v++) {
+        const s = src + 12 + v * 12, d = w + 12 + v * 12;
+        ov.setFloat32(d,     dv.getFloat32(s, true) + ox, true);
+        ov.setFloat32(d + 4, dv.getFloat32(s + 4, true) + oy, true);
+        ov.setFloat32(d + 8, dv.getFloat32(s + 8, true) + oz, true);
+      }
+      ov.setUint16(w + 48, 0, true);
+      w += 50;
+    }
+  });
+  return new Blob([out], { type: 'model/stl' });
+}
+
+/* ------------------------------------------------------------------ *
+ * UI
+ * ------------------------------------------------------------------ */
+const treeEl = document.getElementById('edit') && document.getElementById('tree');
+const editEl = document.getElementById('edit');
+
+function toast(text) {
+  const t = document.getElementById('toast');
+  t.textContent = text; t.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('on'), 2400);
+}
+
+function savePrefs() {
+  if (!store.set('prefs', prefs)) toast('Could not save — storage is full.');
+}
+
+function buildTree() {
+  treeEl.innerHTML = '';
+  manifest.groups.forEach(g => {
+    const wrap = document.createElement('div');
+    wrap.className = 'grp';
+
+    const head = document.createElement('div');
+    head.className = 'grp-head';
+    const gcb = document.createElement('input');
+    gcb.type = 'checkbox';
+    head.appendChild(gcb);
+    head.appendChild(document.createTextNode(g.name));
+    wrap.appendChild(head);
+
+    const rows = [];
+    g.parts.forEach(part => {
+      const row = document.createElement('div');
+      row.className = 'row';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !prefs.hidden[part.id];
+      cb.onclick = e => {
+        e.stopPropagation();
+        prefs.hidden[part.id] = !cb.checked;
+        if (part.mesh) part.mesh.visible = cb.checked;
+        row.classList.toggle('off', !cb.checked);
+        syncGroup(); savePrefs();
+      };
+
+      const sw = document.createElement('span');
+      sw.className = 'sw';
+      sw.style.background = partColor(part);
+
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = part.name;
+
+      const vt = document.createElement('span');
+      vt.className = 'vtag';
+
+      row.append(cb, sw, nm, vt);
+      row.classList.toggle('off', !cb.checked);
+      row.onclick = e => {
+        if (e.ctrlKey || e.metaKey) {
+          const i = selection.indexOf(part.id);
+          if (i >= 0) selection.splice(i, 1); else selection.push(part.id);
+        } else {
+          selection = [part.id];
+        }
+        renderSelection();
+      };
+
+      part.ui = { row, cb, sw, vt };
+      rows.push(cb);
+      wrap.appendChild(row);
+    });
+
+    function syncGroup() {
+      const on = rows.filter(c => c.checked).length;
+      gcb.checked = on === rows.length;
+      gcb.indeterminate = on > 0 && on < rows.length;
+    }
+    gcb.onclick = () => {
+      const want = gcb.checked;
+      g.parts.forEach(part => {
+        prefs.hidden[part.id] = !want;
+        part.ui.cb.checked = want;
+        part.ui.row.classList.toggle('off', !want);
+        if (part.mesh) part.mesh.visible = want;
+      });
+      syncGroup(); savePrefs();
+    };
+    syncGroup();
+
+    treeEl.appendChild(wrap);
+  });
+  refreshTags();
+}
+
+function refreshTags() {
+  parts.forEach(p => {
+    if (!p.ui) return;
+    p.ui.sw.style.background = partColor(p);
+    const v = chosenVersion(p);
+    p.ui.vt.textContent = p.versions.length > 1 ? v.label.replace(' standoff', '') : '';
+    p.ui.row.classList.toggle('sel', selection.includes(p.id));
+  });
+}
+
+function renderSelection() {
+  refreshTags();
+  editEl.classList.remove('empty');
+  editEl.innerHTML = '';
+
+  if (selection.length === 0) {
+    editEl.classList.add('empty');
+    editEl.textContent = 'Select a part to choose a version, set its colour, or download it for printing.';
+    return;
+  }
+
+  if (selection.length > 1) {
+    const h = document.createElement('h2');
+    h.textContent = selection.length + ' parts selected';
+    const n = document.createElement('p');
+    n.className = 'note';
+    n.textContent = 'They will be laid out side by side on one plate, in their own print orientation.';
+    const btn = document.createElement('button');
+    btn.className = 'act primary';
+    btn.textContent = 'Download ' + selection.length + ' parts as one STL';
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = 'merging…';
+      try {
+        const list = selection.map(id => byId.get(id));
+        saveBlob('fantoma-plate-' + selection.length + '-parts.stl', await mergedSTL(list));
+        toast('Merged plate downloaded.');
+      } catch (err) { toast('Merge failed: ' + err.message); }
+      btn.disabled = false;
+      btn.textContent = 'Download ' + selection.length + ' parts as one STL';
+    };
+    editEl.append(h, n, btn);
+    return;
+  }
+
+  const part = byId.get(selection[0]);
+
+  const h = document.createElement('h2');
+  h.textContent = part.name;
+  const n = document.createElement('p');
+  n.className = 'note';
+  n.textContent = part.note;
+  editEl.append(h, n);
+
+  if (part.versions.length > 1) {
+    const lab = document.createElement('label');
+    lab.textContent = 'Version';
+    const sel = document.createElement('select');
+    part.versions.forEach(v => {
+      const o = document.createElement('option');
+      o.value = v.id; o.textContent = v.label;
+      if (v.id === chosenVersion(part).id) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = async () => {
+      prefs.versions[part.id] = sel.value;
+      savePrefs();
+      await loadPart(part);
+      refreshTags();
+    };
+    editEl.append(lab, sel);
+  }
+
+  const clab = document.createElement('label');
+  clab.textContent = 'Colour';
+  const sws = document.createElement('div');
+  sws.className = 'sws';
+  manifest.palette.forEach(hex => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.background = hex; b.title = hex;
+    if (partColor(part).toLowerCase() === hex.toLowerCase()) b.classList.add('on');
+    b.onclick = () => {
+      prefs.colors[part.id] = hex;
+      savePrefs(); applyColors(); renderSelection();
+    };
+    sws.appendChild(b);
+  });
+  editEl.append(clab, sws);
+
+  const dl = document.createElement('button');
+  dl.className = 'act primary';
+  dl.textContent = 'Download STL for printing';
+  dl.onclick = async () => {
+    const v = chosenVersion(part);
+    try {
+      saveBlob(v.file, new Blob([await rawBytes(v.file)], { type: 'model/stl' }));
+      toast(v.file + ' downloaded.');
+    } catch (err) { toast('Download failed: ' + err.message); }
+  };
+  editEl.appendChild(dl);
+
+  if (part.template) {
+    const tb = document.createElement('button');
+    tb.className = 'act';
+    tb.textContent = 'Download 1:1 paper template';
+    tb.onclick = async () => {
+      const res = await fetch('./models/' + part.template);
+      saveBlob(part.template, await res.blob());
+      toast('Print it landscape at 100%, then measure the 50 mm bar.');
+    };
+    editEl.appendChild(tb);
+  }
+
+  const hint = document.createElement('p');
+  hint.id = 'hint';
+  hint.textContent = 'Downloads are in the part’s own print orientation — the assembly position is only used here on screen. Ctrl-click to select several parts for one plate.';
+  editEl.appendChild(hint);
+}
+
+/* ================================================================== *
+ * LAYOUT TAB
+ *
+ * Drag a module around the panel and see immediately whether it still
+ * obeys the web rule. The output is four lines of Python.
+ *
+ * This code knows NO project geometry. Anchors, offsets, opening sizes
+ * and minWeb all arrive in manifest.layout; the rules below are generic
+ * rectangle arithmetic. That separation is the whole point: a second
+ * copy of the real rules living in JavaScript is how a viewer starts
+ * disagreeing with the CAD, and the two bugs found on the paper template
+ * were both a known number applied in one place and not another.
+ *
+ * check() in control_panel.py remains the authority. export_viewer.py
+ * refuses to publish when it complains, so if this tab and check() ever
+ * disagree, the export fails rather than shipping — it fails closed.
+ * ------------------------------------------------------------------ */
+const SVGNS = 'http://www.w3.org/2000/svg';
+let L = null;             // manifest.layout
+let pos = {};             // group id -> [x, y], the live anchors
+let linksOn = {};         // group id -> bool
+let rot = {};             // group id -> 0 | 90 | 180 | 270
+let lmode = 'plan';       // 'plan' (measure it) | 'render' (look at it)
+let paint = {};           // slot key -> colour
+
+/* Slot keys are "panel", "mount", or "<group>:<slot>". Keyed by name rather
+   than by index so adding a slot to the manifest never silently reassigns
+   somebody's saved colours. */
+function paintOf(key, fallback) { return paint[key] || fallback; }
+let lsel = null;          // selected group id
+
+const lsvg = document.getElementById('lsvg');
+
+function el(name, attrs) {
+  const e = document.createElementNS(SVGNS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function grp(id) { return L.groups.find(g => g.id === id); }
+
+/* ---- rotation -----------------------------------------------------
+ * A quarter turn of a group is a rigid rotation of every offset about
+ * its anchor, plus a swap of width and depth on the odd steps. Doing it
+ * here rather than in the exported data keeps the manifest describing
+ * the part as built, with the rotation as a proposal laid over it.
+ */
+function rotOff(r, dx, dy) {
+  switch (((r % 360) + 360) % 360) {
+    case 90:  return [-dy, dx];
+    case 180: return [-dx, -dy];
+    case 270: return [dy, -dx];
+    default:  return [dx, dy];
+  }
+}
+function odd(r) { const a = ((r % 360) + 360) % 360; return a === 90 || a === 270; }
+
+/* A group's opening at an arbitrary anchor and turn. One function so the
+   live shape and the ghost of where it started cannot be computed two
+   slightly different ways. */
+function rectAt(g, ax, ay, r, grow) {
+  const o = g.opening;
+  const [dx, dy] = rotOff(r, o.dx, o.dy);
+  const pad = 2 * (grow || 0);
+  return { cx: ax + dx, cy: ay + dy,
+           w: (odd(r) ? o.d : o.w) + pad,
+           d: (odd(r) ? o.w : o.d) + pad,
+           id: g.id, name: g.name };
+}
+
+function openingOf(g, grow) {
+  return rectAt(g, pos[g.id][0], pos[g.id][1], rot[g.id] || 0, grow);
+}
+
+/* Has this group been moved or turned away from what was exported? */
+function moved(g) {
+  return (rot[g.id] || 0) !== 0 ||
+         Math.abs(pos[g.id][0] - g.anchor[0]) > 1e-6 ||
+         Math.abs(pos[g.id][1] - g.anchor[1]) > 1e-6;
+}
+
+/* The module plate that would carry this group: the opening plus a flange
+   all round, sitting on the frame's rebate. This is the rectangle that
+   really has to fit — the aperture is only a stand-in for it. */
+function mountOf(g) { return openingOf(g, L.flange); }
+
+/* Separation between two axis-aligned rectangles. Negative on both axes
+   means they overlap; the larger value is the true clear distance. */
+function separation(a, b) {
+  return Math.max(Math.abs(a.cx - b.cx) - (a.w + b.w) / 2,
+                  Math.abs(a.cy - b.cy) - (a.d + b.d) / 2);
+}
+
+function edgeGap(r) {
+  return Math.min(r.cx - r.w / 2, L.panel.width - (r.cx + r.w / 2),
+                  r.cy - r.d / 2, L.panel.depth - (r.cy + r.d / 2));
+}
+
+function violations() {
+  const out = [];
+
+  // Rule 1: apertures keep minWeb between them and to the edge.
+  const ap = L.groups.map(g => openingOf(g));
+  for (let i = 0; i < ap.length; i++) {
+    for (let j = i + 1; j < ap.length; j++) {
+      const s = separation(ap[i], ap[j]);
+      if (s < L.minWeb - 1e-6) {
+        out.push({ ids: [ap[i].id, ap[j].id],
+                   text: ap[i].name + ' / ' + ap[j].name, mm: s,
+                   want: L.minWeb });
+      }
+    }
+  }
+  ap.forEach(r => {
+    const m = edgeGap(r);
+    if (m < L.minWeb - 1e-6) {
+      out.push({ ids: [r.id], text: r.name + ' / panel edge', mm: m,
+                 want: L.minWeb });
+    }
+  });
+
+  // Rule 2: the mounts themselves must not touch. Weaker threshold — they
+  // only have to miss each other — but it is the rule that actually decides
+  // whether the modular panel is buildable, so a violation here is fatal in
+  // a way a thin web is not.
+  const mt = L.groups.map(mountOf);
+  for (let i = 0; i < mt.length; i++) {
+    for (let j = i + 1; j < mt.length; j++) {
+      const s = separation(mt[i], mt[j]);
+      if (s < 0) {
+        out.push({ ids: [mt[i].id, mt[j].id],
+                   text: 'MOUNTS overlap: ' + mt[i].name + ' / ' + mt[j].name,
+                   mm: s, want: 0 });
+      }
+    }
+  }
+  mt.forEach(r => {
+    if (edgeGap(r) < 0) {
+      out.push({ ids: [r.id], text: 'MOUNT off the panel: ' + r.name,
+                 mm: edgeGap(r), want: 0 });
+    }
+  });
+  return out;
+}
+
+/* Tightest clearance between neighbouring mounts — the number that says how
+   much frame face is left between two modules. */
+function tightestMountGap() {
+  const mt = L.groups.map(mountOf);
+  let best = Infinity;
+  for (let i = 0; i < mt.length; i++) {
+    for (let j = i + 1; j < mt.length; j++) best = Math.min(best, separation(mt[i], mt[j]));
+    best = Math.min(best, edgeGap(mt[i]));
+  }
+  return best;
+}
+
+/* Links: one group's axis is driven by another's. Dragging the follower
+   along that axis does nothing, which is the honest behaviour — the value
+   is not its own to set. */
+function applyLinks() {
+  L.groups.forEach(g => {
+    if (!g.link || !linksOn[g.id]) return;
+    const src = pos[g.link.to];
+    if (g.link.axis === 'x') pos[g.id][0] = src[0] + g.link.offset;
+    else pos[g.id][1] = src[1] + g.link.offset;
+  });
+}
+
+function saveLayout() {
+  prefs.layout = pos;
+  prefs.links = linksOn;
+  prefs.rot = rot;
+  prefs.paint = paint;
+  prefs.lmode = lmode;
+  savePrefs();
+}
+
+/* ---- drawing ---- */
+// Margin around the panel, in mm. Has to clear the axis numbers: the bottom
+// row sits 10.4 mm below the panel and a three-digit label on the left runs
+// about 8 mm wide.
+const PAD = 16;
+
+function sy(y) { return L.panel.depth - y; }   // panel Y is up, SVG Y is down
+
+function drawLayout() {
+  const t = themeColors();
+  lsvg.setAttribute('viewBox',
+    `${-PAD} ${-PAD} ${L.panel.width + 2 * PAD} ${L.panel.depth + 2 * PAD}`);
+  lsvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  while (lsvg.firstChild) lsvg.removeChild(lsvg.firstChild);
+
+  const bad = violations();
+  const badIds = new Set(bad.flatMap(v => v.ids));
+
+  const render = (lmode === 'render');
+
+  lsvg.appendChild(el('rect', {
+    x: 0, y: 0, width: L.panel.width, height: L.panel.depth,
+    rx: render ? 4 : 0,
+    fill: render ? paintOf('panel', L.render.panel)
+                 : (t.dark ? '#1c1c24' : '#ffffff'),
+    stroke: render ? 'none' : (t.dark ? '#4a4a5c' : '#9c9a9d'),
+    'stroke-width': 0.6
+  }));
+
+  const ink = t.dark ? '#c8c6c9' : '#2c2a2b';
+  const dim = t.dark ? '#787677' : '#a2a2a4';
+  // One subdued grey for every non-interactive mark — ruling, numbers and
+  // ghosts alike. Keeping them all the same colour is what stops the
+  // reference furniture reading as something you could grab.
+  const quiet = t.dark ? '#5a5a66' : '#b8b6b9';
+
+  // Rulings, numbers and ghosts are measuring furniture. A render is for
+  // judging how it looks, so none of them belong in it.
+  if (!render) {
+  // ---- ruling: fine every 10 mm, stronger every 20, numbered every 20 ----
+  for (let x = 10; x < L.panel.width; x += 10) {
+    lsvg.appendChild(el('line', { x1: x, y1: 0, x2: x, y2: L.panel.depth,
+      stroke: quiet, 'stroke-width': x % 20 ? 0.12 : 0.25,
+      opacity: x % 20 ? 0.5 : 0.8 }));
+  }
+  for (let y = 10; y < L.panel.depth; y += 10) {
+    lsvg.appendChild(el('line', { x1: 0, y1: sy(y), x2: L.panel.width, y2: sy(y),
+      stroke: quiet, 'stroke-width': y % 20 ? 0.12 : 0.25,
+      opacity: y % 20 ? 0.5 : 0.8 }));
+  }
+
+  function tick(x, y, text, anchor) {
+    const e = el('text', { x: x, y: y, fill: quiet, 'font-size': 3.2,
+      'text-anchor': anchor, 'font-family': 'system-ui, sans-serif' });
+    e.textContent = text;
+    lsvg.appendChild(e);
+  }
+  for (let x = 0; x <= L.panel.width; x += 20) tick(x, L.panel.depth + 5.2, x, 'middle');
+  for (let y = 0; y <= L.panel.depth; y += 20) tick(-2.2, sy(y) + 1.2, y, 'end');
+  tick(L.panel.width / 2, L.panel.depth + 10.4, 'mm across the panel →', 'middle');
+
+  // ---- ghosts: where each part started, for anything that has moved ------
+  // Only for parts that HAVE moved. Drawing a ghost under every part would
+  // double every line in the default view and say nothing.
+  L.groups.filter(moved).forEach(g => {
+    const [ax, ay] = g.anchor;
+    [rectAt(g, ax, ay, 0, L.flange), rectAt(g, ax, ay, 0, 0)].forEach(r => {
+      lsvg.appendChild(el('rect', {
+        x: r.cx - r.w / 2, y: sy(r.cy + r.d / 2),
+        width: r.w, height: r.d, fill: 'none', stroke: quiet,
+        'stroke-width': 0.3, 'stroke-dasharray': '1 1.2', opacity: 0.85
+      }));
+    });
+  });
+  }   // end plan-only furniture
+
+  L.groups.forEach(g => {
+    const [gx, gy] = pos[g.id];
+    const r = rot[g.id] || 0;
+    const hot = badIds.has(g.id);
+    const stroke = hot ? '#b74858' : (g.id === lsel ? '#6cbfaf' : '#d06a1a');
+    const node = el('g', { style: 'cursor:grab' });
+    node.dataset.group = g.id;
+
+    const m = mountOf(g);
+
+    if (render) {
+      // The module plate as it would be printed, with its parts on it. No
+      // aperture outline: on the real thing the module covers the hole.
+      node.appendChild(el('rect', {
+        x: m.cx - m.w / 2, y: sy(m.cy + m.d / 2),
+        width: m.w, height: m.d, rx: 1.5,
+        fill: paintOf('mount', L.render.mount),
+        // A collision still has to be visible when you are looking at
+        // colours rather than numbers.
+        stroke: hot ? '#e9ca00' : 'none', 'stroke-width': hot ? 1.1 : 0
+      }));
+
+      const colourOf = idx => {
+        const slot = g.paint.find(s => s.features.includes(idx));
+        return slot ? paintOf(g.id + ':' + slot.id, slot.color) : '#2c2a2b';
+      };
+      g.features.forEach((f, i) => {
+        const [fx, fy] = rotOff(r, f.dx, f.dy);
+        node.appendChild(el('circle', {
+          cx: gx + fx, cy: sy(gy + fy), r: f.dia / 2,
+          fill: colourOf(i), stroke: 'rgba(0,0,0,.45)', 'stroke-width': 0.3
+        }));
+      });
+
+      node.addEventListener('pointerdown', e => startDrag(e, g.id));
+      lsvg.appendChild(node);
+      return;
+    }
+
+    // The mount plate, outermost: a thin solid grey line. Drawn first so
+    // the opening and the parts sit on top of it.
+    node.appendChild(el('rect', {
+      x: m.cx - m.w / 2, y: sy(m.cy + m.d / 2),
+      width: m.w, height: m.d, fill: 'none',
+      stroke: hot ? '#b74858' : (t.dark ? '#a2a2a4' : '#787677'),
+      'stroke-width': 0.45
+    }));
+
+    const o = openingOf(g);
+    node.appendChild(el('rect', {
+      x: o.cx - o.w / 2, y: sy(o.cy + o.d / 2),
+      width: o.w, height: o.d,
+      fill: hot ? 'rgba(183,72,88,.16)' : 'rgba(108,191,175,.07)',
+      stroke: stroke, 'stroke-width': 0.9
+    }));
+
+    const b = g.board;
+    const [bdx, bdy] = rotOff(r, b.dx, b.dy);
+    node.appendChild(el('rect', {
+      x: gx + bdx - (odd(r) ? b.d : b.w) / 2,
+      y: sy(gy + bdy + (odd(r) ? b.w : b.d) / 2),
+      width: odd(r) ? b.d : b.w, height: odd(r) ? b.w : b.d, fill: 'none',
+      stroke: dim, 'stroke-width': 0.4, 'stroke-dasharray': '2 1.5'
+    }));
+
+    g.holes.forEach(h => {
+      const [hx, hy] = rotOff(r, h[0], h[1]);
+      node.appendChild(el('circle', {
+        cx: gx + hx, cy: sy(gy + hy), r: 1.6,
+        fill: 'none', stroke: dim, 'stroke-width': 0.4
+      }));
+    });
+
+    g.features.forEach(f => {
+      const [fx, fy] = rotOff(r, f.dx, f.dy);
+      node.appendChild(el('circle', {
+        cx: gx + fx, cy: sy(gy + fy), r: f.dia / 2,
+        fill: 'none', stroke: ink, 'stroke-width': 0.55
+      }));
+    });
+
+    const label = el('text', {
+      x: m.cx - m.w / 2, y: sy(m.cy + m.d / 2) - 1.6,
+      fill: stroke, 'font-size': 3.6, 'font-family': 'system-ui, sans-serif'
+    });
+    label.textContent = g.name;
+    node.appendChild(label);
+
+    node.addEventListener('pointerdown', e => startDrag(e, g.id));
+    lsvg.appendChild(node);
+  });
+}
+
+/* ---- dragging ---- */
+let drag = null;
+
+function toPanel(evt) {
+  const p = lsvg.createSVGPoint();
+  p.x = evt.clientX; p.y = evt.clientY;
+  const u = p.matrixTransform(lsvg.getScreenCTM().inverse());
+  return { x: u.x, y: L.panel.depth - u.y };
+}
+
+function startDrag(evt, id) {
+  evt.preventDefault();
+  lsel = id;
+  const at = toPanel(evt);
+  drag = { id, ox: at.x - pos[id][0], oy: at.y - pos[id][1] };
+  lsvg.setPointerCapture(evt.pointerId);
+  renderLayoutSide();
+  drawLayout();
+}
+
+lsvg.addEventListener('pointermove', evt => {
+  if (!drag) return;
+  const at = toPanel(evt);
+  // 0.1 mm steps: finer than anything we can print or measure, and it keeps
+  // the emitted Python from carrying six meaningless decimals.
+  pos[drag.id] = [Math.round((at.x - drag.ox) * 10) / 10,
+                  Math.round((at.y - drag.oy) * 10) / 10];
+  applyLinks();
+  drawLayout();
+  renderLayoutSide();
+});
+
+lsvg.addEventListener('pointerup', evt => {
+  if (!drag) return;
+  drag = null;
+  lsvg.releasePointerCapture(evt.pointerId);
+  saveLayout();
+});
+
+/* ---- sidebar ---- */
+
+/* One labelled row of palette swatches, bound to a paint slot. */
+function swatchRow(label, key, fallback) {
+  const wrap = document.createElement('div');
+  wrap.className = 'swrow';
+  const cap = document.createElement('span');
+  cap.textContent = label;
+  const grid = document.createElement('div');
+  grid.className = 'sws';
+  manifest.palette.forEach(hex => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.background = hex; b.title = hex;
+    if (paintOf(key, fallback).toLowerCase() === hex.toLowerCase()) b.classList.add('on');
+    b.onclick = e => {
+      e.stopPropagation();
+      paint[key] = hex;
+      saveLayout(); drawLayout(); renderLayoutSide();
+    };
+    grid.appendChild(b);
+  });
+  wrap.append(cap, grid);
+  return wrap;
+}
+
+function renderLayoutSide() {
+  const glob = document.getElementById('lglobal');
+  glob.innerHTML = '';
+  if (lmode === 'render') {
+    glob.appendChild(swatchRow('Panel', 'panel', L.render.panel));
+    glob.appendChild(swatchRow('Mount plates', 'mount', L.render.mount));
+  }
+
+  const host = document.getElementById('lgroups');
+  host.innerHTML = '';
+  L.groups.forEach(g => {
+    const d = document.createElement('div');
+    d.className = 'lg' + (g.id === lsel ? ' sel' : '');
+    d.onclick = () => { lsel = g.id; renderLayoutSide(); drawLayout(); };
+
+    const top = document.createElement('div');
+    top.className = 'lg-top';
+    const nm = document.createElement('span');
+    nm.className = 'lg-nm'; nm.textContent = g.name;
+    const xy = document.createElement('span');
+    xy.className = 'lg-xy';
+    xy.textContent = pos[g.id][0].toFixed(1) + ', ' + pos[g.id][1].toFixed(1);
+
+    const rb = document.createElement('button');
+    rb.className = 'rotbtn';
+    rb.type = 'button';
+    rb.title = 'Turn a quarter clockwise';
+    rb.textContent = '⟳ ' + (rot[g.id] || 0) + '°';
+    rb.classList.toggle('warn', (rot[g.id] || 0) !== 0 && !g.rotation.supported);
+    rb.onclick = e => {
+      e.stopPropagation();
+      rot[g.id] = (((rot[g.id] || 0) + 90) % 360);
+      lsel = g.id;
+      saveLayout(); drawLayout(); renderLayoutSide();
+    };
+
+    top.append(nm, xy, rb);
+    d.appendChild(top);
+
+    if (g.id === lsel && (rot[g.id] || 0) !== 0) {
+      const rn = document.createElement('div');
+      rn.className = g.rotation.supported ? 'lg-why' : 'lg-warn';
+      rn.textContent = g.rotation.note;
+      d.appendChild(rn);
+    }
+
+    if (g.id === lsel && g.why) {
+      const w = document.createElement('div');
+      w.className = 'lg-why'; w.textContent = g.why;
+      d.appendChild(w);
+    }
+
+    if (g.id === lsel && lmode === 'render' && g.paint && g.paint.length) {
+      const box = document.createElement('div');
+      box.style.marginTop = '7px';
+      g.paint.forEach(s =>
+        box.appendChild(swatchRow(s.label, g.id + ':' + s.id, s.color)));
+      d.appendChild(box);
+    }
+
+    if (g.link) {
+      const lw = document.createElement('label');
+      lw.className = 'lg-link';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = !!linksOn[g.id];
+      cb.onclick = e => {
+        e.stopPropagation();
+        linksOn[g.id] = cb.checked;
+        applyLinks(); saveLayout(); drawLayout(); renderLayoutSide();
+      };
+      lw.append(cb, document.createTextNode(g.link.label));
+      d.appendChild(lw);
+    }
+    host.appendChild(d);
+  });
+
+  const rules = document.getElementById('lrules');
+  rules.innerHTML = '';
+  const bad = violations();
+  if (!bad.length) {
+    const ok = document.createElement('div');
+    ok.className = 'ok';
+    ok.textContent = '✓ every gap is at least ' + L.minWeb + ' mm';
+    rules.appendChild(ok);
+  } else {
+    bad.forEach(v => {
+      const e2 = document.createElement('div');
+      e2.className = 'bad';
+      e2.textContent = '✕ ' + v.text + ' — ' + v.mm.toFixed(2) +
+                       ' mm (want ' + v.want + ')';
+      rules.appendChild(e2);
+    });
+  }
+  const mg = document.createElement('div');
+  mg.className = tightestMountGap() < 0 ? 'bad' : 'dimline';
+  mg.textContent = 'mounts (' + L.flange + ' mm flange): tightest clearance ' +
+                   tightestMountGap().toFixed(2) + ' mm';
+  rules.appendChild(mg);
+
+  document.getElementById('lsnippet').textContent = snippet();
+}
+
+/* The snippet may only contain parameters case_params actually consumes.
+   A rotation the CAD cannot express is reported as a comment, not as a
+   plausible-looking assignment that would silently do nothing. */
+function snippet() {
+  const w = Math.max(...L.groups.map(g => g.param.length));
+  const lines = L.groups.map(g =>
+    g.param.padEnd(w) + ' = (' + pos[g.id][0].toFixed(1) + ', ' +
+    pos[g.id][1].toFixed(1) + ')');
+
+  L.groups.forEach(g => {
+    const r = rot[g.id] || 0;
+    if (!r) return;
+    if (g.rotation.supported && g.rotation.kind === 'bool') {
+      // An odd quarter turn flips the strip relative to how it was exported.
+      const v = odd(r) ? !g.rotation.base : g.rotation.base;
+      lines.push(g.rotation.param.padEnd(w) + ' = ' + (v ? 'True' : 'False'));
+    }
+  });
+
+  const unsupported = L.groups.filter(g => (rot[g.id] || 0) && !g.rotation.supported);
+  if (unsupported.length) {
+    lines.push('');
+    lines.push('# NOT YET EXPRESSIBLE — these turns need a CAD change first:');
+    unsupported.forEach(g => {
+      lines.push('#   ' + g.name + ' turned ' + rot[g.id] + '°');
+    });
+  }
+  return lines.join('\n');
+}
+
+/* ---- 1:1 paper ---- */
+function layoutSVGmm() {
+  const w = L.panel.width + 2 * PAD, h = L.panel.depth + 2 * PAD;
+  const clone = lsvg.cloneNode(true);
+  clone.setAttribute('width', w + 'mm');
+  clone.setAttribute('height', h + 'mm');
+  clone.setAttribute('xmlns', SVGNS);
+  // A scale bar, because "print at 100%" is advice and a measured bar is proof.
+  const bar = el('g', {});
+  bar.appendChild(el('line', { x1: 0, y1: L.panel.depth + 8, x2: 50,
+    y2: L.panel.depth + 8, stroke: '#000', 'stroke-width': 0.5 }));
+  const tx = el('text', { x: 0, y: L.panel.depth + 12, 'font-size': 3.4,
+    fill: '#000', 'font-family': 'sans-serif' });
+  tx.textContent = 'measure this bar: it must be exactly 50 mm';
+  bar.appendChild(tx);
+  clone.appendChild(bar);
+  return new Blob([clone.outerHTML], { type: 'image/svg+xml' });
+}
+
+document.getElementById('lcopy').onclick = () => {
+  navigator.clipboard.writeText(snippet())
+    .then(() => toast('Four lines copied — paste into case_params.py.'))
+    .catch(() => toast('Could not reach the clipboard; select the text instead.'));
+};
+document.getElementById('lprint').onclick = () => {
+  saveBlob('panel_layout_proposal.svg', layoutSVGmm());
+  toast('Print landscape at 100%, then measure the 50 mm bar.');
+};
+document.getElementById('lreset').onclick = () => {
+  L.groups.forEach(g => { pos[g.id] = g.anchor.slice(); rot[g.id] = 0; });
+  applyLinks(); saveLayout(); drawLayout(); renderLayoutSide();
+  toast('Back to the layout that was exported.');
+};
+
+document.querySelectorAll('#lmodebar .tab').forEach(btn => {
+  btn.onclick = () => {
+    lmode = btn.dataset.mode;
+    document.querySelectorAll('#lmodebar .tab')
+      .forEach(b => b.classList.toggle('on', b === btn));
+    saveLayout(); drawLayout(); renderLayoutSide();
+  };
+});
+
+function initLayout() {
+  L = manifest.layout;
+  paint = prefs.paint || {};
+  lmode = (prefs.lmode === 'render') ? 'render' : 'plan';
+  document.querySelectorAll('#lmodebar .tab')
+    .forEach(b => b.classList.toggle('on', b.dataset.mode === lmode));
+  const saved = prefs.layout || {};
+  const savedLinks = prefs.links || {};
+  const savedRot = prefs.rot || {};
+  L.groups.forEach(g => {
+    pos[g.id] = Array.isArray(saved[g.id]) ? saved[g.id].slice() : g.anchor.slice();
+    linksOn[g.id] = g.link ? (g.id in savedLinks ? !!savedLinks[g.id] : true) : false;
+    rot[g.id] = Number(savedRot[g.id]) || 0;
+  });
+  applyLinks();
+  drawLayout();
+  renderLayoutSide();
+}
+
+/* ---- tab switching ---- */
+document.querySelectorAll('#tabs .tab').forEach(btn => {
+  btn.onclick = () => {
+    const v = btn.dataset.view;
+    document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === btn));
+    const assembly = (v === 'assembly');
+    document.getElementById('side').hidden = !assembly;
+    document.getElementById('stage').hidden = !assembly;
+    document.getElementById('layoutView').hidden = assembly;
+    document.getElementById('fitBtn').hidden = !assembly;
+    if (assembly) resize(); else drawLayout();
+  };
+});
+
+/* ------------------------------------------------------------------ *
+ * Camera / loop
+ * ------------------------------------------------------------------ */
+/* Frame the whole cabinet from its bounding sphere rather than from
+   hand-tuned multiples of the dimensions — those looked right at one aspect
+   ratio and clipped the box at every other. */
+function fit() {
+  const b = manifest.bounds;
+
+  // Frame what is actually on screen, not just the cabinet. The bench row
+  // sits well outside the cabinet's footprint, so framing the bounds alone
+  // pushed it off the edge the moment those parts were switched on.
+  const box = new THREE.Box3(
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(b.width, b.depth, b.height));
+  parts.forEach(p => {
+    if (p.mesh && p.mesh.visible) box.expandByObject(p.mesh);
+  });
+
+  const c = box.getCenter(new THREE.Vector3());
+  const s = box.getSize(new THREE.Vector3());
+  const radius = 0.5 * Math.hypot(s.x, s.y, s.z);
+
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(camera.aspect, 0.35));
+  const dist = 1.18 * radius / Math.sin(Math.min(vFov, hFov) / 2);
+
+  // Front-left and slightly above: the angle you look at an arcade cabinet
+  // from when you are about to play it.
+  const dir = new THREE.Vector3(-0.52, -0.78, 0.35).normalize();
+  controls.target.copy(c);
+  camera.position.copy(c).addScaledVector(dir, dist);
+  camera.near = Math.max(1, dist * 0.02);
+  camera.far = dist * 6;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+function applyBg() {
+  document.documentElement.setAttribute('data-bg', prefs.bg === 'light' ? 'light' : 'dark');
+  renderer.setClearColor(themeColors().clear, 1);
+  if (manifest) { buildReference(); applyColors(); refreshTags(); }
+  if (L) drawLayout();
+}
+
+(function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+/* ------------------------------------------------------------------ *
+ * Boot
+ * ------------------------------------------------------------------ */
+async function boot() {
+  // ?fresh=1 makes the service worker fetch this network-first instead of
+  // serving its cached copy (see shared/sw-core.js).
+  //
+  // The manifest describes every other file, so a stale one makes the whole
+  // page quietly disagree with what was exported — no error, just wrong
+  // numbers. That caught me four times while building this.
+  //
+  // NOTE: the `cache` option on fetch() does NOT help here. It is a hint to
+  // the HTTP cache, and the service worker intercepts the request before
+  // that and answers from its own cache. Only a request the worker chooses
+  // to treat differently gets past it.
+  manifest = await (await fetch('./models/manifest.json?fresh=1')).json();
+  parts = manifest.groups.flatMap(g => g.parts);
+  parts.forEach(p => byId.set(p.id, p));
+
+  // The manifest decides what is on by default; the saved prefs override it
+  // only for parts the user has actually touched. Testing `in` rather than
+  // truthiness matters — a part deliberately hidden is stored as `true`, and
+  // a part deliberately shown as `false`, which is falsy.
+  parts.forEach(p => {
+    if (!(p.id in prefs.hidden)) prefs.hidden[p.id] = !p.visible;
+  });
+
+  document.getElementById('gen').textContent = 'exported ' + manifest.generated;
+
+  applyBg();
+  buildReference();
+  buildTree();
+  initLayout();
+  resize();   // must precede fit(): the framing reads camera.aspect
+  fit();
+
+  for (const p of parts) {
+    try { await loadPart(p); }
+    catch (err) { console.warn('[model-viewer]', p.id, err); }
+  }
+  document.getElementById('load').remove();
+}
+
+document.getElementById('bgBtn').onclick = () => {
+  prefs.bg = (prefs.bg === 'light') ? 'dark' : 'light';
+  savePrefs(); applyBg();
+};
+document.getElementById('fitBtn').onclick = fit;
+
+boot().catch(err => {
+  document.getElementById('load').textContent = 'Could not load models: ' + err.message;
+});
+
+FantomaApp.init({
+  toolId: 'model-viewer',
+  store: store,
+  accent: '#6cbfaf',
+  onImport: function () { location.reload(); }
+});
+
+/* The shared Data panel appends itself to <body>. Every other tool is a
+   scrolling page where that is fine; this one is a full-height viewport, so
+   left alone it steals a fifth of the screen from the 3D view. Move it into
+   the sidebar and fold it behind a summary — same buttons, same behaviour,
+   no fork of shared/app.js. */
+(function tuckAwayDataPanel(tries) {
+  const panel = document.getElementById('fantoma-panel');
+  if (!panel) { if (tries) setTimeout(() => tuckAwayDataPanel(tries - 1), 60); return; }
+  const det = document.createElement('details');
+  det.id = 'dataFold';
+  const sum = document.createElement('summary');
+  sum.textContent = 'Backup & install';
+  det.append(sum, panel);
+  document.getElementById('side').appendChild(det);
+})(20);
+</script>
+</body>
+</html>

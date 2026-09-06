@@ -17,6 +17,129 @@ Live at: `https://<your-github-username>.github.io/fantoma-tools/`
 | --- | --- |
 | [Pixel Studio](tools/pixel-studio/) | Draw sprites on an 8/16/32 grid, export PNG |
 | [SFX Forge](tools/sfx-forge/) | Compose buzzer melodies and frequency sweeps, export a `SoundStep[]` C array for `cpp/fantoma/sound.h` |
+| [Model Viewer](tools/model-viewer/) | The case parts shown assembled. Pick between printed versions, colour them, download any part — or several on one plate — ready to slice |
+
+---
+
+## Model Viewer: the one tool with generated content
+
+The other two author things from nothing. This one **displays what the CAD
+produced**, so it has an input the others don't: `models/`, written by
+`fantoma/python/case/export_viewer.py`.
+
+```powershell
+cd ..\fantoma\python\case
+..\..\.venv\Scripts\python.exe export_viewer.py
+```
+
+That builds every part and version, writes `models/*.stl`, the 1:1 paper
+templates, and `models/manifest.json` — which carries the part list, the
+version list, and a 4×4 placement matrix per part. **The web page holds no
+dimensions of its own.** Positions come from `case_params.py` by way of the
+manifest, so the viewer cannot drift from the CAD; if a number is wrong it is
+wrong in one place.
+
+### The Layout tab
+
+Drag a module around the panel and watch the web rule live. The output is four
+lines of Python to paste into `case_params.py` — the tool proposes, the source
+of truth still decides.
+
+**Dragging moves a whole module, never a single feature.** Each module has
+exactly one anchor in `case_params` (`JOY_POS`, `BTN_POS`, `AUX_POS`,
+`BUZZ_POS`) and everything else — caps, screws, boards, the grille — is stored
+as an offset from it. There is no per-feature coordinate to move, so group
+dragging is not a UI convenience, it is the only thing the data allows.
+
+The options strip is **linked** to the action buttons so the options key stays
+above the red one; drag the buttons and the strip follows. The link can be
+switched off.
+
+It has two modes. **Plan** is the measuring view — rulings numbered in mm,
+apertures, boards, screws, and dotted ghosts of where anything moved from.
+**Render** drops all of that and fills the shapes: panel, mount plates, and
+the caps in their real colours, so a layout can be judged by eye. Every colour
+is a palette swatch and is remembered per element; the defaults ship in the
+manifest (`layout.render` and each group's `paint` slots), so the browser is
+still not the place any of them is decided.
+
+A rule violation stays visible in Render — the offending mount gets a yellow
+outline — because a layout that looks good and does not fit is the one mistake
+this view could otherwise encourage.
+
+Each group draws three rectangles: a **thin grey mount plate** (the module,
+opening plus `MODULE_FLANGE` all round), the **orange aperture** inside it, and
+the **dashed board** inside that. The mount is the one that decides whether the
+modular panel is buildable — two apertures can clear each other comfortably
+while their mounts overlap, so both are checked, the aperture against
+`MODULE_MIN_WEB` and the mount against zero.
+
+**Rotation is offered in quarter turns, but only emitted where a parameter
+exists.** Today that is exactly one group: the aux strip has `AUX_VERTICAL`.
+Turning anything else shows you the consequence and then says so in a comment:
+
+```
+# NOT YET EXPRESSIBLE — these turns need a CAD change first:
+#   Buzzer turned 90°
+```
+
+That asymmetry is deliberate. A tool that emitted `BUZZ_ROT = 90` into a
+`case_params.py` that ignores it would look like an accepted decision and
+change nothing — worse than refusing to rotate at all.
+
+**The browser holds no project geometry.** `manifest.layout` carries the
+anchors, the offsets, the opening sizes and `minWeb`; the JavaScript applies
+generic rectangle arithmetic and never learns what a joystick is. `check()` in
+`control_panel.py` stays the authority — `export_viewer.py` refuses to publish
+when it complains, so a disagreement between the two fails the export rather
+than shipping. It fails closed.
+
+**The STLs are stored in PRINT orientation, not model orientation.** Parts are
+authored plate-up with their bosses hanging below, which is the natural way to
+model them and exactly the wrong way to print them — the slicer would start on
+the boss tips, in mid-air. `export_viewer.py` flips each part 180° about X and
+drops it into the positive octant before writing the file, so a download opens
+in the slicer already sitting flat on the bed. The viewer undoes that transform
+for display, which is why the placement matrix lives on the *version* rather
+than the part: a taller standoff has a different bounding box and therefore a
+different flip.
+
+Two consequences worth knowing:
+
+- **Re-exporting changes the STL bytes but not their names.** Caches key on
+  the name, so bump `SW_CACHE` in `tools/model-viewer/sw.js` after an export
+  or an installed copy will keep showing yesterday's *models*. The manifest
+  is exempt — see below — so the numbers, positions and part list are always
+  current even if you forget.
+
+- **`manifest.json` is requested as `?fresh=1`.** That flag tells
+  `shared/sw-core.js` to fetch it network-first instead of the usual
+  stale-while-revalidate, with the cache kept only as the offline fallback.
+
+  Stale-while-revalidate is right for almost everything, because a file
+  arriving one load late is harmless. It is wrong for a file that *describes*
+  the others: a stale manifest makes the whole page quietly disagree with what
+  was exported — no error, no warning, just wrong numbers. That cost four
+  false diagnoses while this tool was being built.
+
+  Note that `fetch(url, {cache: 'reload'})` does **not** solve this. The
+  `cache` option is a hint to the HTTP cache, and the service worker
+  intercepts the request before that and answers from its own store. Only a
+  request the worker itself chooses to treat differently gets past it. The
+  flag is a fixed string rather than a timestamp, so it stays exactly one
+  cache entry and still works offline.
+- **The models are not precached.** `install` uses `addAll()`, which is
+  atomic — one missing file would fail the install outright. They are ordinary
+  sub-resources instead, so stale-while-revalidate caches each one the first
+  time it is viewed, and it is offline from then on.
+
+`export_viewer.py` refuses to publish if `check()` reports a geometry problem.
+A part that looks finished on screen and fails in plastic is worse than a part
+that was never published.
+
+three.js loads from a CDN rather than from this repo, which is the one place
+these tools are not self-contained: the viewer needs the network on its very
+first load. Everything after that is cached.
 
 ---
 
@@ -121,6 +244,12 @@ fantoma-tools/
       index.html  manifest.webmanifest  sw.js  icons/
     sfx-forge/
       index.html  manifest.webmanifest  sw.js  icons/
+    model-viewer/
+      index.html  manifest.webmanifest  sw.js  icons/
+      models/                 GENERATED — do not hand-edit
+        manifest.json         part list, versions, placement matrices
+        *.stl                 one per part per version
+        *.svg                 1:1 paper templates
 ```
 
 ---

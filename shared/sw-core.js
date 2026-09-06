@@ -81,6 +81,24 @@
       event.respondWith(networkFirst(request));
       return;
     }
+
+    // Opt-in freshness: a sub-resource asked for with ?fresh=1 is treated
+    // like a navigation — network first, cache only as the offline fallback.
+    //
+    // Stale-while-revalidate is right for almost everything, because a file
+    // arriving one load late is harmless. It is wrong for a file that
+    // DESCRIBES the others: model-viewer's manifest carries the geometry, so
+    // a stale copy makes the whole page quietly disagree with what was
+    // exported, with no error to notice. Cheap files that other files are
+    // interpreted against want this; bulk assets do not.
+    //
+    // The flag is a fixed string, not a timestamp, so it is still exactly one
+    // cache entry and still works offline.
+    if (url.searchParams.get('fresh') === '1') {
+      event.respondWith(networkFirst(request));
+      return;
+    }
+
     event.respondWith(staleWhileRevalidate(request));
   });
 

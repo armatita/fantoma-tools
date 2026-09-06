@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240.0mm" height="140.4030650891055mm" viewBox="0 0 240.0 140.4030650891055">
+<rect width="100%" height="100%" fill="#fff"/>
+<line x1="18.00" y1="122.40" x2="18.00" y2="18.00" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="18.00" y="127.40" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="middle" font-weight="normal">0</text>
+<line x1="28.00" y1="122.40" x2="28.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="38.00" y1="122.40" x2="38.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="48.00" y1="122.40" x2="48.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="58.00" y1="122.40" x2="58.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="68.00" y1="122.40" x2="68.00" y2="18.00" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="68.00" y="127.40" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="middle" font-weight="normal">50</text>
+<line x1="78.00" y1="122.40" x2="78.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="88.00" y1="122.40" x2="88.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="98.00" y1="122.40" x2="98.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="108.00" y1="122.40" x2="108.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="118.00" y1="122.40" x2="118.00" y2="18.00" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="118.00" y="127.40" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="middle" font-weight="normal">100</text>
+<line x1="128.00" y1="122.40" x2="128.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="138.00" y1="122.40" x2="138.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="148.00" y1="122.40" x2="148.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="158.00" y1="122.40" x2="158.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="168.00" y1="122.40" x2="168.00" y2="18.00" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="168.00" y="127.40" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="middle" font-weight="normal">150</text>
+<line x1="178.00" y1="122.40" x2="178.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="188.00" y1="122.40" x2="188.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="198.00" y1="122.40" x2="198.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="208.00" y1="122.40" x2="208.00" y2="18.00" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="218.00" y1="122.40" x2="218.00" y2="18.00" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="218.00" y="127.40" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="middle" font-weight="normal">200</text>
+<line x1="18.00" y1="122.40" x2="222.00" y2="122.40" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="16.00" y="123.60" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="end" font-weight="normal">0</text>
+<line x1="18.00" y1="112.40" x2="222.00" y2="112.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="102.40" x2="222.00" y2="102.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="92.40" x2="222.00" y2="92.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="82.40" x2="222.00" y2="82.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="72.40" x2="222.00" y2="72.40" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="16.00" y="73.60" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="end" font-weight="normal">50</text>
+<line x1="18.00" y1="62.40" x2="222.00" y2="62.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="52.40" x2="222.00" y2="52.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="42.40" x2="222.00" y2="42.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="32.40" x2="222.00" y2="32.40" stroke="#e4e4e4" stroke-width="0.15"/>
+<line x1="18.00" y1="22.40" x2="222.00" y2="22.40" stroke="#c4c4c4" stroke-width="0.25"/>
+<text x="16.00" y="23.60" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="end" font-weight="normal">100</text>
+<rect x="18.0" y="18.0" width="204.0" height="104.4030650891055" fill="none" stroke="#000" stroke-width="0.5"/>
+<rect x="38.90" y="68.50" width="34.00" height="26.00" fill="none" stroke="#9a9a9a" stroke-width="0.3" stroke-dasharray="2 1.5"/>
+<circle cx="43.90" cy="92.50" r="1.75" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="69.90" cy="92.50" r="1.75" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="69.90" cy="72.50" r="1.75" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="43.90" cy="72.50" r="1.75" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<rect x="138.78" y="68.52" width="70.00" height="32.00" fill="none" stroke="#9a9a9a" stroke-width="0.3" stroke-dasharray="2 1.5"/>
+<circle cx="140.78" cy="97.52" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="206.78" cy="97.52" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="206.78" cy="71.52" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="140.78" cy="71.52" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<rect x="99.90" y="30.40" width="20.00" height="80.00" fill="none" stroke="#9a9a9a" stroke-width="0.3" stroke-dasharray="2 1.5"/>
+<circle cx="101.90" cy="108.40" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="117.90" cy="108.40" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="117.90" cy="32.40" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="101.90" cy="32.40" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<rect x="138.94" y="30.36" width="29.93" height="20.29" fill="none" stroke="#9a9a9a" stroke-width="0.3" stroke-dasharray="2 1.5"/>
+<circle cx="158.94" cy="40.15" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<rect x="36.90" y="66.50" width="38.00" height="30.00" fill="none" stroke="#d06a1a" stroke-width="0.9"/>
+<text x="38.40" y="70.70" font-family="Helvetica" font-size="3.4" fill="#d06a1a" text-anchor="start" font-weight="normal">joystick opening</text>
+<rect x="136.78" y="66.52" width="74.00" height="36.00" fill="none" stroke="#d06a1a" stroke-width="0.9"/>
+<text x="138.28" y="70.72" font-family="Helvetica" font-size="3.4" fill="#d06a1a" text-anchor="start" font-weight="normal">buttons opening</text>
+<rect x="97.90" y="28.40" width="24.00" height="84.00" fill="none" stroke="#d06a1a" stroke-width="0.9"/>
+<text x="99.40" y="32.60" font-family="Helvetica" font-size="3.4" fill="#d06a1a" text-anchor="start" font-weight="normal">aux opening</text>
+<rect x="136.94" y="28.36" width="33.93" height="24.29" fill="none" stroke="#d06a1a" stroke-width="0.9"/>
+<text x="138.44" y="32.56" font-family="Helvetica" font-size="3.4" fill="#d06a1a" text-anchor="start" font-weight="normal">buzzer opening</text>
+<circle cx="55.90" cy="81.50" r="10.50" fill="none" stroke="#b8402f" stroke-width="0.3"/>
+<circle cx="152.50" cy="89.60" r="7.00" fill="none" stroke="#2f6f4e" stroke-width="0.3"/>
+<circle cx="170.28" cy="84.52" r="7.00" fill="none" stroke="#2f6f4e" stroke-width="0.3"/>
+<circle cx="188.06" cy="79.44" r="7.00" fill="none" stroke="#2f6f4e" stroke-width="0.3"/>
+<circle cx="109.90" cy="53.40" r="7.00" fill="none" stroke="#6a4e8c" stroke-width="0.3"/>
+<circle cx="150.19" cy="40.50" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<circle cx="148.06" cy="36.82" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<circle cx="143.81" cy="36.82" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<circle cx="141.69" cy="40.50" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<circle cx="143.81" cy="44.18" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<circle cx="148.06" cy="44.18" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<circle cx="145.94" cy="40.50" r="1.25" fill="none" stroke="#888" stroke-width="0.3"/>
+<text x="120.00" y="133.40" font-family="Helvetica" font-size="4.2" fill="#444" text-anchor="middle" font-weight="bold">FRONT EDGE — nearest you</text>
+<line x1="18.00" y1="9.00" x2="68.00" y2="9.00" stroke="#000" stroke-width="0.5"/>
+<line x1="18.00" y1="7.00" x2="18.00" y2="11.00" stroke="#000" stroke-width="0.5"/>
+<line x1="68.00" y1="7.00" x2="68.00" y2="11.00" stroke="#000" stroke-width="0.5"/>
+<text x="71.00" y="10.40" font-family="Helvetica" font-size="3.4" fill="#000" text-anchor="start" font-weight="normal">50 mm — measure this first; if it isn't 50, the print was scaled and nothing else here is right</text>
+<rect x="18.00" y="0.50" width="204.00" height="6.5" fill="#fdecea" stroke="#c0392b" stroke-width="0.4"/>
+<text x="20.00" y="4.80" font-family="Helvetica" font-size="3.6" fill="#c0392b" text-anchor="start" font-weight="bold">PRINT LANDSCAPE — this sheet is 240 mm wide and A4 portrait is only 210 mm, so portrait will shrink it no matter what scale you choose</text>
+<line x1="9.00" y1="122.40" x2="9.00" y2="72.40" stroke="#000" stroke-width="0.5"/>
+<line x1="7.00" y1="122.40" x2="11.00" y2="122.40" stroke="#000" stroke-width="0.5"/>
+<line x1="7.00" y1="72.40" x2="11.00" y2="72.40" stroke="#000" stroke-width="0.5"/>
+<text x="6.00" y="97.40" font-family="Helvetica" font-size="3.4" fill="#000" text-anchor="middle" transform="rotate(-90 6.00 97.40)">50 mm</text>
+<text x="18.00" y="139.40" font-family="Helvetica" font-size="3.4" fill="#444" text-anchor="start" font-weight="normal">solid colour = holes to cut</text>
+<text x="18.00" y="144.00" font-family="Helvetica" font-size="3.4" fill="#9a9a9a" text-anchor="start" font-weight="normal">dashed grey = boards behind the panel, and joystick screw holes</text>
+<text x="18.00" y="148.60" font-family="Helvetica" font-size="3.4" fill="#999" text-anchor="start" font-weight="normal">grid = 10 mm, heavier every 50 — pencil a position, read it off the margin, type it into case_params.py</text>
+<text x="222.00" y="148.60" font-family="Helvetica" font-size="3.2" fill="#bbb" text-anchor="end" font-weight="normal">board outlines are estimates until measured</text>
+</svg>

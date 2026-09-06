@@ -1,0 +1,799 @@
+{
+  "generated": "2026-09-06 21:00 UTC",
+  "units": "mm",
+  "upAxis": "Z",
+  "source": "fantoma/python/case/export_viewer.py from case_params.py",
+  "palette": [
+    "#b74858",
+    "#993233",
+    "#e9ca00",
+    "#d8a309",
+    "#c7711e",
+    "#428d38",
+    "#94b91e",
+    "#6cbfaf",
+    "#017eaa",
+    "#3e51ad",
+    "#2c2a2b",
+    "#787677",
+    "#a2a2a4",
+    "#c8c6c9",
+    "#e8e6e7"
+  ],
+  "defaultColor": {
+    "dark": "#c8c6c9",
+    "light": "#787677"
+  },
+  "bounds": {
+    "width": 210.0,
+    "depth": 210.0,
+    "height": 240.0
+  },
+  "layout": {
+    "panel": {
+      "width": 204.0,
+      "depth": 104.4030650891055
+    },
+    "minWeb": 10.0,
+    "flange": 3.0,
+    "render": {
+      "panel": "#2c2a2b",
+      "mount": "#993233"
+    },
+    "groups": [
+      {
+        "id": "joystick",
+        "name": "Joystick",
+        "param": "JOY_POS",
+        "anchor": [
+          37.9,
+          40.9
+        ],
+        "why": "Anchored on the stick itself, because that is what a hand aims at. The mount's holes are not centred on it.",
+        "opening": {
+          "dx": 0,
+          "dy": 0,
+          "w": 38.0,
+          "d": 30.0
+        },
+        "board": {
+          "dx": 0,
+          "dy": 0,
+          "w": 34.0,
+          "d": 26.0
+        },
+        "holes": [
+          [
+            -12.0,
+            -11.0
+          ],
+          [
+            14.0,
+            -11.0
+          ],
+          [
+            14.0,
+            9.0
+          ],
+          [
+            -12.0,
+            9.0
+          ]
+        ],
+        "features": [
+          {
+            "dx": 0,
+            "dy": 0,
+            "dia": 21.0
+          }
+        ],
+        "rotation": {
+          "supported": false,
+          "note": "case_params has no rotation for this group yet. Try it here to see whether it helps; making it real needs the CAD to honour an angle."
+        },
+        "paint": [
+          {
+            "id": "stick",
+            "label": "Joystick",
+            "color": "#787677",
+            "features": [
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "name": "Action buttons",
+        "param": "BTN_POS",
+        "anchor": [
+          134.5,
+          32.8
+        ],
+        "why": "Anchored on the FIRST cap, lowest and leftmost; the other two follow from the pitch and stagger. The perfboard sits 3.5 mm right of the cap row, which is why its outline and its opening are offset from this point.",
+        "opening": {
+          "dx": 21.28,
+          "dy": 5.079999999999998,
+          "w": 74.0,
+          "d": 36.0
+        },
+        "board": {
+          "dx": 21.28,
+          "dy": 5.079999999999998,
+          "w": 70.0,
+          "d": 32.0
+        },
+        "holes": [
+          [
+            -11.72,
+            -7.92
+          ],
+          [
+            54.28,
+            -7.92
+          ],
+          [
+            54.28,
+            18.08
+          ],
+          [
+            -11.72,
+            18.08
+          ]
+        ],
+        "features": [
+          {
+            "dx": 0.0,
+            "dy": 0.0,
+            "dia": 14.0
+          },
+          {
+            "dx": 17.78,
+            "dy": 5.079999999999998,
+            "dia": 14.0
+          },
+          {
+            "dx": 35.56,
+            "dy": 10.159999999999997,
+            "dia": 14.0
+          }
+        ],
+        "rotation": {
+          "supported": false,
+          "note": "case_params has no rotation for this group yet. Try it here to see whether it helps; making it real needs the CAD to honour an angle."
+        },
+        "paint": [
+          {
+            "id": "cap-l",
+            "label": "Left cap",
+            "color": "#e9ca00",
+            "features": [
+              0
+            ]
+          },
+          {
+            "id": "cap-m",
+            "label": "Middle cap",
+            "color": "#3e51ad",
+            "features": [
+              1
+            ]
+          },
+          {
+            "id": "cap-r",
+            "label": "Right cap",
+            "color": "#b74858",
+            "features": [
+              2
+            ]
+          }
+        ]
+      },
+      {
+        "id": "aux",
+        "name": "Options strip",
+        "param": "AUX_POS",
+        "anchor": [
+          91.9,
+          52.0
+        ],
+        "why": "Carries only the options button now the buzzer has its own board. Linked to the action buttons so the options key stays directly above the red one.",
+        "opening": {
+          "dx": 0,
+          "dy": 0,
+          "w": 24.0,
+          "d": 84.0
+        },
+        "board": {
+          "dx": 0,
+          "dy": 0,
+          "w": 20.0,
+          "d": 80.0
+        },
+        "holes": [
+          [
+            -8.0,
+            -38.0
+          ],
+          [
+            8.0,
+            -38.0
+          ],
+          [
+            8.0,
+            38.0
+          ],
+          [
+            -8.0,
+            38.0
+          ]
+        ],
+        "features": [
+          {
+            "dx": 0,
+            "dy": 17.0,
+            "dia": 14.0
+          }
+        ],
+        "link": {
+          "to": "buttons",
+          "axis": "x",
+          "offset": -42.6,
+          "label": "keep the strip's spacing from the action buttons"
+        },
+        "rotation": {
+          "supported": true,
+          "kind": "bool",
+          "param": "AUX_VERTICAL",
+          "base": true,
+          "note": "AUX_VERTICAL already exists, so a quarter turn is real."
+        },
+        "paint": [
+          {
+            "id": "options",
+            "label": "Options button",
+            "color": "#b74858",
+            "features": [
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "id": "buzzer",
+        "name": "Buzzer",
+        "param": "BUZZ_POS",
+        "anchor": [
+          135.9,
+          81.9
+        ],
+        "why": "The sounder is not centred on its board \u2014 the header takes the right-hand end \u2014 so the grille is offset from the anchor by BUZZ_SOUNDER_POS.",
+        "opening": {
+          "dx": 0,
+          "dy": 0,
+          "w": 33.93,
+          "d": 24.29
+        },
+        "board": {
+          "dx": 0,
+          "dy": 0,
+          "w": 29.93,
+          "d": 20.29
+        },
+        "holes": [
+          [
+            5.035,
+            0.355
+          ]
+        ],
+        "features": [
+          {
+            "dx": -3.715,
+            "dy": 0.0,
+            "dia": 2.5
+          },
+          {
+            "dx": -5.84,
+            "dy": 3.681,
+            "dia": 2.5
+          },
+          {
+            "dx": -10.09,
+            "dy": 3.681,
+            "dia": 2.5
+          },
+          {
+            "dx": -12.215,
+            "dy": 0.0,
+            "dia": 2.5
+          },
+          {
+            "dx": -10.09,
+            "dy": -3.681,
+            "dia": 2.5
+          },
+          {
+            "dx": -5.84,
+            "dy": -3.681,
+            "dia": 2.5
+          },
+          {
+            "dx": -7.965,
+            "dy": 0.0,
+            "dia": 2.5
+          }
+        ],
+        "rotation": {
+          "supported": false,
+          "note": "case_params has no rotation for this group yet. Try it here to see whether it helps; making it real needs the CAD to honour an angle."
+        },
+        "paint": [
+          {
+            "id": "grille",
+            "label": "Grille",
+            "color": "#2c2a2b",
+            "features": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "groups": [
+    {
+      "id": "control-panel",
+      "name": "Control Panel",
+      "parts": [
+        {
+          "id": "control-panel",
+          "name": "Control panel",
+          "note": "The whole panel as one print. Still monolithic \u2014 the modular frame is not modelled yet.",
+          "versions": [
+            {
+              "id": "control-panel",
+              "label": "Control panel",
+              "file": "control-panel.stl",
+              "bytes": 950484,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.957826,
+                -0.287348,
+                0.0,
+                0.0,
+                0.287348,
+                -0.957826,
+                0.0,
+                3.0,
+                99.137956,
+                52.873479,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "control-panel",
+          "visible": true,
+          "template": "panel_template.svg"
+        }
+      ]
+    },
+    {
+      "id": "io-plate",
+      "name": "I/O Plate",
+      "parts": [
+        {
+          "id": "io-plate",
+          "name": "I/O plate",
+          "note": "Carries the DC socket and the rocker switch, built at the bench and bolted on. Position on the wall is a PLACEHOLDER.",
+          "versions": [
+            {
+              "id": "io-plate",
+              "label": "I/O plate",
+              "file": "io-plate.stl",
+              "bytes": 155084,
+              "matrix": [
+                -1.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.0,
+                -0.0,
+                -1.0,
+                0.0,
+                -0.0,
+                -1.0,
+                0.0,
+                0.0,
+                145.0,
+                210.0,
+                65.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "io-plate",
+          "visible": true,
+          "template": "io_plate_template.svg"
+        }
+      ]
+    },
+    {
+      "id": "bench",
+      "name": "Bench tests",
+      "parts": [
+        {
+          "id": "joystick-module",
+          "name": "Joystick mount (test)",
+          "note": "Standoff sets how far the stick sits below the panel \u2014 the one dimension no caliper reaches once assembled.",
+          "versions": [
+            {
+              "id": "joystick-module-13mm",
+              "label": "13 mm standoff",
+              "file": "joystick-module-13mm.stl",
+              "bytes": 268484,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.0,
+                -139.0,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "joystick-module-14mm",
+              "label": "14 mm standoff",
+              "file": "joystick-module-14mm.stl",
+              "bytes": 268484,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.0,
+                -139.0,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "joystick-module-15mm",
+              "label": "15 mm standoff",
+              "file": "joystick-module-15mm.stl",
+              "bytes": 268484,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0.0,
+                -139.0,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "joystick-module-14mm",
+          "visible": false,
+          "template": null
+        },
+        {
+          "id": "button-module",
+          "name": "Action buttons (test)",
+          "note": "Also checks the 3.5 mm hole-pattern offset lands the screws on the perfboard.",
+          "versions": [
+            {
+              "id": "button-module-4mm",
+              "label": "4 mm standoff",
+              "file": "button-module-4mm.stl",
+              "bytes": 304084,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                64.0,
+                -143.0,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "button-module-5mm",
+              "label": "5 mm standoff",
+              "file": "button-module-5mm.stl",
+              "bytes": 304084,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                64.0,
+                -143.0,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "button-module-6mm",
+              "label": "6 mm standoff",
+              "file": "button-module-6mm.stl",
+              "bytes": 304084,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                64.0,
+                -143.0,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "button-module-5mm",
+          "visible": false,
+          "template": null
+        },
+        {
+          "id": "aux-module",
+          "name": "Options button strip (test)",
+          "note": "Carries only the options button now the buzzer has moved off it, so it takes the same standoff as the action row.",
+          "versions": [
+            {
+              "id": "aux-module-4mm",
+              "label": "4 mm standoff",
+              "file": "aux-module-4mm.stl",
+              "bytes": 253284,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                166.0,
+                -137.0,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "aux-module-5mm",
+              "label": "5 mm standoff",
+              "file": "aux-module-5mm.stl",
+              "bytes": 253284,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                166.0,
+                -137.0,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "aux-module-6mm",
+              "label": "6 mm standoff",
+              "file": "aux-module-6mm.stl",
+              "bytes": 253284,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                166.0,
+                -137.0,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "aux-module-5mm",
+          "visible": false,
+          "template": null
+        },
+        {
+          "id": "buzzer-module",
+          "name": "Buzzer module (test)",
+          "note": "Three pocket walls stop the board pivoting on its single screw. Grille must land inside the 12 mm sounder.",
+          "versions": [
+            {
+              "id": "buzzer-module-9mm",
+              "label": "9 mm standoff",
+              "file": "buzzer-module-9mm.stl",
+              "bytes": 282084,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                278.0,
+                -135.29,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "buzzer-module-10mm",
+              "label": "10 mm standoff",
+              "file": "buzzer-module-10mm.stl",
+              "bytes": 282084,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                278.0,
+                -135.29,
+                0.0,
+                1
+              ]
+            },
+            {
+              "id": "buzzer-module-11mm",
+              "label": "11 mm standoff",
+              "file": "buzzer-module-11mm.stl",
+              "bytes": 282084,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                278.0,
+                -135.29,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "buzzer-module-10mm",
+          "visible": false,
+          "template": null
+        },
+        {
+          "id": "panel-coupon",
+          "name": "Fit coupon",
+          "note": "Strip for checking hole sizes against real parts in the hand. Never part of the machine.",
+          "versions": [
+            {
+              "id": "panel-coupon",
+              "label": "Fit coupon",
+              "file": "panel-coupon.stl",
+              "bytes": 203284,
+              "matrix": [
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                341.93,
+                -141.0,
+                0.0,
+                1
+              ]
+            }
+          ],
+          "defaultVersion": "panel-coupon",
+          "visible": false,
+          "template": null
+        }
+      ]
+    }
+  ]
+}

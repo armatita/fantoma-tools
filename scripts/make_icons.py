@@ -158,10 +158,41 @@ def sfx_forge_icon():
     return g
 
 
+def model_viewer_icon():
+    """Model Viewer: an isometric cube, drawn as three faces in one grey.
+
+    Three tones of the project palette rather than three arbitrary greys, so
+    the icon reads as the same family as the parts it shows. The lightest
+    face is the one the key light hits in the viewer itself.
+    """
+    sprite = [
+        '................',
+        '.......##.......',
+        '.....######.....',
+        '...##########...',
+        '.##############.',
+        '.###aaa##bbb###.',
+        '.##aaaa##bbbb##.',
+        '.#aaaaa##bbbbb#.',
+        '.#aaaaa##bbbbb#.',
+        '.#aaaaa##bbbbb#.',
+        '.#aaaaa##bbbbb#.',
+        '..#aaaa##bbbb#..',
+        '...#aaa##bbb#...',
+        '.....#a##b#.....',
+        '.......##.......',
+        '................',
+    ]
+    g = Grid('#14141a')
+    g.art(sprite, {'#': '#c8c6c9', 'a': '#787677', 'b': '#a2a2a4'})
+    return g
+
+
 ICONS = {
     'icons': hub_icon,
     'tools/pixel-studio/icons': pixel_studio_icon,
     'tools/sfx-forge/icons': sfx_forge_icon,
+    'tools/model-viewer/icons': model_viewer_icon,
 }
 
 
