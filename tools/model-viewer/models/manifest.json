@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-06 22:10 UTC",
+  "generated": "2026-09-07 23:14 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -366,6 +366,292 @@
     }
   ],
   "groups": [
+    {
+      "id": "cabinet",
+      "name": "Cabinet",
+      "parts": [
+        {
+          "id": "shell-wall-left",
+          "name": "Side wall (left)",
+          "note": "One closed profile swept sideways \u2014 this is the whole silhouette of the machine.",
+          "versions": [
+            {
+              "id": "shell-wall-left",
+              "label": "Side wall (left)",
+              "file": "shell-wall-left.stl",
+              "bytes": 1084,
+              "matrix": [
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                0.0,
+                3.0,
+                0.0,
+                -0.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-wall-left",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "shell-wall-right",
+          "name": "Side wall (right)",
+          "note": "The same part, mirrored across the cabinet.",
+          "versions": [
+            {
+              "id": "shell-wall-right",
+              "label": "Side wall (right)",
+              "file": "shell-wall-right.stl",
+              "bytes": 1084,
+              "matrix": [
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                0.0,
+                210.0,
+                0.0,
+                -0.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-wall-right",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "matrix-bracket-left",
+          "name": "Screen bracket (left)",
+          "note": "A strip lying against the BACK of the LED panel, running up its 12 degree lean, turning into a foot that bolts to the base.",
+          "versions": [
+            {
+              "id": "matrix-bracket-left",
+              "label": "Screen bracket (left)",
+              "file": "matrix-bracket-left.stl",
+              "bytes": 37084,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.207912,
+                0.978148,
+                0.0,
+                0.0,
+                -0.978148,
+                0.207912,
+                0.0,
+                7.0,
+                125.594952,
+                -1.474103,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "matrix-bracket-left",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "matrix-bracket-right",
+          "name": "Screen bracket (right)",
+          "note": "The same part on the other side. Identical, not mirrored.",
+          "versions": [
+            {
+              "id": "matrix-bracket-right",
+              "label": "Screen bracket (right)",
+              "file": "matrix-bracket-right.stl",
+              "bytes": 37084,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.207912,
+                0.978148,
+                0.0,
+                0.0,
+                -0.978148,
+                0.207912,
+                0.0,
+                181.0,
+                125.594952,
+                -1.474103,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "matrix-bracket-right",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "shell-base",
+          "name": "Base",
+          "note": "The floor, spanning between the walls.",
+          "versions": [
+            {
+              "id": "shell-base",
+              "label": "Base",
+              "file": "shell-base.stl",
+              "bytes": 181884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                -0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                3.0,
+                210.0,
+                11.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-base",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "shell-front",
+          "name": "Front wall",
+          "note": "Only 20 mm tall \u2014 above that the control panel is the front of the machine.",
+          "versions": [
+            {
+              "id": "shell-front",
+              "label": "Front wall",
+              "file": "shell-front.stl",
+              "bytes": 684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                3.0,
+                -0.0,
+                20.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-front",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "shell-back",
+          "name": "Back wall",
+          "note": "Full height. Will gain the switch and socket openings.",
+          "versions": [
+            {
+              "id": "shell-back",
+              "label": "Back wall",
+              "file": "shell-back.stl",
+              "bytes": 684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                3.0,
+                207.0,
+                245.804339,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-back",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "shell-panel-rail",
+          "name": "Panel rail",
+          "note": "The cross rail at the screen's foot that carries the control panel's back edge.",
+          "versions": [
+            {
+              "id": "shell-panel-rail",
+              "label": "Panel rail",
+              "file": "shell-panel-rail.stl",
+              "bytes": 684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                -0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                3.0,
+                100.0,
+                50.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-panel-rail",
+          "visible": true,
+          "template": null,
+          "when": null
+        }
+      ]
+    },
     {
       "id": "control-panel",
       "name": "Control Panel",
