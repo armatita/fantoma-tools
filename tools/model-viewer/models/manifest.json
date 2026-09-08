@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-08 21:56 UTC",
+  "generated": "2026-09-08 22:56 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -379,7 +379,7 @@
               "id": "shell-wall-left",
               "label": "Side wall (left)",
               "file": "shell-wall-left.stl",
-              "bytes": 7284,
+              "bytes": 21484,
               "matrix": [
                 0.0,
                 0.0,
@@ -393,7 +393,7 @@
                 0.0,
                 0.0,
                 0.0,
-                10.0,
+                17.5,
                 31.0,
                 3.0,
                 1.0
@@ -414,7 +414,7 @@
               "id": "shell-wall-right",
               "label": "Side wall (right)",
               "file": "shell-wall-right.stl",
-              "bytes": 7284,
+              "bytes": 21484,
               "matrix": [
                 0.0,
                 0.0,
@@ -869,7 +869,7 @@
               "id": "front-post-left",
               "label": "Front corner post (left)",
               "file": "front-post-left.stl",
-              "bytes": 77384,
+              "bytes": 74384,
               "matrix": [
                 1.0,
                 0.0,
@@ -904,7 +904,7 @@
               "id": "front-post-right",
               "label": "Front corner post (right)",
               "file": "front-post-right.stl",
-              "bytes": 77384,
+              "bytes": 74384,
               "matrix": [
                 1.0,
                 0.0,
@@ -974,7 +974,7 @@
               "id": "shell-front",
               "label": "Front wall",
               "file": "shell-front.stl",
-              "bytes": 2284,
+              "bytes": 1484,
               "matrix": [
                 1.0,
                 0.0,
@@ -1038,29 +1038,29 @@
         {
           "id": "shell-panel-rail",
           "name": "Panel rail",
-          "note": "The cross rail at the screen's foot that carries the control panel's back edge.",
+          "note": "The cross rail under the control panel's back edge, with a 12 mm downstand.",
           "versions": [
             {
               "id": "shell-panel-rail",
               "label": "Panel rail",
               "file": "shell-panel-rail.stl",
-              "bytes": 684,
+              "bytes": 1684,
               "matrix": [
                 1.0,
                 0.0,
                 0.0,
                 0.0,
                 0.0,
-                1.0,
+                0.121869,
+                -0.992546,
                 0.0,
                 0.0,
+                0.992546,
+                0.121869,
                 0.0,
-                0.0,
-                1.0,
-                0.0,
-                3.0,
-                109.487649,
-                51.916808,
+                17.5,
+                102.827781,
+                52.625664,
                 1.0
               ]
             }
@@ -1085,7 +1085,7 @@
               "id": "panel-frame",
               "label": "Panel frame",
               "file": "panel-frame.stl",
-              "bytes": 235484,
+              "bytes": 271284,
               "matrix": [
                 1.0,
                 0.0,
