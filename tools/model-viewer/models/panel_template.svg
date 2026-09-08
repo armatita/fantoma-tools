@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240.0mm" height="140.4030650891055mm" viewBox="0 0 240.0 140.4030650891055">
+<svg xmlns="http://www.w3.org/2000/svg" width="240.0mm" height="140.4mm" viewBox="0 0 240.0 140.4">
 <rect width="100%" height="100%" fill="#fff"/>
 <line x1="18.00" y1="122.40" x2="18.00" y2="18.00" stroke="#c4c4c4" stroke-width="0.25"/>
 <text x="18.00" y="127.40" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="middle" font-weight="normal">0</text>
@@ -40,7 +40,7 @@
 <line x1="18.00" y1="32.40" x2="222.00" y2="32.40" stroke="#e4e4e4" stroke-width="0.15"/>
 <line x1="18.00" y1="22.40" x2="222.00" y2="22.40" stroke="#c4c4c4" stroke-width="0.25"/>
 <text x="16.00" y="23.60" font-family="Helvetica" font-size="3.2" fill="#999" text-anchor="end" font-weight="normal">100</text>
-<rect x="18.0" y="18.0" width="204.0" height="104.4030650891055" fill="none" stroke="#000" stroke-width="0.5"/>
+<rect x="18.0" y="18.0" width="204.0" height="104.4" fill="none" stroke="#000" stroke-width="0.5"/>
 <rect x="38.90" y="68.50" width="34.00" height="26.00" fill="none" stroke="#9a9a9a" stroke-width="0.3" stroke-dasharray="2 1.5"/>
 <circle cx="43.90" cy="92.50" r="1.75" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
 <circle cx="69.90" cy="92.50" r="1.75" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
@@ -57,7 +57,7 @@
 <circle cx="117.90" cy="32.40" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
 <circle cx="101.90" cy="32.40" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
 <rect x="138.94" y="30.36" width="29.93" height="20.29" fill="none" stroke="#9a9a9a" stroke-width="0.3" stroke-dasharray="2 1.5"/>
-<circle cx="158.94" cy="40.15" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
+<circle cx="158.94" cy="40.14" r="1.00" fill="none" stroke="#9a9a9a" stroke-width="0.3"/>
 <rect x="36.90" y="66.50" width="38.00" height="30.00" fill="none" stroke="#d06a1a" stroke-width="0.9"/>
 <text x="38.40" y="70.70" font-family="Helvetica" font-size="3.4" fill="#d06a1a" text-anchor="start" font-weight="normal">joystick opening</text>
 <rect x="136.78" y="66.52" width="74.00" height="36.00" fill="none" stroke="#d06a1a" stroke-width="0.9"/>

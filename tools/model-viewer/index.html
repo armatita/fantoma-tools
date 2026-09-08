@@ -105,6 +105,26 @@ button.act:disabled { opacity: .45; cursor: default; }
 .sws button.on { border-color: var(--ink); }
 #hint { font-size: 11px; color: var(--ink-dim); margin-top: 9px; }
 
+/* Ruler numbers and the measurement readout are HTML over the canvas: text
+   in a 3D scene needs a texture atlas or sprites, and neither earns its keep
+   for numbers you only glance at. */
+#ticks { position: absolute; inset: 0; pointer-events: none; }
+#ticks span {
+  position: absolute; transform: translate(-50%, -50%);
+  font-size: 10px; color: var(--ink-dim); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#measure {
+  position: absolute; left: 12px; top: 12px;
+  background: var(--panel); border: 1px solid #e9ca00; border-radius: 7px;
+  padding: 8px 11px; font-size: 13px; color: var(--ink);
+  pointer-events: none; line-height: 1.5;
+}
+#measure span { font-size: 11px; color: var(--ink-dim);
+  font-variant-numeric: tabular-nums; }
+.tab.on, .chip.on { outline: 1px solid #e9ca00; }
+#stage.measuring canvas { cursor: crosshair; }
+
 #toast {
   position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
   background: var(--panel); border: 1px solid var(--line); color: var(--ink);
@@ -209,6 +229,7 @@ button.act:disabled { opacity: .45; cursor: default; }
     <button class="tab" data-view="layout" type="button">Layout</button>
   </nav>
   <button class="chip" id="bgBtn" type="button" title="Light / dark background">◐</button>
+  <button class="chip" id="measBtn" type="button" title="Measure between two points">⟷ Measure</button>
   <button class="chip" id="fitBtn" type="button" title="Frame everything">Fit</button>
   <span class="gen" id="gen"></span>
 </header>
@@ -221,6 +242,8 @@ button.act:disabled { opacity: .45; cursor: default; }
   </div>
   <div id="stage">
     <div id="load">loading models…</div>
+    <div id="ticks"></div>
+    <div id="measure" hidden></div>
     <div id="toast"></div>
   </div>
 
@@ -319,6 +342,73 @@ const partsRoot = new THREE.Group();
 scene.add(partsRoot);
 let refRoot = new THREE.Group();
 scene.add(refRoot);
+const measureRoot = new THREE.Group();
+scene.add(measureRoot);
+
+let rulerLabels = [];        // [Vector3, mm] pairs, drawn as HTML
+let measuring = false;
+let measurePts = [];         // 0, 1 or 2 picked points
+
+/* ------------------------------------------------------------------ *
+ * Measuring
+ *
+ * Ticks give constant context; picking gives an answer. Both are worth
+ * having, because "is that gap 5 mm or 15" is not a question you can
+ * settle by looking, and reading it off a printed template means
+ * exporting first.
+ *
+ * Points are picked by raycasting against the visible meshes, so a click
+ * lands exactly on a surface rather than on a plane through the cursor.
+ * ------------------------------------------------------------------ */
+const raycaster = new THREE.Raycaster();
+
+function pickPoint(evt) {
+  const r = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((evt.clientX - r.left) / r.width) * 2 - 1,
+    -((evt.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(
+    partsRoot.children.filter(m => m.visible), false);
+  return hits.length ? hits[0].point.clone() : null;
+}
+
+function drawMeasure() {
+  measureRoot.clear();
+  const t = themeColors();
+  const dot = new THREE.SphereGeometry(1.6, 12, 8);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xe9ca00 });
+  measurePts.forEach(p => {
+    const s = new THREE.Mesh(dot, mat);
+    s.position.copy(p);
+    measureRoot.add(s);
+  });
+  if (measurePts.length === 2) {
+    const g = new THREE.BufferGeometry().setFromPoints(measurePts);
+    measureRoot.add(new THREE.Line(
+      g, new THREE.LineBasicMaterial({ color: 0xe9ca00 })));
+  }
+  renderMeasureReadout();
+}
+
+function renderMeasureReadout() {
+  const el = document.getElementById('measure');
+  if (!measuring) { el.hidden = true; return; }
+  el.hidden = false;
+  if (measurePts.length < 2) {
+    el.textContent = measurePts.length === 0
+      ? 'Click a point on any part'
+      : 'Click a second point';
+    return;
+  }
+  const [a, b] = measurePts;
+  const d = a.distanceTo(b);
+  el.innerHTML =
+    `<b>${d.toFixed(2)} mm</b><br>` +
+    `<span>Δx ${(b.x - a.x).toFixed(2)} &nbsp; ` +
+    `Δy ${(b.y - a.y).toFixed(2)} &nbsp; ` +
+    `Δz ${(b.z - a.z).toFixed(2)}</span>`;
+}
 
 function themeColors() {
   const dark = (prefs.bg !== 'light');
@@ -329,6 +419,26 @@ function themeColors() {
     grid2: dark ? 0x272733 : 0xcfcdd0,
     box:   dark ? 0x4a4a5c : 0x9c9a9d
   };
+}
+
+/* A tick every 10 mm along one edge, labelled every 50.
+   Drawn as line segments rather than sprites: text in a 3D scene needs a
+   texture atlas or an HTML overlay, and neither is worth it for numbers you
+   read at a glance. The labels are HTML, positioned in project(). */
+function addRule(root, colour, from, to, up, every, major) {
+  const dir = to.clone().sub(from);
+  const len = dir.length();
+  dir.normalize();
+  const pts = [];
+  for (let d = 0; d <= len + 1e-6; d += every) {
+    const p = from.clone().addScaledVector(dir, d);
+    const big = Math.abs(d % major) < 1e-6;
+    pts.push(p, p.clone().addScaledVector(up, big ? 6 : 2.5));
+  }
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  root.add(new THREE.LineSegments(
+    g, new THREE.LineBasicMaterial({ color: colour, transparent: true,
+                                     opacity: 0.75 })));
 }
 
 /* The cabinet's footprint and volume, drawn as a wireframe. Without it the
@@ -351,6 +461,19 @@ function buildReference() {
   helper.material.transparent = true;
   helper.material.opacity = 0.55;
   refRoot.add(helper);
+
+  // Rules along three edges meeting at the origin corner: across, deep, up.
+  const O = new THREE.Vector3(0, 0, 0);
+  addRule(refRoot, t.grid1, O, new THREE.Vector3(b.width, 0, 0),
+          new THREE.Vector3(0, -1, 0), 10, 50);
+  addRule(refRoot, t.grid1, O, new THREE.Vector3(0, b.depth, 0),
+          new THREE.Vector3(-1, 0, 0), 10, 50);
+  addRule(refRoot, t.grid1, O, new THREE.Vector3(0, 0, b.height),
+          new THREE.Vector3(-1, 0, 0), 10, 50);
+  rulerLabels = [];
+  for (let d = 0; d <= b.width; d += 50) rulerLabels.push([new THREE.Vector3(d, -10, 0), d]);
+  for (let d = 50; d <= b.depth; d += 50) rulerLabels.push([new THREE.Vector3(-10, d, 0), d]);
+  for (let d = 50; d <= b.height; d += 50) rulerLabels.push([new THREE.Vector3(-10, 0, d), d]);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1398,6 +1521,7 @@ document.querySelectorAll('#tabs .tab').forEach(btn => {
     document.getElementById('stage').hidden = !assembly;
     document.getElementById('layoutView').hidden = assembly;
     document.getElementById('fitBtn').hidden = !assembly;
+    document.getElementById('measBtn').hidden = !assembly;   // 3D only
     if (assembly) resize(); else drawLayout();
   };
 });
@@ -1456,11 +1580,61 @@ function applyBg() {
   if (L) drawLayout();
 }
 
+/* Project the ruler numbers onto the canvas each frame. Cheap — there are
+   about twenty of them — and it keeps them upright and readable however the
+   model is turned, which a 3D label would not be. */
+const tickEls = [];
+function drawTicks() {
+  const host = document.getElementById('ticks');
+  while (tickEls.length < rulerLabels.length) {
+    const s = document.createElement('span');
+    host.appendChild(s);
+    tickEls.push(s);
+  }
+  const w = renderer.domElement.clientWidth;
+  const h = renderer.domElement.clientHeight;
+  const v = new THREE.Vector3();
+  rulerLabels.forEach(([p, mm], i) => {
+    v.copy(p).project(camera);
+    const on = v.z < 1;
+    const e = tickEls[i];
+    e.hidden = !on;
+    if (!on) return;
+    e.textContent = mm;
+    e.style.left = ((v.x * 0.5 + 0.5) * w) + 'px';
+    e.style.top = ((-v.y * 0.5 + 0.5) * h) + 'px';
+  });
+  for (let i = rulerLabels.length; i < tickEls.length; i++) tickEls[i].hidden = true;
+}
+
 (function loop() {
   requestAnimationFrame(loop);
   controls.update();
   renderer.render(scene, camera);
+  drawTicks();
 })();
+
+/* ---- the measure tool's controls ---- */
+document.getElementById('measBtn').onclick = () => {
+  measuring = !measuring;
+  measurePts = [];
+  measureRoot.clear();
+  document.getElementById('measBtn').classList.toggle('on', measuring);
+  stage.classList.toggle('measuring', measuring);
+  // Orbiting and picking both want the left button, so the orbit is stood
+  // down while measuring. Pan and zoom still work.
+  controls.enableRotate = !measuring;
+  renderMeasureReadout();
+};
+
+renderer.domElement.addEventListener('click', evt => {
+  if (!measuring) return;
+  const p = pickPoint(evt);
+  if (!p) { toast('Nothing there — click on a part.'); return; }
+  if (measurePts.length >= 2) measurePts = [];
+  measurePts.push(p);
+  drawMeasure();
+});
 
 /* ------------------------------------------------------------------ *
  * Boot

@@ -9,7 +9,7 @@
  * they are offline from then on. Re-exporting changes their bytes but not
  * their names, so bump the version here after an export or the viewer will
  * show yesterday's geometry. */
-self.SW_CACHE = 'model-viewer-v13';
+self.SW_CACHE = 'model-viewer-v14';
 self.SW_ASSETS = [
   './',
   './index.html',
