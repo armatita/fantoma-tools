@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-08 15:25 UTC",
+  "generated": "2026-09-08 21:56 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -25,7 +25,7 @@
     "light": "#787677"
   },
   "bounds": {
-    "width": 210.0,
+    "width": 216.0,
     "depth": 210.0,
     "height": 240.0
   },
@@ -231,7 +231,7 @@
         "features": [
           {
             "dx": 0,
-            "dy": -24.0,
+            "dy": -28.48,
             "dia": 14.0
           }
         ],
@@ -379,7 +379,7 @@
               "id": "shell-wall-left",
               "label": "Side wall (left)",
               "file": "shell-wall-left.stl",
-              "bytes": 1084,
+              "bytes": 7284,
               "matrix": [
                 0.0,
                 0.0,
@@ -393,9 +393,9 @@
                 0.0,
                 0.0,
                 0.0,
+                10.0,
+                31.0,
                 3.0,
-                0.0,
-                -0.0,
                 1.0
               ]
             }
@@ -408,13 +408,13 @@
         {
           "id": "shell-wall-right",
           "name": "Side wall (right)",
-          "note": "The same part, mirrored across the cabinet.",
+          "note": "The left wall MIRRORED \u2014 no longer the same STL.",
           "versions": [
             {
               "id": "shell-wall-right",
               "label": "Side wall (right)",
               "file": "shell-wall-right.stl",
-              "bytes": 1084,
+              "bytes": 7284,
               "matrix": [
                 0.0,
                 0.0,
@@ -428,9 +428,9 @@
                 0.0,
                 0.0,
                 0.0,
-                210.0,
-                0.0,
-                -0.0,
+                216.0,
+                31.0,
+                3.0,
                 1.0
               ]
             }
@@ -463,7 +463,7 @@
                 -0.978148,
                 0.207912,
                 0.0,
-                7.0,
+                10.0,
                 145.946738,
                 -1.474103,
                 1.0
@@ -498,7 +498,7 @@
                 -0.978148,
                 0.207912,
                 0.0,
-                181.0,
+                184.0,
                 145.946738,
                 -1.474103,
                 1.0
@@ -506,6 +506,426 @@
             }
           ],
           "defaultVersion": "matrix-bracket-right",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-left-1",
+          "name": "Corner post left \u2014 segment 1 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-left-1",
+              "label": "Corner post left \u2014 segment 1 of 5",
+              "file": "corner-post-left-1.stl",
+              "bytes": 60284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                179.0,
+                3.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-left-1",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-left-2",
+          "name": "Corner post left \u2014 segment 2 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-left-2",
+              "label": "Corner post left \u2014 segment 2 of 5",
+              "file": "corner-post-left-2.stl",
+              "bytes": 40884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                179.0,
+                52.544229,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-left-2",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-left-3",
+          "name": "Corner post left \u2014 segment 3 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-left-3",
+              "label": "Corner post left \u2014 segment 3 of 5",
+              "file": "corner-post-left-3.stl",
+              "bytes": 60284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                179.0,
+                102.088459,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-left-3",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-left-4",
+          "name": "Corner post left \u2014 segment 4 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-left-4",
+              "label": "Corner post left \u2014 segment 4 of 5",
+              "file": "corner-post-left-4.stl",
+              "bytes": 40884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                179.0,
+                151.632688,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-left-4",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-left-5",
+          "name": "Corner post left \u2014 segment 5 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-left-5",
+              "label": "Corner post left \u2014 segment 5 of 5",
+              "file": "corner-post-left-5.stl",
+              "bytes": 60284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                179.0,
+                201.176918,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-left-5",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-right-1",
+          "name": "Corner post right \u2014 segment 1 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-right-1",
+              "label": "Corner post right \u2014 segment 1 of 5",
+              "file": "corner-post-right-1.stl",
+              "bytes": 60284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                185.0,
+                179.0,
+                3.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-right-1",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-right-2",
+          "name": "Corner post right \u2014 segment 2 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-right-2",
+              "label": "Corner post right \u2014 segment 2 of 5",
+              "file": "corner-post-right-2.stl",
+              "bytes": 40884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                185.0,
+                179.0,
+                52.544229,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-right-2",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-right-3",
+          "name": "Corner post right \u2014 segment 3 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-right-3",
+              "label": "Corner post right \u2014 segment 3 of 5",
+              "file": "corner-post-right-3.stl",
+              "bytes": 60284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                185.0,
+                179.0,
+                102.088459,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-right-3",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-right-4",
+          "name": "Corner post right \u2014 segment 4 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-right-4",
+              "label": "Corner post right \u2014 segment 4 of 5",
+              "file": "corner-post-right-4.stl",
+              "bytes": 40884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                185.0,
+                179.0,
+                151.632688,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-right-4",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "corner-post-right-5",
+          "name": "Corner post right \u2014 segment 5 of 5",
+          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "versions": [
+            {
+              "id": "corner-post-right-5",
+              "label": "Corner post right \u2014 segment 5 of 5",
+              "file": "corner-post-right-5.stl",
+              "bytes": 60284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                185.0,
+                179.0,
+                201.176918,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "corner-post-right-5",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "front-post-left",
+          "name": "Front corner post (left)",
+          "note": "Short, and cut off along the panel's slope.",
+          "versions": [
+            {
+              "id": "front-post-left",
+              "label": "Front corner post (left)",
+              "file": "front-post-left.stl",
+              "bytes": 77384,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                -0.0,
+                3.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "front-post-left",
+          "visible": true,
+          "template": null,
+          "when": null
+        },
+        {
+          "id": "front-post-right",
+          "name": "Front corner post (right)",
+          "note": "The same part, mirrored.",
+          "versions": [
+            {
+              "id": "front-post-right",
+              "label": "Front corner post (right)",
+              "file": "front-post-right.stl",
+              "bytes": 77384,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                185.0,
+                -0.0,
+                3.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "front-post-right",
           "visible": true,
           "template": null,
           "when": null
@@ -519,23 +939,23 @@
               "id": "shell-base",
               "label": "Base",
               "file": "shell-base.stl",
-              "bytes": 181884,
+              "bytes": 197084,
               "matrix": [
                 1.0,
                 0.0,
                 0.0,
                 0.0,
                 0.0,
-                -1.0,
-                -0.0,
+                1.0,
                 0.0,
                 0.0,
                 0.0,
-                -1.0,
                 0.0,
-                3.0,
-                210.0,
-                11.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
                 1.0
               ]
             }
@@ -554,7 +974,7 @@
               "id": "shell-front",
               "label": "Front wall",
               "file": "shell-front.stl",
-              "bytes": 684,
+              "bytes": 2284,
               "matrix": [
                 1.0,
                 0.0,
@@ -568,9 +988,9 @@
                 1.0,
                 0.0,
                 0.0,
-                3.0,
+                31.0,
                 -0.0,
-                40.0,
+                43.318873,
                 1.0
               ]
             }
@@ -603,7 +1023,7 @@
                 1.0,
                 0.0,
                 0.0,
-                3.0,
+                31.0,
                 207.0,
                 250.721147,
                 1.0
@@ -631,16 +1051,16 @@
                 0.0,
                 0.0,
                 0.0,
-                -1.0,
-                -0.0,
+                1.0,
                 0.0,
                 0.0,
                 0.0,
-                -1.0,
+                0.0,
+                1.0,
                 0.0,
                 3.0,
-                121.487649,
-                54.916808,
+                109.487649,
+                51.916808,
                 1.0
               ]
             }
@@ -665,7 +1085,7 @@
               "id": "panel-frame",
               "label": "Panel frame",
               "file": "panel-frame.stl",
-              "bytes": 201484,
+              "bytes": 235484,
               "matrix": [
                 1.0,
                 0.0,
@@ -679,9 +1099,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                3.0,
-                103.25621,
-                55.700798,
+                6.0,
+                106.233849,
+                56.066406,
                 1.0
               ]
             }
@@ -716,9 +1136,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                16.9,
-                60.080453,
-                50.399481,
+                19.9,
+                63.058091,
+                50.765089,
                 1.0
               ]
             },
@@ -740,9 +1160,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                16.9,
-                60.080453,
-                50.399481,
+                19.9,
+                63.058091,
+                50.765089,
                 1.0
               ]
             },
@@ -764,9 +1184,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                16.9,
-                60.080453,
-                50.399481,
+                19.9,
+                63.058091,
+                50.765089,
                 1.0
               ]
             }
@@ -801,9 +1221,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                116.78,
-                60.060602,
-                50.397044,
+                119.78,
+                63.03824,
+                50.762652,
                 1.0
               ]
             },
@@ -825,9 +1245,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                116.78,
-                60.060602,
-                50.397044,
+                119.78,
+                63.03824,
+                50.762652,
                 1.0
               ]
             },
@@ -849,9 +1269,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                116.78,
-                60.060602,
-                50.397044,
+                119.78,
+                63.03824,
+                50.762652,
                 1.0
               ]
             }
@@ -886,9 +1306,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                77.9,
-                97.896461,
-                55.042703,
+                80.9,
+                100.874099,
+                55.408311,
                 1.0
               ]
             },
@@ -910,9 +1330,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                77.9,
-                97.896461,
-                55.042703,
+                80.9,
+                100.874099,
+                55.408311,
                 1.0
               ]
             },
@@ -934,9 +1354,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                77.9,
-                97.896461,
-                55.042703,
+                80.9,
+                100.874099,
+                55.408311,
                 1.0
               ]
             }
@@ -971,9 +1391,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                116.935,
-                97.941126,
-                55.048188,
+                119.935,
+                100.918764,
+                55.413796,
                 1.0
               ]
             },
@@ -995,9 +1415,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                116.935,
-                97.941126,
-                55.048188,
+                119.935,
+                100.918764,
+                55.413796,
                 1.0
               ]
             },
@@ -1019,9 +1439,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                116.935,
-                97.941126,
-                55.048188,
+                119.935,
+                100.918764,
+                55.413796,
                 1.0
               ]
             }
@@ -1056,9 +1476,9 @@
                 0.121869,
                 -0.992546,
                 0.0,
-                3.0,
-                103.25621,
-                55.700798,
+                6.0,
+                106.233849,
+                56.066406,
                 1.0
               ]
             }
@@ -1099,7 +1519,7 @@
                 -1.0,
                 0.0,
                 0.0,
-                145.0,
+                148.0,
                 210.0,
                 65.0,
                 1.0
