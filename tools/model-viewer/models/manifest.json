@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-08 22:56 UTC",
+  "generated": "2026-09-10 22:18 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -1085,7 +1085,7 @@
               "id": "panel-frame",
               "label": "Panel frame",
               "file": "panel-frame.stl",
-              "bytes": 271284,
+              "bytes": 269084,
               "matrix": [
                 1.0,
                 0.0,
