@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-10 22:18 UTC",
+  "generated": "2026-09-11 21:32 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -27,7 +27,7 @@
   "bounds": {
     "width": 216.0,
     "depth": 210.0,
-    "height": 240.0
+    "height": 250.72114697368073
   },
   "layout": {
     "panel": {
