@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-14 10:29 UTC",
+  "generated": "2026-09-14 11:38 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -519,7 +519,7 @@
               "id": "corner-post-left-1",
               "label": "Corner post left \u2014 segment 1 of 5",
               "file": "corner-post-left-1.stl",
-              "bytes": 60284,
+              "bytes": 89884,
               "matrix": [
                 1.0,
                 0.0,
@@ -694,7 +694,7 @@
               "id": "corner-post-right-1",
               "label": "Corner post right \u2014 segment 1 of 5",
               "file": "corner-post-right-1.stl",
-              "bytes": 60284,
+              "bytes": 89884,
               "matrix": [
                 1.0,
                 0.0,
@@ -869,7 +869,7 @@
               "id": "front-post-left",
               "label": "Front corner post (left)",
               "file": "front-post-left.stl",
-              "bytes": 74384,
+              "bytes": 93184,
               "matrix": [
                 1.0,
                 0.0,
@@ -904,7 +904,7 @@
               "id": "front-post-right",
               "label": "Front corner post (right)",
               "file": "front-post-right.stl",
-              "bytes": 74384,
+              "bytes": 93184,
               "matrix": [
                 1.0,
                 0.0,
@@ -939,7 +939,7 @@
               "id": "shell-base",
               "label": "Base",
               "file": "shell-base.stl",
-              "bytes": 197084,
+              "bytes": 333084,
               "matrix": [
                 1.0,
                 0.0,
