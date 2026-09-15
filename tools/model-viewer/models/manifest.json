@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-14 12:34 UTC",
+  "generated": "2026-09-15 09:27 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -449,7 +449,7 @@
               "id": "matrix-bracket-left",
               "label": "Screen bracket (left)",
               "file": "matrix-bracket-left.stl",
-              "bytes": 36884,
+              "bytes": 37684,
               "matrix": [
                 1.0,
                 0.0,
@@ -484,7 +484,7 @@
               "id": "matrix-bracket-right",
               "label": "Screen bracket (right)",
               "file": "matrix-bracket-right.stl",
-              "bytes": 36884,
+              "bytes": 37684,
               "matrix": [
                 1.0,
                 0.0,
