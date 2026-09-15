@@ -18,6 +18,7 @@ Live at: `https://<your-github-username>.github.io/fantoma-tools/`
 | [Pixel Studio](tools/pixel-studio/) | Draw sprites on an 8/16/32 grid, export PNG |
 | [SFX Forge](tools/sfx-forge/) | Compose buzzer melodies and frequency sweeps, export a `SoundStep[]` C array for `cpp/fantoma/sound.h` |
 | [Model Viewer](tools/model-viewer/) | The case parts shown assembled. Pick between printed versions, colour them, download any part — or several on one plate — ready to slice |
+| [Protoplaca](tools/protoplaca/) | Replace a breadboard with a printed plate. Draw the components and the wires between them; get bosses and wire tunnels to print. English and European Portuguese |
 
 ---
 
@@ -250,7 +251,33 @@ fantoma-tools/
         manifest.json         part list, versions, placement matrices
         *.stl                 one per part per version
         *.svg                 1:1 paper templates
+    protoplaca/
+      index.html  manifest.webmanifest  sw.js  icons/
+      DESIGN.md               what it is for, and why each decision went the way it did
 ```
+
+---
+
+## Protoplaca: the one tool that is not about Fantoma
+
+It lives here because this is where the tools live, and it shares the shell —
+one static page, no build step, the storage layer, the service worker. It shares
+nothing else: it must never reach into `fantoma/python/case` or `case_params.py`.
+If it ever needs to, the feature belongs in Fantoma rather than here.
+
+It is also the first bilingual tool. Every user-visible string sits in one
+catalogue at the top of its script, in English and European Portuguese; the
+language is remembered per browser. The shared Export / Import panel is still
+English, because that lives in `shared/app.js` and is used by three tools that
+have no translations.
+
+`tools/protoplaca/DESIGN.md` carries the reasoning — the coordinate convention,
+why the STL is derived rather than stored, why there is no CAD kernel, and why
+tunnels are the default but the ends of a wire are not. Read it before changing
+geometry decisions.
+
+**Built so far: step 1**, the drawing surface — plate, grid, rulers, pan and
+zoom, guides and measuring. The project document and its file format are step 2.
 
 ---
 

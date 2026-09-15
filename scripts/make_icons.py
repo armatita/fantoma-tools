@@ -188,11 +188,41 @@ def model_viewer_icon():
     return g
 
 
+def protoplaca_icon():
+    """Protoplaca: a wire crossing the plate, with a tunnel arch over it.
+
+    The three things the tool is about, in the order you meet them -- the
+    plate you print, the wire you route, and the retainer that holds it down.
+    """
+    sprite = [
+        '................',
+        '................',
+        '................',
+        '................',
+        '....########....',
+        '....#......#....',
+        '....#......#....',
+        '....#......#....',
+        'wwww#wwwwww#wwww',
+        'oooooooooooooooo',
+        'oooooooooooooooo',
+        'oooooooooooooooo',
+        '................',
+        '................',
+        '................',
+        '................',
+    ]
+    g = Grid('#0d0d12')
+    g.art(sprite, {'#': '#c8c6c9', 'o': '#787677', 'w': '#4dd8ff'})
+    return g
+
+
 ICONS = {
     'icons': hub_icon,
     'tools/pixel-studio/icons': pixel_studio_icon,
     'tools/sfx-forge/icons': sfx_forge_icon,
     'tools/model-viewer/icons': model_viewer_icon,
+    'tools/protoplaca/icons': protoplaca_icon,
 }
 
 

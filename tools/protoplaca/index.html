@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Protoplaca</title>
+<meta name="description" content="Design a printed plate that replaces a breadboard: components, bosses and wire retainers.">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: #0d0d12;
+    color: #f4f4f2;
+    font-family: 'Courier New', ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: flex;
+    justify-content: center;
+    padding: 18px 14px 40px;
+  }
+  .wrap { width: 100%; max-width: 1180px; }
+
+  h1 {
+    font-size: 15px; font-weight: 700; letter-spacing: 0.08em;
+    margin: 0; text-transform: uppercase; color: #4dd8ff; display: inline-block;
+  }
+  .headrow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .sub { font-size: 11px; color: #6b6b76; margin: 4px 0 14px; }
+
+  .cols { display: block; }
+  @media (min-width: 880px) {
+    .cols { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; align-items: start; }
+  }
+
+  /* The canvas draws its own rulers, so there is nothing to keep in sync
+     with a separate element -- the ruler strips are just an inset of the
+     same drawing surface. */
+  #stage {
+    position: relative; width: 100%; height: 62vh; min-height: 380px;
+    border: 1px solid #2b2b36; border-radius: 8px; overflow: hidden;
+    background: #14141a; touch-action: none; user-select: none;
+  }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+
+  .statusbar {
+    display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+    font-size: 11px; color: #9a9aa4; margin-top: 8px; min-height: 18px;
+  }
+  .statusbar b { color: #f4f4f2; font-weight: 400; }
+  .statusbar .sep { color: #2b2b36; }
+  .statusbar .hint { color: #6b6b76; }
+
+  .panel { border: 1px solid #2b2b36; border-radius: 8px; padding: 12px; margin-top: 14px; }
+  @media (min-width: 880px) { .panel:first-child { margin-top: 0; } }
+  .panel h2 {
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #4dd8ff; margin: 0 0 10px; font-weight: 700;
+  }
+  .field { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #9a9aa4; }
+  .field label { flex: 1; }
+  .field input[type=number], .field select {
+    width: 92px; background: #17171f; border: 1px solid #2b2b36; border-radius: 6px;
+    color: #f4f4f2; padding: 6px 8px; font-size: 12px; font-family: inherit;
+  }
+  .field select { width: 110px; }
+  .field .unit { color: #6b6b76; width: 18px; }
+
+  .row { display: flex; gap: 6px; margin-top: 10px; }
+  button {
+    border: 1px solid #2b2b36; background: #17171f; color: #f4f4f2;
+    border-radius: 6px; padding: 7px 10px; font-size: 12px; letter-spacing: 0.03em;
+    cursor: pointer; font-family: inherit; flex: 1;
+  }
+  button:active { transform: translateY(1px); }
+  button.active { background: #4dd8ff; color: #0d0d12; border-color: #4dd8ff; }
+
+  .langswitch { display: flex; gap: 4px; }
+  .langswitch button { padding: 4px 8px; font-size: 10px; flex: 0 0 auto; letter-spacing: 0.1em; }
+
+  .note { font-size: 11px; color: #6b6b76; line-height: 1.55; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="headrow">
+    <h1>Protoplaca</h1>
+    <div class="langswitch">
+      <button type="button" id="langEn">EN</button>
+      <button type="button" id="langPt">PT</button>
+    </div>
+  </div>
+  <div class="sub" id="subtitle"></div>
+
+  <div class="cols">
+    <div>
+      <div id="stage"><canvas id="cv"></canvas></div>
+      <div class="statusbar">
+        <span>X <b id="curX">—</b></span>
+        <span>Y <b id="curY">—</b></span>
+        <span class="sep">|</span>
+        <span id="zoomLabel"></span>
+        <span class="sep">|</span>
+        <span class="hint" id="hint"></span>
+      </div>
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2 id="ttPlate"></h2>
+        <div class="field">
+          <label for="plateW" id="lbW"></label>
+          <input type="number" id="plateW" inputmode="decimal" min="10" max="500" step="1" value="120">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field">
+          <label for="plateH" id="lbH"></label>
+          <input type="number" id="plateH" inputmode="decimal" min="10" max="500" step="1" value="80">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field">
+          <label for="plateT" id="lbT"></label>
+          <input type="number" id="plateT" inputmode="decimal" min="1" max="20" step="0.2" value="3">
+          <span class="unit">mm</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 id="ttView"></h2>
+        <div class="field">
+          <label for="gridSel" id="lbGrid"></label>
+          <select id="gridSel">
+            <option value="1">1 mm</option>
+            <option value="2.54">2.54 mm</option>
+            <option value="5">5 mm</option>
+            <option value="0" id="optNoGrid"></option>
+          </select>
+        </div>
+        <div class="row">
+          <button type="button" id="fitBtn"></button>
+          <button type="button" id="measureBtn"></button>
+        </div>
+        <div class="row">
+          <button type="button" id="clearGuidesBtn"></button>
+        </div>
+        <div class="note" id="viewNote"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="dataPanelHost"></div>
+
+</div>
+
+<script src="../../shared/storage.js"></script>
+<script src="../../shared/app.js"></script>
+<script>
+'use strict';
+
+/* ==========================================================================
+   Protoplaca — step 1: the canvas.
+
+   Plate, grid, rulers, pan and zoom, guides, measuring. Nothing is generated
+   and nothing is saved yet beyond the language choice; the project document
+   and its file format arrive in step 2. See DESIGN.md for why the steps are
+   cut this way.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   Language
+   --------------------------------------------------------------------------
+   Every user-visible string lives here, from the first commit, because
+   retrofitting i18n is miserable and doing it from the start costs nothing.
+   Portuguese here is European Portuguese, not Brazilian.
+   -------------------------------------------------------------------------- */
+var STRINGS = {
+  en: {
+    subtitle: 'step 1 — the drawing surface',
+    plate: 'Plate',
+    width: 'Width',
+    height: 'Height',
+    thickness: 'Thickness',
+    view: 'View',
+    grid: 'Grid',
+    noGrid: 'off',
+    fit: 'Fit',
+    measure: 'Measure',
+    clearGuides: 'Clear guides',
+    zoom: 'Zoom',
+    hintIdle: 'drag to pan · wheel to zoom · drag off a ruler for a guide',
+    hintGuide: 'drop it back on the ruler to delete it',
+    hintMeasureStart: 'click the first point',
+    hintMeasureEnd: 'click the second point · Esc to cancel',
+    viewNote: 'Origin 0,0 is the bottom-left corner of the plate. X runs right, '
+      + 'Y runs up. Drag down from the top ruler or right from the left ruler '
+      + 'to place a guide; double-click a guide to remove it.',
+    dist: 'distance'
+  },
+  pt: {
+    subtitle: 'passo 1 — a área de desenho',
+    plate: 'Placa',
+    width: 'Largura',
+    height: 'Altura',
+    thickness: 'Espessura',
+    view: 'Vista',
+    grid: 'Grelha',
+    noGrid: 'desligada',
+    fit: 'Ajustar',
+    measure: 'Medir',
+    clearGuides: 'Limpar guias',
+    zoom: 'Ampliação',
+    hintIdle: 'arraste para deslocar · roda para ampliar · arraste de uma régua para uma guia',
+    hintGuide: 'largue-a sobre a régua para a apagar',
+    hintMeasureStart: 'clique no primeiro ponto',
+    hintMeasureEnd: 'clique no segundo ponto · Esc para cancelar',
+    viewNote: 'A origem 0,0 é o canto inferior esquerdo da placa. X cresce para a '
+      + 'direita, Y para cima. Arraste da régua de cima para baixo, ou da régua '
+      + 'da esquerda para a direita, para colocar uma guia; duplo clique numa '
+      + 'guia remove-a.',
+    dist: 'distância'
+  }
+};
+
+var lang = 'en';
+function t(key) { return STRINGS[lang][key]; }
+
+/* Numbers are always formatted with a decimal POINT, in both languages.
+   toFixed does that regardless of locale; toLocaleString would not. */
+function mm(value, places) {
+  return value.toFixed(places === undefined ? 1 : places);
+}
+
+
+/* --------------------------------------------------------------------------
+   The document, so far
+   -------------------------------------------------------------------------- */
+var plate = { w: 120, h: 80, thickness: 3 };
+var guides = [];          // { axis: 'x' | 'y', v: mm }
+var gridPitch = 1;        // mm; 0 means no grid and no snapping
+
+
+/* --------------------------------------------------------------------------
+   Coordinates
+   --------------------------------------------------------------------------
+   World coordinates are millimetres with 0,0 at the plate's bottom-left
+   corner, X right and Y up — the modelling convention, chosen so the mesh
+   generator never has to flip an axis. The screen has Y increasing downward,
+   so the flip happens HERE and in no other place in the program. If a part
+   ever comes out mirrored, these four lines are the entire suspect list.
+   -------------------------------------------------------------------------- */
+var RULER = 22;           // px: width of the left ruler, height of the top one
+
+var view = { scale: 4, x0: -10, y0: -10 };   // px per mm, and the world point
+                                             // at the plot area's bottom-left
+
+var plot = { x0: RULER, y0: RULER, x1: 0, y1: 0 };   // px, filled in on resize
+
+function sx(wx) { return plot.x0 + (wx - view.x0) * view.scale; }
+function sy(wy) { return plot.y1 - (wy - view.y0) * view.scale; }
+function wx(px) { return view.x0 + (px - plot.x0) / view.scale; }
+function wy(py) { return view.y0 + (plot.y1 - py) / view.scale; }
+
+function snap(value) {
+  if (!gridPitch) return value;
+  return Math.round(value / gridPitch) * gridPitch;
+}
+
+
+/* --------------------------------------------------------------------------
+   Canvas plumbing
+   -------------------------------------------------------------------------- */
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+var W = 0, H = 0;         // CSS pixels
+var pending = false;
+
+function draw() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(function () { pending = false; render(); });
+}
+
+/* Match the drawing surface to the element it is drawn into. Returns true if
+   anything changed.
+
+   This is checked at the start of every render rather than only when a
+   ResizeObserver fires, because those callbacks are delivered as part of a
+   rendering update -- a window that is not painting can hold them back
+   indefinitely, and the canvas would keep drawing at yesterday's width. The
+   ruler would then be quietly wrong, which is the one thing this tool cannot
+   afford. A rect read per frame is cheap; a lying ruler is not.
+
+   The CANVAS rect, not the stage's: the stage has a 1px border and a
+   scrollbar may come and go beside it, so the two boxes differ. */
+function syncSize() {
+  var rect = cv.getBoundingClientRect();
+  var w = Math.max(1, Math.round(rect.width));
+  var h = Math.max(1, Math.round(rect.height));
+  if (w === W && h === H) return false;
+
+  var dpr = window.devicePixelRatio || 1;
+  W = w;
+  H = h;
+  cv.width = Math.round(W * dpr);
+  cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // draw in CSS px, render at device px
+  plot.x1 = W;
+  plot.y1 = H;
+  return true;
+}
+
+// These only ask for a redraw; the redraw works out the new size for itself.
+if (window.ResizeObserver) new ResizeObserver(draw).observe(cv);
+window.addEventListener('resize', draw);
+
+
+/* --------------------------------------------------------------------------
+   Drawing
+   -------------------------------------------------------------------------- */
+var COL = {
+  bg: '#14141a',
+  plate: '#1e1e28',
+  gridDim: 'rgba(255,255,255,0.045)',
+  gridDimMajor: 'rgba(255,255,255,0.085)',
+  grid: 'rgba(255,255,255,0.075)',
+  gridMajor: 'rgba(255,255,255,0.16)',
+  plateEdge: '#6f6f80',
+  axis: '#4dd8ff',
+  ruler: '#101016',
+  rulerEdge: '#2b2b36',
+  tick: '#4a4a58',
+  label: '#8a8a96',
+  guide: '#ffb648',
+  measure: '#4dd8ff'
+};
+
+/* A "nice" step is one a person reads without counting: 1, 2, 5 and their
+   decades. Pick the smallest one that leaves at least minPx between lines. */
+function niceStep(minPx) {
+  var steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+  for (var i = 0; i < steps.length; i++) {
+    if (steps[i] * view.scale >= minPx) return steps[i];
+  }
+  return steps[steps.length - 1];
+}
+
+function line(x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+/* Half-pixel offset so a 1px line lands on one row of pixels instead of
+   straddling two and coming out grey and fat. */
+function crisp(v) { return Math.round(v) + 0.5; }
+
+/* Below this, grid lines are closer together than they are wide and the grid
+   turns into a grey wash, so that density is dropped. 3.5px rather than a
+   rounder 5: a 120mm plate fitted to a laptop window lands at about 5 px/mm,
+   and a 1mm grid that disappears exactly when you first open the tool is a
+   poor way to introduce it. */
+var MIN_GRID_PX = 3.5;
+
+function drawGridLines(minor, major, dimColour, majorColour) {
+  var left = wx(plot.x0), right = wx(plot.x1);
+  var bottom = wy(plot.y1), top = wy(plot.y0);
+  var i, v;
+
+  ctx.lineWidth = 1;
+
+  if (minor * view.scale >= MIN_GRID_PX) {
+    ctx.strokeStyle = dimColour;
+    ctx.beginPath();
+    for (i = Math.ceil(left / minor); i * minor <= right; i++) {
+      v = crisp(sx(i * minor));
+      ctx.moveTo(v, plot.y0); ctx.lineTo(v, plot.y1);
+    }
+    for (i = Math.ceil(bottom / minor); i * minor <= top; i++) {
+      v = crisp(sy(i * minor));
+      ctx.moveTo(plot.x0, v); ctx.lineTo(plot.x1, v);
+    }
+    ctx.stroke();
+  }
+
+  if (major * view.scale >= MIN_GRID_PX) {
+    ctx.strokeStyle = majorColour;
+    ctx.beginPath();
+    for (i = Math.ceil(left / major); i * major <= right; i++) {
+      v = crisp(sx(i * major));
+      ctx.moveTo(v, plot.y0); ctx.lineTo(v, plot.y1);
+    }
+    for (i = Math.ceil(bottom / major); i * major <= top; i++) {
+      v = crisp(sy(i * major));
+      ctx.moveTo(plot.x0, v); ctx.lineTo(plot.x1, v);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawGrid() {
+  var minor = gridPitch || 10;
+  var major = minor * 10;
+
+  // Dim everywhere, bright inside the plate. The plate is where the work
+  // happens; outside it the grid is context, not a working surface.
+  drawGridLines(minor, major, COL.gridDim, COL.gridDimMajor);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plot.x0, plot.y0, plot.x1 - plot.x0, plot.y1 - plot.y0);
+  ctx.clip();
+  ctx.beginPath();
+  ctx.rect(sx(0), sy(plate.h), plate.w * view.scale, plate.h * view.scale);
+  ctx.clip();
+  drawGridLines(minor, major, COL.grid, COL.gridMajor);
+  ctx.restore();
+}
+
+function drawPlate() {
+  var x = sx(0), y = sy(plate.h);
+  var w = plate.w * view.scale, h = plate.h * view.scale;
+
+  ctx.fillStyle = COL.plate;
+  ctx.fillRect(x, y, w, h);
+
+  ctx.strokeStyle = COL.plateEdge;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(crisp(x), crisp(y), Math.round(w), Math.round(h));
+
+  // The origin corner, marked so the coordinate convention is visible rather
+  // than something you have to remember.
+  ctx.strokeStyle = COL.axis;
+  ctx.lineWidth = 2;
+  var ox = sx(0), oy = sy(0), arm = Math.min(18, w * 0.4, h * 0.4);
+  line(ox, oy, ox + arm, oy);
+  line(ox, oy, ox, oy - arm);
+  ctx.fillStyle = COL.axis;
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('0,0', ox + 4, oy + 4);
+}
+
+function drawGuides() {
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = COL.guide;
+  ctx.setLineDash([4, 4]);
+  for (var i = 0; i < guides.length; i++) {
+    var g = guides[i];
+    if (g.axis === 'x') {
+      var px = crisp(sx(g.v));
+      if (px >= plot.x0 && px <= plot.x1) line(px, plot.y0, px, plot.y1);
+    } else {
+      var py = crisp(sy(g.v));
+      if (py >= plot.y0 && py <= plot.y1) line(plot.x0, py, plot.x1, py);
+    }
+  }
+  ctx.setLineDash([]);
+}
+
+function drawRulers() {
+  var step = niceStep(56);          // labelled ticks
+  var minor = step / 5;
+  var i, p;
+
+  ctx.fillStyle = COL.ruler;
+  ctx.fillRect(0, 0, W, RULER);
+  ctx.fillRect(0, 0, RULER, H);
+
+  ctx.strokeStyle = COL.rulerEdge;
+  ctx.lineWidth = 1;
+  line(0, crisp(RULER), W, crisp(RULER));
+  line(crisp(RULER), 0, crisp(RULER), H);
+
+  ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
+  ctx.fillStyle = COL.label;
+
+  // Top ruler: X
+  ctx.strokeStyle = COL.tick;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  var left = wx(plot.x0), right = wx(plot.x1);
+  ctx.beginPath();
+  for (i = Math.ceil(left / minor); i * minor <= right; i++) {
+    p = crisp(sx(i * minor));
+    ctx.moveTo(p, RULER - 4); ctx.lineTo(p, RULER);
+  }
+  ctx.stroke();
+  for (i = Math.ceil(left / step); i * step <= right; i++) {
+    p = sx(i * step);
+    ctx.strokeStyle = COL.label;
+    line(crisp(p), RULER - 8, crisp(p), RULER);
+    ctx.fillText(mm(i * step, step < 1 ? 1 : 0), p + 3, 3);
+  }
+
+  // Left ruler: Y. Numbers increase upward, which is the whole point of
+  // choosing the modelling convention — the ruler reads like a ruler.
+  ctx.strokeStyle = COL.tick;
+  var bottom = wy(plot.y1), top = wy(plot.y0);
+  ctx.beginPath();
+  for (i = Math.ceil(bottom / minor); i * minor <= top; i++) {
+    p = crisp(sy(i * minor));
+    ctx.moveTo(RULER - 4, p); ctx.lineTo(RULER, p);
+  }
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  for (i = Math.ceil(bottom / step); i * step <= top; i++) {
+    p = sy(i * step);
+    ctx.strokeStyle = COL.label;
+    line(RULER - 8, crisp(p), RULER, crisp(p));
+    ctx.save();
+    ctx.translate(3, p - 3);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'left';
+    ctx.fillText(mm(i * step, step < 1 ? 1 : 0), 0, 10);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = COL.ruler;
+  ctx.fillRect(0, 0, RULER, RULER);
+  ctx.strokeStyle = COL.rulerEdge;
+  ctx.strokeRect(0.5, 0.5, RULER - 1, RULER - 1);
+  ctx.fillStyle = COL.label;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('mm', RULER / 2, RULER / 2);
+}
+
+function drawMeasure() {
+  if (!measure.a) return;
+  var b = measure.b || measure.live;
+  if (!b) return;
+
+  var ax = sx(measure.a.x), ay = sy(measure.a.y);
+  var bx = sx(b.x), by = sy(b.y);
+
+  ctx.strokeStyle = COL.measure;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  line(ax, ay, bx, by);
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = COL.measure;
+  ctx.beginPath(); ctx.arc(ax, ay, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI * 2); ctx.fill();
+}
+
+function render() {
+  // Until you pan or zoom, the plate stays fitted through every layout change
+  // -- the window resizing, a scrollbar appearing, the panel reflowing. After
+  // that the view is yours and a resize leaves it alone.
+  if (syncSize() && !userAdjusted) fit();
+
+  ctx.fillStyle = COL.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plot.x0, plot.y0, plot.x1 - plot.x0, plot.y1 - plot.y0);
+  ctx.clip();
+
+  drawPlate();
+  drawGrid();
+  drawGuides();
+  drawMeasure();
+
+  ctx.restore();
+
+  drawRulers();
+  updateStatus();
+}
+
+
+/* --------------------------------------------------------------------------
+   Status bar
+   -------------------------------------------------------------------------- */
+var cursor = null;        // world coords, or null when off the plot area
+var measure = { on: false, a: null, b: null, live: null };
+
+function updateStatus() {
+  document.getElementById('curX').textContent = cursor ? mm(cursor.x, 2) : '—';
+  document.getElementById('curY').textContent = cursor ? mm(cursor.y, 2) : '—';
+  document.getElementById('zoomLabel').textContent =
+    t('zoom') + ' ' + mm(view.scale, 2) + ' px/mm';
+
+  var hint = document.getElementById('hint');
+  if (measure.on && measure.a && !measure.b) {
+    hint.textContent = t('hintMeasureEnd');
+  } else if (measure.on && !measure.a) {
+    hint.textContent = t('hintMeasureStart');
+  } else if (drag && drag.kind === 'guide') {
+    hint.textContent = t('hintGuide');
+  } else if (measure.a && measure.b) {
+    var dx = measure.b.x - measure.a.x, dy = measure.b.y - measure.a.y;
+    hint.textContent = 'Δx ' + mm(dx, 2) + '  Δy ' + mm(dy, 2)
+      + '  ' + t('dist') + ' ' + mm(Math.sqrt(dx * dx + dy * dy), 2) + ' mm';
+  } else {
+    hint.textContent = t('hintIdle');
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   View control
+   -------------------------------------------------------------------------- */
+function fit() {
+  var padPx = 26;
+  var availW = Math.max(40, (plot.x1 - plot.x0) - padPx * 2);
+  var availH = Math.max(40, (plot.y1 - plot.y0) - padPx * 2);
+  view.scale = Math.min(availW / plate.w, availH / plate.h);
+  // Centre the plate: put its middle at the middle of the plot area.
+  view.x0 = plate.w / 2 - (plot.x1 - plot.x0) / 2 / view.scale;
+  view.y0 = plate.h / 2 - (plot.y1 - plot.y0) / 2 / view.scale;
+}
+
+function zoomAt(px, py, factor) {
+  userAdjusted = true;
+  var before = { x: wx(px), y: wy(py) };
+  view.scale = Math.max(0.4, Math.min(80, view.scale * factor));
+  // Keep the world point under the pointer exactly where it was.
+  view.x0 = before.x - (px - plot.x0) / view.scale;
+  view.y0 = before.y - (plot.y1 - py) / view.scale;
+  draw();
+}
+
+
+/* --------------------------------------------------------------------------
+   Pointer handling
+   -------------------------------------------------------------------------- */
+var drag = null;
+var userAdjusted = false; // has the user taken control of the view?
+var pointers = {};        // active pointers, for pinch
+var pinchStart = null;
+
+function localPoint(e) {
+  var r = cv.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function zoneOf(p) {
+  if (p.x < RULER && p.y < RULER) return 'corner';
+  if (p.y < RULER) return 'rulerTop';
+  if (p.x < RULER) return 'rulerLeft';
+  return 'plot';
+}
+
+function guideAt(p) {
+  var tol = 4;
+  for (var i = 0; i < guides.length; i++) {
+    var g = guides[i];
+    if (g.axis === 'x' && Math.abs(sx(g.v) - p.x) <= tol) return g;
+    if (g.axis === 'y' && Math.abs(sy(g.v) - p.y) <= tol) return g;
+  }
+  return null;
+}
+
+cv.addEventListener('pointerdown', function (e) {
+  cv.setPointerCapture(e.pointerId);
+  pointers[e.pointerId] = localPoint(e);
+
+  var ids = Object.keys(pointers);
+  if (ids.length === 2) {
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), scale: view.scale };
+    drag = null;
+    return;
+  }
+
+  var p = localPoint(e);
+  var zone = zoneOf(p);
+
+  if (zone === 'rulerTop') {
+    // Dragging down from the top ruler produces a horizontal guide: one
+    // constant Y. Same convention as every drawing program.
+    var gy = { axis: 'y', v: snap(wy(p.y)) };
+    guides.push(gy);
+    drag = { kind: 'guide', guide: gy };
+  } else if (zone === 'rulerLeft') {
+    var gx = { axis: 'x', v: snap(wx(p.x)) };
+    guides.push(gx);
+    drag = { kind: 'guide', guide: gx };
+  } else if (zone === 'plot') {
+    if (measure.on) {
+      if (!measure.a || measure.b) {
+        measure.a = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
+        measure.b = null;
+      } else {
+        measure.b = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
+      }
+      draw();
+      return;
+    }
+    var hit = guideAt(p);
+    if (hit) {
+      drag = { kind: 'guide', guide: hit };
+    } else {
+      drag = { kind: 'pan', from: p, x0: view.x0, y0: view.y0 };
+    }
+  }
+  draw();
+});
+
+cv.addEventListener('pointermove', function (e) {
+  var p = localPoint(e);
+  if (pointers[e.pointerId]) pointers[e.pointerId] = p;
+
+  var ids = Object.keys(pointers);
+  if (ids.length === 2 && pinchStart) {
+    var a = pointers[ids[0]], b = pointers[ids[1]];
+    var dist = Math.hypot(a.x - b.x, a.y - b.y);
+    var mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    if (pinchStart.dist > 0) {
+      var target = pinchStart.scale * (dist / pinchStart.dist);
+      zoomAt(mid.x, mid.y, target / view.scale);
+    }
+    return;
+  }
+
+  cursor = zoneOf(p) === 'plot' ? { x: wx(p.x), y: wy(p.y) } : null;
+
+  if (drag && drag.kind === 'guide') {
+    drag.guide.v = snap(drag.guide.axis === 'x' ? wx(p.x) : wy(p.y));
+  } else if (drag && drag.kind === 'pan') {
+    userAdjusted = true;
+    view.x0 = drag.x0 - (p.x - drag.from.x) / view.scale;
+    view.y0 = drag.y0 + (p.y - drag.from.y) / view.scale;
+  } else if (measure.on && measure.a && !measure.b) {
+    measure.live = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
+  } else {
+    cv.style.cursor = guideAt(p) ? 'move' : 'default';
+  }
+  draw();
+});
+
+function endPointer(e) {
+  delete pointers[e.pointerId];
+  if (Object.keys(pointers).length < 2) pinchStart = null;
+
+  if (drag && drag.kind === 'guide') {
+    // Dropped back over its own ruler: the standard way to throw a guide away.
+    var p = localPoint(e);
+    var zone = zoneOf(p);
+    var onItsRuler = (drag.guide.axis === 'x' && zone === 'rulerLeft')
+                  || (drag.guide.axis === 'y' && zone === 'rulerTop');
+    if (onItsRuler || zone === 'corner') removeGuide(drag.guide);
+  }
+  drag = null;
+  draw();
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+
+cv.addEventListener('pointerleave', function () {
+  cursor = null;
+  draw();
+});
+
+cv.addEventListener('dblclick', function (e) {
+  var g = guideAt(localPoint(e));
+  if (g) { removeGuide(g); draw(); }
+});
+
+cv.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  var p = localPoint(e);
+  zoomAt(p.x, p.y, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+}, { passive: false });
+
+function removeGuide(g) {
+  var i = guides.indexOf(g);
+  if (i >= 0) guides.splice(i, 1);
+}
+
+window.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    measure.a = measure.b = measure.live = null;
+    draw();
+  }
+});
+
+
+/* --------------------------------------------------------------------------
+   Controls
+   -------------------------------------------------------------------------- */
+function num(el, fallback) {
+  var v = parseFloat(el.value);      // always a decimal point, never a comma
+  return isFinite(v) ? v : fallback;
+}
+
+var plateW = document.getElementById('plateW');
+var plateH = document.getElementById('plateH');
+var plateT = document.getElementById('plateT');
+
+function readPlate() {
+  plate.w = Math.max(10, num(plateW, plate.w));
+  plate.h = Math.max(10, num(plateH, plate.h));
+  plate.thickness = Math.max(1, num(plateT, plate.thickness));
+  if (!userAdjusted) fit();
+  draw();
+}
+plateW.addEventListener('input', readPlate);
+plateH.addEventListener('input', readPlate);
+plateT.addEventListener('input', readPlate);
+
+var gridSel = document.getElementById('gridSel');
+gridSel.addEventListener('change', function () {
+  gridPitch = parseFloat(gridSel.value) || 0;
+  draw();
+});
+
+document.getElementById('fitBtn').onclick = function () {
+  userAdjusted = false;   // hand the view back, so it tracks layout again
+  fit();
+  draw();
+};
+
+var measureBtn = document.getElementById('measureBtn');
+measureBtn.onclick = function () {
+  measure.on = !measure.on;
+  measure.a = measure.b = measure.live = null;
+  measureBtn.classList.toggle('active', measure.on);
+  draw();
+};
+
+document.getElementById('clearGuidesBtn').onclick = function () {
+  guides.length = 0;
+  draw();
+};
+
+
+/* --------------------------------------------------------------------------
+   Boot
+   -------------------------------------------------------------------------- */
+var store = Fantoma.store('protoplaca');
+
+function applyLang() {
+  document.documentElement.lang = (lang === 'pt' ? 'pt-PT' : 'en');
+  document.getElementById('subtitle').textContent = t('subtitle');
+  document.getElementById('ttPlate').textContent = t('plate');
+  document.getElementById('lbW').textContent = t('width');
+  document.getElementById('lbH').textContent = t('height');
+  document.getElementById('lbT').textContent = t('thickness');
+  document.getElementById('ttView').textContent = t('view');
+  document.getElementById('lbGrid').textContent = t('grid');
+  document.getElementById('optNoGrid').textContent = t('noGrid');
+  document.getElementById('fitBtn').textContent = t('fit');
+  document.getElementById('measureBtn').textContent = t('measure');
+  document.getElementById('clearGuidesBtn').textContent = t('clearGuides');
+  document.getElementById('viewNote').textContent = t('viewNote');
+  document.getElementById('langEn').classList.toggle('active', lang === 'en');
+  document.getElementById('langPt').classList.toggle('active', lang === 'pt');
+  draw();
+}
+
+function setLang(next) {
+  lang = next;
+  store.set('lang', next);      // a preference, not part of the document
+  applyLang();
+}
+document.getElementById('langEn').onclick = function () { setLang('en'); };
+document.getElementById('langPt').onclick = function () { setLang('pt'); };
+
+lang = store.get('lang')
+    || (String(navigator.language || '').toLowerCase().indexOf('pt') === 0 ? 'pt' : 'en');
+
+applyLang();
+render();     // synchronous, so the first paint is already the right size
+
+FantomaApp.init({
+  toolId: 'protoplaca',
+  store: store,
+  accent: '#4dd8ff',
+  mountInto: document.getElementById('dataPanelHost'),
+  onImport: function () { location.reload(); }
+});
+</script>
+</body>
+</html>
