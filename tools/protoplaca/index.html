@@ -440,6 +440,20 @@
           <input type="number" id="profHole" inputmode="decimal" step="0.1" min="0.2">
           <span class="unit">mm</span>
         </div>
+        <div class="field narrow">
+          <label for="profAllow" id="lbAllow"></label>
+          <input type="number" id="profAllow" inputmode="decimal" step="0.05">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field">
+          <label id="lbDrawn"></label>
+          <span class="unit" style="width:auto" id="drawnDia">—</span>
+        </div>
+        <div class="field narrow">
+          <label for="profMinPen" id="lbMinPen"></label>
+          <input type="number" id="profMinPen" inputmode="decimal" step="0.05" min="0.2">
+          <span class="unit">mm</span>
+        </div>
         <div class="field">
           <label id="lbSource"></label>
           <span class="src" id="holeSrc">—</span>
@@ -657,6 +671,9 @@ var STRINGS = {
     profile: 'Print profile',
     wall: 'Wall',
     minHole: 'Smallest hole',
+    allow: 'Allowance',
+    drawnAs: 'Drawn as',
+    minPen: 'Thinnest pen',
     holeFrom: 'This hole is',
     srcMeasured: 'measured',
     srcStandard: 'standard size',
@@ -828,6 +845,9 @@ var STRINGS = {
     profile: 'Perfil de impress\u00e3o',
     wall: 'Parede',
     minHole: 'Furo m\u00ednimo',
+    allow: 'Compensa\u00e7\u00e3o',
+    drawnAs: 'Desenhado a',
+    minPen: 'Tra\u00e7o m\u00ednimo',
     holeFrom: 'Este furo \u00e9',
     srcMeasured: 'medido',
     srcStandard: 'medida padr\u00e3o',
@@ -954,8 +974,34 @@ function defaultProfile() {
     // Whose printer these numbers describe. Results mean nothing without it:
     // the same 1.6 mm pilot measured 0.925 mm under one slicer profile and
     // 1.580 mm under another, from settings alone.
-    source: 'Elegoo Centauri Carbon \u00b7 PLA \u00b7 FINISH profile',
-    minHole: 1.5,         // below this a round hole stops being round
+    source: 'Elegoo Centauri Carbon \u00b7 Tucab PLA 3D850 white \u00b7 FINISH profile',
+
+    /* MEASURED on the calibration coupon, 18 holes.
+       1.5 was the old floor, from through-holes in a 3 mm plate on the
+       previous filament. On this one a 1.1 mm self-tap hole came out at 1.02,
+       round, and took its screw -- so the concept holds and the number does
+       not. Kept as a profile value precisely because it moves with the spool. */
+    minHole: 1.0,
+
+    /* How much wider to draw a hole than the table asks for.
+
+       The coupon lost 0.14 +/- 0.08 mm across all eighteen holes, so a hole
+       drawn at the tapping size arrives under it. This is one number per
+       fixing rather than eighteen corrected sizes, which keeps the table
+       meaning what it says -- M3 self-tap is 2.5 because that is the tapping
+       size -- and puts the machine's behaviour somewhere of its own.
+
+       Self-tap: 0.15, so the hole lands where the table intends. The screws
+       bit at the undersized diameters too, but a little wider was reported as
+       more comfortable and T2's sweep showed a wide safe band either side.
+
+       Clearance: 0. They already pass a screw; wider would only be looser.
+
+       Insert: 0, and deliberately untested. An insert hole coming out tight is
+       what heat-set wants, and nobody has yet pushed an insert into one. */
+    allow: { selftap: 0.15, insert: 0, clearance: 0 },
+
+    minPen: 0.5,          // the thinnest raised line worth drawing
     wall: 2,              // mm of material around the hole
 
     // Retainers: the tunnels and clips that hold a wire on its path.
@@ -1009,12 +1055,15 @@ function defaultHoleSource() {
   return {
     // M2 and M3 self-tap pilots: swept on T2 and both took their screws
     // without splitting or stripping at 2-3 mm of engagement.
-    M1_4: { selftap: 'standard', insert: 'assumed',  clearance: 'standard' },
-    M1_7: { selftap: 'assumed',  insert: 'assumed',  clearance: 'assumed'  },
+    /* Every self-tap size took its screw on the coupon, so the whole column
+       is measured now. The inserts are not: their holes were measured but no
+       insert has been pushed into one, and a diameter is not a fit. */
+    M1_4: { selftap: 'measured', insert: 'assumed',  clearance: 'standard' },
+    M1_7: { selftap: 'measured', insert: 'assumed',  clearance: 'assumed'  },
     M2:   { selftap: 'measured', insert: 'assumed',  clearance: 'standard' },
-    M2_5: { selftap: 'standard', insert: 'assumed',  clearance: 'standard' },
+    M2_5: { selftap: 'measured', insert: 'assumed',  clearance: 'standard' },
     M3:   { selftap: 'measured', insert: 'assumed',  clearance: 'standard' },
-    M4:   { selftap: 'standard', insert: 'assumed',  clearance: 'standard' }
+    M4:   { selftap: 'measured', insert: 'assumed',  clearance: 'standard' }
   };
 }
 
@@ -1036,9 +1085,18 @@ var FIXINGS = ['selftap', 'insert', 'clearance'];
 
 function sizeLabel(key) { return key.replace('_', '.'); }
 
-function holeDia(b) {
+/* What the table says. */
+function holeNominal(b) {
   var row = doc.profile.holes[b.size] || doc.profile.holes.M3;
   return numOr(row[b.fixing], 2.5, 0.2, 40);
+}
+
+/* What gets drawn: the table plus this filament's allowance. Everything that
+   makes geometry uses this one, so the bore, the plate's hole and the drawing
+   can never disagree about which number they meant. */
+function holeDia(b) {
+  var allow = (doc.profile.allow && doc.profile.allow[b.fixing]) || 0;
+  return Math.max(0.2, holeNominal(b) + allow);
 }
 
 function bossOuterDia(b) {
@@ -1206,6 +1264,12 @@ function normProfile(raw) {
   var out = copyInto({}, raw && typeof raw === 'object' ? raw : {});
   out.wall = numOr(out.wall, d.wall, 0.4, 20);
   out.minHole = numOr(out.minHole, d.minHole, 0.1, 20);
+  out.minPen = numOr(out.minPen, d.minPen, 0.2, 5);
+  var al = copyInto({}, out.allow || {});
+  for (var f2 = 0; f2 < FIXINGS.length; f2++) {
+    al[FIXINGS[f2]] = numOr(al[FIXINGS[f2]], d.allow[FIXINGS[f2]], -2, 5);
+  }
+  out.allow = al;
   out.wireClear = numOr(out.wireClear, d.wireClear, 0, 5);
   out.retWall = numOr(out.retWall, d.retWall, 0.4, 10);
   out.retLen = numOr(out.retLen, d.retLen, 1, 60);
@@ -1302,7 +1366,7 @@ function normText(raw, taken) {
   x.text = typeof x.text === 'string' ? x.text.slice(0, 40) : 'TEXT';
   x.at = pairOr(x.at, [10, 10]);
   x.size = numOr(x.size, 4, 1, 100);          // cap height
-  x.stroke = numOr(x.stroke, 0.8, 0.2, 10);   // pen width
+  x.stroke = numOr(x.stroke, penFor(x.size), 0.2, 10);
   x.height = numOr(x.height, 0.6, 0.1, 10);   // how far it stands proud
   x.align = (x.align === 'centre') ? 'centre' : 'left';
   return x;
@@ -3472,6 +3536,9 @@ var profHole = document.getElementById('profHole');
 var profMinHole = document.getElementById('profMinHole');
 var profSource = document.getElementById('profSource');
 var holeSrc = document.getElementById('holeSrc');
+var profAllow = document.getElementById('profAllow');
+var profMinPen = document.getElementById('profMinPen');
+var drawnDia = document.getElementById('drawnDia');
 var promoteBtn = document.getElementById('promoteBtn');
 var holeSmallWarn = document.getElementById('holeSmallWarn');
 
@@ -3511,8 +3578,11 @@ function syncBossControls() {
     // rather than accepting a number it would immediately overwrite.
     B.height.disabled = !!b.of;
     document.getElementById('bossDerived').textContent = b.of ? t('bossDerived') : '';
-    profHole.value = round2(holeDia(b));
+    profHole.value = round2(holeNominal(b));
     profHole.disabled = false;
+    profAllow.value = (doc.profile.allow && doc.profile.allow[b.fixing]) || 0;
+    profAllow.disabled = false;
+    drawnDia.textContent = round2(holeDia(b)) + ' mm';
 
     var src = holeSourceOf(b);
     holeSrc.textContent = t('src' + src.charAt(0).toUpperCase() + src.slice(1));
@@ -3523,6 +3593,9 @@ function syncBossControls() {
   } else {
     profHole.value = '';
     profHole.disabled = true;
+    profAllow.value = '';
+    profAllow.disabled = true;
+    drawnDia.textContent = '\u2014';
     holeSrc.textContent = '\u2014';
     holeSrc.className = 'src';
     promoteBtn.textContent = t('promote');
@@ -3530,6 +3603,7 @@ function syncBossControls() {
     holeSmallWarn.hidden = true;
   }
   profWall.value = doc.profile.wall;
+  profMinPen.value = doc.profile.minPen;
   profMinHole.value = doc.profile.minHole;
   profSource.value = doc.profile.source;
 }
@@ -3608,9 +3682,28 @@ profHole.addEventListener('input', function () {
   // Editing the hole edits the profile, not the boss: every M3 self-tapped
   // hole in the project is the same hole, and they are all wrong together
   // until the coupon says otherwise.
-  doc.profile.holes[b.size][b.fixing] = Math.max(0.2, num(profHole, holeDia(b)));
+  doc.profile.holes[b.size][b.fixing] = Math.max(0.2, num(profHole, holeNominal(b)));
+  syncControls();
   scheduleSave();
   draw();
+});
+
+profAllow.addEventListener('focus', snapshot);
+profAllow.addEventListener('input', function () {
+  if (syncing) return;
+  var b = selectedBoss();
+  if (!b) return;
+  doc.profile.allow[b.fixing] = num(profAllow, doc.profile.allow[b.fixing]);
+  syncControls();
+  scheduleSave();
+  draw();
+});
+
+profMinPen.addEventListener('focus', snapshot);
+profMinPen.addEventListener('input', function () {
+  if (syncing) return;
+  doc.profile.minPen = Math.max(0.2, num(profMinPen, doc.profile.minPen));
+  scheduleSave();
 });
 
 /* A new boss lands on the selected component if there is one -- that is what
@@ -4220,6 +4313,20 @@ function textStrokes(str, size) {
   }
   out.width = (pen - GLYPH_GAP) * k;
   return out;
+}
+
+/* A pen for a given cap height.
+
+   A fixed 0.8 mm looked sensible on its own -- two nozzle widths, certainly
+   printable -- and produced 3:1 letters at the 2.4 mm the coupon labels use,
+   where the counters close up and every glyph becomes a blob. Type is legible
+   at somewhere between 6:1 and 10:1, so the pen follows the height instead of
+   standing still, and only stops at what the nozzle can lay down.
+
+   It matters twice on a pale filament: raised letters have nothing but their
+   own shadow to read by, and a fat stroke casts less of it. */
+function penFor(size) {
+  return Math.max(numOr(doc.profile.minPen, 0.5), size / 6);
 }
 
 function textWidth(str, size) {
@@ -5367,7 +5474,7 @@ function couponDoc() {
   var headGap = 4;                        // boss edge to column heading
 
   d.plate.w = left + (SIZES.length - 1) * pitch + left;
-  d.plate.h = bottom + (FIXINGS.length - 1) * pitch + 12;
+  d.plate.h = bottom + (FIXINGS.length - 1) * pitch + 15;
 
   var taken = {};
   var i, j;
@@ -5396,7 +5503,9 @@ function couponDoc() {
 
   var topRow = bottom + (FIXINGS.length - 1) * pitch;
   var headY = topRow + widest + headGap;
-  var size = 2.6;
+  // 3 mm, so the pen comes out at 0.5 and the letters run 6:1. At 2.4 they
+  // were 3:1 and unreadable on the plate.
+  var size = 3;
 
   for (i = 0; i < SIZES.length; i++) {
     d.texts.push(normText({
@@ -5415,7 +5524,7 @@ function couponDoc() {
   d.texts.push(normText({
     text: t('couponKey'),
     at: [d.plate.w / 2, keyY],
-    size: 2.2, align: 'centre'
+    size: 2.6, align: 'centre'
   }, taken));
 
   return d;
@@ -5448,7 +5557,7 @@ function retainerCouponDoc() {
   var left = 18, bottom = 13;
 
   d.plate.w = left + (kinds.length - 1) * colPitch + left;
-  d.plate.h = bottom + (gauges.length - 1) * rowPitch + 14;
+  d.plate.h = bottom + (gauges.length - 1) * rowPitch + 16;
 
   var taken = {};
   var i, j;
@@ -5477,8 +5586,8 @@ function retainerCouponDoc() {
 
     d.texts.push(normText({
       text: String(gauges[i]),
-      at: [7, y + 2.5],
-      size: 2.4, align: 'centre'
+      at: [8, y - 1.5],
+      size: 3, align: 'centre'
     }, taken));
   }
 
@@ -5486,14 +5595,14 @@ function retainerCouponDoc() {
   for (j = 0; j < kinds.length; j++) {
     d.texts.push(normText({
       text: heads[j],
-      at: [left + j * colPitch, d.plate.h - 8],
-      size: 2.4, align: 'centre'
+      at: [left + j * colPitch, d.plate.h - 9],
+      size: 3, align: 'centre'
     }, taken));
   }
   d.texts.push(normText({
     text: t('retCouponKey'),
     at: [d.plate.w / 2, 3],
-    size: 2, align: 'centre'
+    size: 2.6, align: 'centre'
   }, taken));
 
   return d;
@@ -5609,6 +5718,9 @@ function applyLang() {
   document.getElementById('lbWall').textContent = t('wall');
   document.getElementById('lbHoleDia').textContent = t('holeDia');
   document.getElementById('lbMinHole').textContent = t('minHole');
+  document.getElementById('lbAllow').textContent = t('allow');
+  document.getElementById('lbDrawn').textContent = t('drawnAs');
+  document.getElementById('lbMinPen').textContent = t('minPen');
   document.getElementById('lbSource').textContent = t('holeFrom');
   document.getElementById('lbProfSource').textContent = t('profSource');
   document.getElementById('holeSmallWarn').textContent = t('holeSmallWarn');

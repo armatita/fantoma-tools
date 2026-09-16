@@ -295,17 +295,62 @@ under another — 71 % wider, from settings alone, with roundness improving by a
 order of magnitude alongside it. A hole diameter without the profile that
 produced it is not a measurement, it is an anecdote.
 
+### What the first coupon said
+
+Printed on the Centauri Carbon in **Tucab PLA 3D850, white** — a different
+brand and a different base resin grade from the filament every earlier test
+used. Eighteen holes, measured with calipers.
+
+**Every hole came out under the size it was drawn, by 0.14 ± 0.08 mm.**
+Clearance lost 0.125, heat-set 0.17, self-tap about 0.12.
+
+**The blind-versus-through distinction did not survive the spool.** T2's most
+striking result was that a blind pilot in a boss lost only 0.02 mm against
+0.168 for a through-hole, and that gap is the whole reason
+`xy_hole_compensation` stays at 0. On this coupon the two are
+indistinguishable. Both feature types are on one plate printed in one hour
+under one profile, so the filament is the variable that is left. 3D850 is sold
+for higher crystallinity, and crystallinity drives shrinkage — that last step
+is inference, not measurement.
+
+**The scatter grew fourfold**, from ±0.020 to ±0.084. Some of that is the
+measurement rather than the part: a blind hole can only be reached at its
+mouth, at the top of an 8 mm boss, where any droop in the top surface goes
+straight into the reading. Inside caliper jaws are poor at these sizes; a drill
+shank that slides in and the next one that does not brackets a small hole
+better than the jaws do.
+
+**Every self-tap size took its screw**, including M1.4 and M1.7, so that whole
+column is now measured rather than standard. Reported as slightly tight, which
+matches holes arriving 0.14 under the tapping size, and is what the allowance
+now corrects. The insert column stays assumed: their holes were measured but no
+insert has been pushed into one, and a diameter is not a fit.
+
+### An allowance, rather than eighteen corrected sizes
+
+The table keeps saying what it means — M3 self-tap is 2.5 because that is the
+tapping size — and the machine's behaviour lives in one number per fixing
+beside it. Self-tap 0.15 so the hole lands where the table intends; clearance 0
+because those already pass a screw and wider is only looser; insert 0 and
+deliberately untested, because an insert hole coming out tight is what heat-set
+wants.
+
+The panel shows both: the table value in the field you edit, and what will
+actually be cut beside it.
+
 ### The smallest hole that prints round
 
-`minHole`, default **1.5 mm**, measured. Below it a hole stops being round
-rather than merely being small: at 1.0 mm nominal the measured result was
-0.18 mm out of round — 18 % of nominal — against 0.01–0.07 mm everywhere from
-1.5 to 4.0 mm.
+`minHole`, now **1.0 mm**. It was 1.5, measured on through-holes in a 3 mm
+plate with the old filament, where a 1.0 mm hole came out 0.18 mm out of round
+— 18 % of nominal — against 0.01–0.07 everywhere from 1.5 to 4.0.
 
-Two of the shipped self-tap defaults fall under it: **M1.4 at 1.1 mm and M1.7
-at 1.35 mm**. The tool says so on the boss and again before export, rather than
-letting a number that cannot be printed sit in a table looking like the others.
-Below the floor the advice is to model generously and drill, or to use a
+On the new filament a 1.1 mm self-tap hole came out at 1.02, round, and took
+its screw. Different feature too: blind, in a boss, rather than through a
+plate. **The concept held and the number did not**, which is exactly why it
+lives in the profile and moves with the spool rather than being written into
+the tool.
+
+Below the floor the advice is unchanged: model generously and drill, or use a
 clearance hole and a nut.
 
 ### Shrinkage is not uniform, and that matters later
@@ -699,6 +744,14 @@ of, and the triangulator is now there for it.
 The font is in the page rather than fetched, because this tool works offline
 and a web font would be the first thing to break that. It only has to be
 legible at 3 mm on a printed part, which is a far easier job than reading well.
+
+**The pen follows the cap height**, at a sixth of it, stopping at `minPen` —
+the thinnest line the nozzle is worth asking for. A fixed 0.8 mm looked sensible
+on its own, being two nozzle widths, and produced 3:1 letters at the 2.4 mm the
+coupon labels used. Type is legible somewhere between 6:1 and 10:1; at 3:1 the
+counters close up and every glyph is a blob, which is how the first coupon came
+out. It matters twice on a pale filament, where raised letters have nothing but
+their own shadow to read by and a fat stroke casts less of it.
 
 ### Strokes overlap, they never merely touch
 
