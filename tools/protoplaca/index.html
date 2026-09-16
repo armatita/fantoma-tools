@@ -230,6 +230,7 @@
           <button type="button" id="measureBtn"></button>
         </div>
         <div class="row">
+          <button type="button" id="crosshairBtn"></button>
           <button type="button" id="clearGuidesBtn"></button>
         </div>
         <div class="note" id="viewNote"></div>
@@ -306,6 +307,7 @@ var STRINGS = {
     noGrid: 'off',
     fit: 'Fit',
     measure: 'Measure',
+    crosshair: 'Crosshair',
     clearGuides: 'Clear guides',
     zoom: 'Zoom',
     hintIdle: 'drag to pan · wheel to zoom · drag off a ruler for a guide',
@@ -358,6 +360,7 @@ var STRINGS = {
     noGrid: 'desligada',
     fit: 'Ajustar',
     measure: 'Medir',
+    crosshair: 'Mira',
     clearGuides: 'Limpar guias',
     zoom: 'Ampliação',
     hintIdle: 'arraste para deslocar · roda para ampliar · arraste de uma régua para uma guia',
@@ -765,7 +768,8 @@ var COL = {
   label: '#8a8a96',
   guide: '#ffb648',
   measure: '#4dd8ff',
-  select: '#f4f4f2'
+  select: '#f4f4f2',
+  crosshair: 'rgba(244,244,242,0.30)'
 };
 
 /* A "nice" step is one a person reads without counting: 1, 2, 5 and their
@@ -952,6 +956,15 @@ function drawRulers() {
     ctx.restore();
   }
 
+  // Where the pointer is, marked on both rulers. The crosshair says where you
+  // are; this says what that is on the scale beside it.
+  if (crosshair && cursor) {
+    ctx.fillStyle = COL.axis;
+    var cxp = sx(cursor.x), cyp = sy(cursor.y);
+    if (cxp >= RULER && cxp <= W) ctx.fillRect(Math.round(cxp) - 1, 0, 2, RULER);
+    if (cyp >= RULER && cyp <= H) ctx.fillRect(0, Math.round(cyp) - 1, RULER, 2);
+  }
+
   ctx.fillStyle = COL.ruler;
   ctx.fillRect(0, 0, RULER, RULER);
   ctx.strokeStyle = COL.rulerEdge;
@@ -987,6 +1000,31 @@ function plaque(lines, x, y) {
   for (i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], x + padX, y + padY + i * lineH);
   }
+}
+
+/* The pointer's position, where the pointer is.
+
+   The status bar still carries X and Y, and it stays: it is always visible and
+   does not depend on the pointer being over the drawing. But it is a strip
+   below the canvas, which is not where you are looking while you place a part
+   -- the same complaint the measure tool earned, one layer down. With no
+   component library the coordinate readout is how parts get placed, so it is
+   the number read most often and it belongs under the eye. */
+var crosshair = true;
+
+function drawCursor() {
+  if (!crosshair || !cursor) return;
+
+  var px = sx(cursor.x), py = sy(cursor.y);
+
+  ctx.strokeStyle = COL.crosshair;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  line(crisp(px), plot.y0, crisp(px), plot.y1);
+  line(plot.x0, crisp(py), plot.x1, crisp(py));
+  ctx.setLineDash([]);
+
+  plaque(['(' + mm(cursor.x, 2) + ', ' + mm(cursor.y, 2) + ')'], px + 14, py + 14);
 }
 
 function drawMeasure() {
@@ -1037,6 +1075,7 @@ function render() {
   drawComponents();
   drawGuides();
   drawSelection();
+  drawCursor();
   drawMeasure();
 
   ctx.restore();
@@ -1405,6 +1444,14 @@ measureBtn.onclick = function () {
   draw();
 };
 
+var crosshairBtn = document.getElementById('crosshairBtn');
+crosshairBtn.onclick = function () {
+  crosshair = !crosshair;
+  crosshairBtn.classList.toggle('active', crosshair);
+  store.set('crosshair', crosshair);
+  draw();
+};
+
 document.getElementById('clearGuidesBtn').onclick = function () {
   if (!doc.guides.length) return;
   snapshot();
@@ -1680,6 +1727,7 @@ function applyLang() {
   document.getElementById('optNoGrid').textContent = t('noGrid');
   document.getElementById('fitBtn').textContent = t('fit');
   document.getElementById('measureBtn').textContent = t('measure');
+  document.getElementById('crosshairBtn').textContent = t('crosshair');
   document.getElementById('clearGuidesBtn').textContent = t('clearGuides');
   document.getElementById('viewNote').textContent = t('viewNote');
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
@@ -1700,6 +1748,9 @@ lang = store.get('lang')
 
 gridPitch = numOr(store.get('gridPitch'), 1, 0, 10);
 gridSel.value = String(gridPitch);
+
+crosshair = store.get('crosshair') !== false;   // on unless turned off
+crosshairBtn.classList.toggle('active', crosshair);
 
 /* What this browser remembered goes through the same door as an opened file.
    If it is corrupt or from a version that never existed, we start clean rather

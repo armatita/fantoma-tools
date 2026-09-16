@@ -358,7 +358,10 @@ Portuguese here means European Portuguese, not Brazilian.
 ## Interface, planned but not built
 
 Raised while using the first working build, and worth having. None of it
-changes the document or the geometry — it is all about getting at the tool.
+changes the document or the geometry — it is all about getting at the tool,
+and none of it is load-bearing: the canvas measures its own box every frame, so
+a toolbar can be dropped in above it without the drawing code noticing, and the
+buttons bind by id so moving them is moving markup.
 
 **A toolbar above the drawing, icons with tooltips.** The panels beside the
 canvas are for typing numbers; the things you reach for while drawing belong
@@ -368,10 +371,14 @@ What goes on it:
 
 - **Measure**, as a toggle — moved off the View panel.
 - **Clear guides**, as a push button — likewise.
-- **Cursor readout**, as a toggle. Dashed lines from the pointer to both axes
-  and the coordinate in text beside it, `(17.32, 15.14)`, while the pointer is
-  over the drawing. The status bar already carries the numbers; this puts them
-  where the eye already is.
+- **Cursor readout** — **built**, though it lives on the View panel until
+  there is a toolbar to move it to. Dashed crosshair, a mark on each ruler, and
+  the coordinate beside the pointer. It was pulled forward because it is not
+  really a new feature: the X/Y readout had the same flaw the measure tool did
+  — a strip below the canvas is not where you are looking — and with no
+  component library the coordinate readout is how parts get placed, so it is
+  the number read most often. On by default; the status bar keeps its copy,
+  which is always visible and does not need the pointer to be over the drawing.
 - **Component dimensions**, as a toggle. Each component's size and origin shown
   under its name, when there is room for them.
 
