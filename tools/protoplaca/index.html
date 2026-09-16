@@ -73,13 +73,16 @@
     width: 92px; background: #17171f; border: 1px solid #2b2b36; border-radius: 6px;
     color: #f4f4f2; padding: 6px 8px; font-size: 12px; font-family: inherit;
   }
-  .field select { width: 110px; }
+  .field select { width: 150px; }   /* fits "Heat-set insert" and "Inserto térmico" */
   .field input[type=text] { width: 120px; }
   .field input[type=color] {
     width: 44px; height: 28px; padding: 2px; background: #17171f;
     border: 1px solid #2b2b36; border-radius: 6px; cursor: pointer;
   }
   .field .unit { color: #6b6b76; width: 18px; }
+  /* A field whose value is derived from somewhere else should look as though
+     it cannot be typed in, not merely refuse to be typed in. */
+  .field input:disabled { opacity: 0.45; cursor: not-allowed; }
   .field.narrow input[type=number] { width: 70px; }
 
   .row { display: flex; gap: 6px; margin-top: 10px; }
@@ -214,6 +217,64 @@
         <div class="note" id="compNote"></div>
       </section>
 
+      <section class="panel" id="bossPanel">
+        <h2><span id="ttBosses"></span></h2>
+        <div class="row">
+          <button type="button" id="addBossBtn"></button>
+        </div>
+        <div class="note" id="bossEmpty"></div>
+        <div id="bossFields" hidden>
+          <div class="field narrow">
+            <label for="bossX">X</label>
+            <input type="number" id="bossX" inputmode="decimal" step="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="bossY">Y</label>
+            <input type="number" id="bossY" inputmode="decimal" step="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field">
+            <label for="bossSize" id="lbBossSize"></label>
+            <select id="bossSize"></select>
+          </div>
+          <div class="field">
+            <label for="bossFixing" id="lbBossFixing"></label>
+            <select id="bossFixing"></select>
+          </div>
+          <div class="field">
+            <label for="bossOf" id="lbBossOf"></label>
+            <select id="bossOf"></select>
+          </div>
+          <div class="field narrow">
+            <label for="bossHeight" id="lbBossHeight"></label>
+            <input type="number" id="bossHeight" inputmode="decimal" step="0.5" min="0.4">
+            <span class="unit">mm</span>
+          </div>
+          <div class="note" id="bossDerived"></div>
+          <div class="row">
+            <button type="button" id="dupBossBtn"></button>
+            <button type="button" id="delBossBtn"></button>
+          </div>
+        </div>
+        <div class="note" id="bossNote"></div>
+      </section>
+
+      <section class="panel" id="profilePanel">
+        <h2><span id="ttProfile"></span></h2>
+        <div class="field narrow">
+          <label for="profWall" id="lbWall"></label>
+          <input type="number" id="profWall" inputmode="decimal" step="0.1" min="0.4">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field narrow">
+          <label for="profHole" id="lbHoleDia"></label>
+          <input type="number" id="profHole" inputmode="decimal" step="0.1" min="0.2">
+          <span class="unit">mm</span>
+        </div>
+        <div class="note" id="profileNote"></div>
+      </section>
+
       <section class="panel" id="viewPanel">
         <h2><span id="ttView"></span></h2>
         <div class="field">
@@ -278,6 +339,29 @@ var STRINGS = {
     projectNote: 'Kept in this browser as you work. Save to a file to keep a real '
       + 'copy, or to move the project to another machine.',
     components: 'Components',
+    bosses: 'Bosses',
+    addBoss: 'Add boss',
+    bossSize: 'Screw',
+    bossFixing: 'Fixing',
+    bossOf: 'Holds',
+    bossHeight: 'Height',
+    bossNone: 'nothing',
+    selftap: 'Self-tapping',
+    insert: 'Heat-set insert',
+    clearance: 'Clearance hole',
+    noBoss: 'Nothing selected. Add a boss, or click one on the plate.',
+    bossNote: 'A boss is a tube: the hole, and the wall around it. Its outer '
+      + 'size comes from the print profile, not from the boss.',
+    bossDerived: 'Height follows the standoff of the component it holds, because '
+      + 'they are the same measurement. Detach it to set a height of its own.',
+    hintBoss: 'drag to move \u00b7 Delete removes it',
+    profile: 'Print profile',
+    wall: 'Wall',
+    holeDia: 'Hole',
+    profileNote: 'The hole shown is for the selected boss. Every number here is '
+      + 'a placeholder: the self-tap and clearance figures are standard sizes '
+      + 'rather than measurements, and insert sizes vary by brand. Print the '
+      + 'calibration coupon and replace them with what actually fits.',
     addComp: 'Add component',
     duplicate: 'Duplicate',
     remove: 'Delete',
@@ -331,6 +415,30 @@ var STRINGS = {
       + 'ficheiro para ter uma cópia a sério, ou para levar o projeto para outra '
       + 'máquina.',
     components: 'Componentes',
+    bosses: 'Bossas',
+    addBoss: 'Adicionar bossa',
+    bossSize: 'Parafuso',
+    bossFixing: 'Fixa\u00e7\u00e3o',
+    bossOf: 'Segura',
+    bossHeight: 'Altura',
+    bossNone: 'nada',
+    selftap: 'Autoroscante',
+    insert: 'Inserto t\u00e9rmico',
+    clearance: 'Furo passante',
+    noBoss: 'Nada selecionado. Adicione uma bossa, ou clique numa que esteja na placa.',
+    bossNote: 'Uma bossa \u00e9 um tubo: o furo, e a parede \u00e0 volta dele. O '
+      + 'tamanho exterior vem do perfil de impress\u00e3o, n\u00e3o da bossa.',
+    bossDerived: 'A altura segue o espa\u00e7ador do componente que a bossa segura, '
+      + 'porque s\u00e3o a mesma medida. Separe-a para lhe dar altura pr\u00f3pria.',
+    hintBoss: 'arraste para mover \u00b7 Delete apaga',
+    profile: 'Perfil de impress\u00e3o',
+    wall: 'Parede',
+    holeDia: 'Furo',
+    profileNote: 'O furo mostrado \u00e9 o da bossa selecionada. Todos estes '
+      + 'n\u00fameros s\u00e3o provis\u00f3rios: os valores de autoroscante e de furo '
+      + 'passante s\u00e3o medidas padr\u00e3o e n\u00e3o medi\u00e7\u00f5es, e os '
+      + 'insertos variam com a marca. Imprima o cup\u00e3o de calibra\u00e7\u00e3o e '
+      + 'substitua-os pelo que realmente encaixa.',
     addComp: 'Adicionar componente',
     duplicate: 'Duplicar',
     remove: 'Apagar',
@@ -406,27 +514,91 @@ function blankDoc() {
     units: 'mm',
     name: '',
     plate: { w: 120, h: 80, thickness: 3 },
+    profile: defaultProfile(),
     components: [],       // see normComponent for the fields
+    bosses: [],           // see normBoss
     guides: []            // { axis: 'x' | 'y', v: mm }
   };
 }
 
+/* --------------------------------------------------------------------------
+   The print profile
+   --------------------------------------------------------------------------
+   A boss is a tube: a hole of some diameter with a wall around it. Neither
+   number is a property of the design -- they are properties of your printer,
+   your filament, and in the case of inserts, the particular inserts you
+   bought. So they live here, once, rather than on every boss.
+
+   EVERY NUMBER BELOW IS A PLACEHOLDER. The self-tap and clearance figures are
+   the conventional tapping and clearance sizes, which is inference from a
+   standard rather than a measurement. The insert figures are worse: they vary
+   by brand and by length, and the only way to know yours is to push one in.
+   The calibration coupon exists to replace all of them, and the panel says so
+   rather than letting them look authoritative.
+   -------------------------------------------------------------------------- */
+function defaultProfile() {
+  return {
+    wall: 2,              // mm of material around the hole
+    holes: {
+      // size:   [ self-tap, heat-set insert, clearance ]
+      M2:  { selftap: 1.6, insert: 3.2, clearance: 2.4 },
+      M2_5:{ selftap: 2.1, insert: 3.6, clearance: 2.9 },
+      M3:  { selftap: 2.5, insert: 4.0, clearance: 3.4 },
+      M4:  { selftap: 3.3, insert: 5.6, clearance: 4.5 }
+    }
+  };
+}
+
+var SIZES = ['M2', 'M2_5', 'M3', 'M4'];
+var FIXINGS = ['selftap', 'insert', 'clearance'];
+
+function sizeLabel(key) { return key.replace('_', '.'); }
+
+function holeDia(b) {
+  var row = doc.profile.holes[b.size] || doc.profile.holes.M3;
+  return numOr(row[b.fixing], 2.5, 0.2, 40);
+}
+
+function bossOuterDia(b) {
+  return holeDia(b) + 2 * numOr(doc.profile.wall, 2, 0.4, 20);
+}
+
 var doc = blankDoc();
 
-/* Selection is held as an id, not as a reference to the object. Undo replaces
-   the whole document with a fresh parse, so any object reference kept across
-   it would point at a component that is no longer in the drawing. */
-var selectedId = null;
+/* Selection is held as a kind and an id, never as a reference to the object.
+
+   Two reasons. Undo replaces the whole document with a fresh parse, so an
+   object reference kept across it would point at something no longer in the
+   drawing. And more than one kind of thing is selectable now -- a component or
+   a boss -- so the selection has to say which, rather than every reader
+   guessing from context. */
+var sel = { kind: null, id: null };
+
+function select(kind, id) { sel.kind = kind; sel.id = id; }
+function deselect() { sel.kind = null; sel.id = null; }
+function hasSelection() { return sel.kind !== null; }
+
+function findIn(list, id) {
+  for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+  return null;
+}
 
 /* The grid pitch is how you are working, not what you designed, so it is a
    preference of this browser rather than part of the document. */
 var gridPitch = 1;        // mm; 0 means no grid and no snapping
 
 function selectedComponent() {
-  for (var i = 0; i < doc.components.length; i++) {
-    if (doc.components[i].id === selectedId) return doc.components[i];
-  }
-  return null;
+  return sel.kind === 'component' ? findIn(doc.components, sel.id) : null;
+}
+
+function selectedBoss() {
+  return sel.kind === 'boss' ? findIn(doc.bosses, sel.id) : null;
+}
+
+/* Whatever is selected, of whichever kind. Used by the things that do not
+   care -- delete, and the "is anything selected" hint. */
+function selectedAny() {
+  return selectedComponent() || selectedBoss();
 }
 
 
@@ -496,9 +668,9 @@ function colourOr(value, fallback) {
   return (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) ? value : fallback;
 }
 
-function nextId(taken) {
+function nextId(taken, prefix) {
   var id;
-  do { id = 'c' + (++idSeq); } while (taken && taken[id]);
+  do { id = (prefix || 'c') + (++idSeq); } while (taken && taken[id]);
   return id;
 }
 
@@ -514,6 +686,41 @@ function normComponent(raw, taken) {
   c.board = numOr(c.board, 1.6, 0, 50);         // the PCB itself
   c.body = numOr(c.body, 10, 0, 300);           // whatever stands on top of it
   return c;
+}
+
+/* A boss may belong to a component. When it does, its height is the
+   component's standoff -- they are the same measurement described twice, and
+   if they disagree the board sits crooked or does not sit at all. The value is
+   still written into the file so the document stays self-contained and the
+   mesh generator never has to chase a reference to find a height. */
+function normBoss(raw, taken, componentIds) {
+  var b = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  b.id = (typeof b.id === 'string' && b.id && !taken[b.id]) ? b.id : nextId(taken, 'b');
+  taken[b.id] = true;
+  b.at = pairOr(b.at, [0, 0]);
+  b.size = SIZES.indexOf(b.size) >= 0 ? b.size : 'M3';
+  b.fixing = FIXINGS.indexOf(b.fixing) >= 0 ? b.fixing : 'selftap';
+  b.height = numOr(b.height, 6, 0.4, 200);
+  // A reference to a component that is not in the file is not a reference.
+  b.of = (typeof b.of === 'string' && componentIds[b.of]) ? b.of : null;
+  return b;
+}
+
+function normProfile(raw) {
+  var d = defaultProfile();
+  var out = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  out.wall = numOr(out.wall, d.wall, 0.4, 20);
+  var holes = copyInto({}, (raw && raw.holes) || {});
+  for (var i = 0; i < SIZES.length; i++) {
+    var key = SIZES[i];
+    var row = copyInto({}, holes[key] || {});
+    for (var j = 0; j < FIXINGS.length; j++) {
+      row[FIXINGS[j]] = numOr(row[FIXINGS[j]], d.holes[key][FIXINGS[j]], 0.2, 40);
+    }
+    holes[key] = row;
+  }
+  out.holes = holes;
+  return out;
 }
 
 function normGuide(raw) {
@@ -549,6 +756,15 @@ function normDoc(raw) {
   var list = (raw.components && raw.components.length) ? raw.components : [];
   out.components = [];
   for (var i = 0; i < list.length; i++) out.components.push(normComponent(list[i], taken));
+
+  out.profile = normProfile(raw.profile);
+
+  var componentIds = {};
+  for (var k = 0; k < out.components.length; k++) componentIds[out.components[k].id] = true;
+
+  var bl = (raw.bosses && raw.bosses.length) ? raw.bosses : [];
+  out.bosses = [];
+  for (var m = 0; m < bl.length; m++) out.bosses.push(normBoss(bl[m], taken, componentIds));
 
   var gs = (raw.guides && raw.guides.length) ? raw.guides : [];
   out.guides = [];
@@ -587,7 +803,7 @@ function restore(from, to) {
   if (!from.length) return;
   to.push(JSON.stringify(doc));
   doc = JSON.parse(from.pop());
-  if (!selectedComponent()) selectedId = null;
+  if (!selectedAny()) deselect();
   syncControls();
   scheduleSave();
   draw();
@@ -681,7 +897,70 @@ function drawComponents() {
   }
 }
 
+function bossAt(p) {
+  var x = wx(p.x), y = wy(p.y);
+  for (var i = doc.bosses.length - 1; i >= 0; i--) {
+    var b = doc.bosses[i];
+    var r = bossOuterDia(b) / 2;
+    var dx = x - b.at[0], dy = y - b.at[1];
+    if (dx * dx + dy * dy <= r * r) return b;
+  }
+  return null;
+}
+
+function drawBosses() {
+  for (var i = 0; i < doc.bosses.length; i++) {
+    var b = doc.bosses[i];
+    var cx = sx(b.at[0]), cy = sy(b.at[1]);
+    var outer = bossOuterDia(b) / 2 * view.scale;
+    var hole = holeDia(b) / 2 * view.scale;
+
+    // The ring of material, then the hole through it. Drawn as an annulus so
+    // what you see is what the mesh will be: a tube, not a disc.
+    ctx.fillStyle = withAlpha(COL.boss, 0.30);
+    ctx.beginPath();
+    ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = COL.bg;
+    ctx.beginPath();
+    ctx.arc(cx, cy, hole, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = COL.boss;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, outer, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, hole, 0, Math.PI * 2); ctx.stroke();
+
+    // A heat-set insert is a different operation with a different failure
+    // mode, so it should not look like a drilled hole. Ticks mark it.
+    if (b.fixing === 'insert' && hole > 3) {
+      ctx.beginPath();
+      for (var a = 0; a < 4; a++) {
+        var ang = a * Math.PI / 2 + Math.PI / 4;
+        ctx.moveTo(cx + Math.cos(ang) * hole, cy + Math.sin(ang) * hole);
+        ctx.lineTo(cx + Math.cos(ang) * outer, cy + Math.sin(ang) * outer);
+      }
+      ctx.stroke();
+    }
+  }
+}
+
 function drawSelection() {
+  var b = selectedBoss();
+  if (b) {
+    var bx = sx(b.at[0]), by = sy(b.at[1]);
+    var rad = bossOuterDia(b) / 2 * view.scale + 4;
+    ctx.strokeStyle = COL.select;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.arc(bx, by, rad, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+
   var c = selectedComponent();
   if (!c) return;
   var r = compRectPx(c);
@@ -769,6 +1048,7 @@ var COL = {
   guide: '#ffb648',
   measure: '#4dd8ff',
   select: '#f4f4f2',
+  boss: '#c8c6c9',
   crosshair: 'rgba(244,244,242,0.30)'
 };
 
@@ -1073,6 +1353,7 @@ function render() {
   drawPlate();
   drawGrid();
   drawComponents();
+  drawBosses();
   drawGuides();
   drawSelection();
   drawCursor();
@@ -1104,7 +1385,9 @@ function updateStatus() {
     hint.textContent = t('hintMeasureStart');
   } else if (drag && drag.kind === 'guide') {
     hint.textContent = t('hintGuide');
-  } else if (selectedId) {
+  } else if (sel.kind === 'boss') {
+    hint.textContent = t('hintBoss');
+  } else if (hasSelection()) {
     hint.textContent = t('hintComponent');
   } else {
     hint.textContent = t('hintIdle');
@@ -1220,11 +1503,28 @@ cv.addEventListener('pointerdown', function (e) {
       return;
     }
 
+    // Bosses are picked before components. A boss usually sits on top of the
+    // component it holds down, and the small target has to win or it can never
+    // be clicked at all.
+    var boss = bossAt(p);
+    if (boss) {
+      select('boss', boss.id);
+      snapshot();
+      drag = { kind: 'moveBoss', id: boss.id, from: p, at: boss.at.slice() };
+      syncControls();
+      draw();
+      return;
+    }
+
     var comp = componentAt(p);
     if (comp) {
-      selectedId = comp.id;
+      select('component', comp.id);
       snapshot();
-      drag = { kind: 'move', id: comp.id, from: p, at: comp.at.slice() };
+      drag = {
+        kind: 'move', id: comp.id, from: p, at: comp.at.slice(),
+        // Bosses that belong to this component travel with it.
+        carried: carriedBosses(comp.id)
+      };
       syncControls();
       draw();
       return;
@@ -1235,7 +1535,7 @@ cv.addEventListener('pointerdown', function (e) {
       snapshot();
       drag = { kind: 'guide', guide: hit };
     } else {
-      selectedId = null;
+      deselect();
       syncControls();
       drag = { kind: 'pan', from: p, x0: view.x0, y0: view.y0 };
     }
@@ -1264,8 +1564,18 @@ cv.addEventListener('pointermove', function (e) {
   if (drag && drag.kind === 'move') {
     var moving = selectedComponent();
     if (moving) {
+      var was0 = moving.at[0], was1 = moving.at[1];
       moving.at[0] = snap(drag.at[0] + (p.x - drag.from.x) / view.scale);
       moving.at[1] = snap(drag.at[1] - (p.y - drag.from.y) / view.scale);
+      shiftBosses(drag.carried, moving.at[0] - was0, moving.at[1] - was1);
+      syncControls();
+      scheduleSave();
+    }
+  } else if (drag && drag.kind === 'moveBoss') {
+    var mb = selectedBoss();
+    if (mb) {
+      mb.at[0] = snap(drag.at[0] + (p.x - drag.from.x) / view.scale);
+      mb.at[1] = snap(drag.at[1] - (p.y - drag.from.y) / view.scale);
       syncControls();
       scheduleSave();
     }
@@ -1283,7 +1593,7 @@ cv.addEventListener('pointermove', function (e) {
   } else {
     var grip = handleAt(p);
     if (grip) cv.style.cursor = gripCursor(grip.id);
-    else if (componentAt(p) || guideAt(p)) cv.style.cursor = 'move';
+    else if (bossAt(p) || componentAt(p) || guideAt(p)) cv.style.cursor = 'move';
     else cv.style.cursor = 'default';
   }
   draw();
@@ -1322,6 +1632,35 @@ cv.addEventListener('wheel', function (e) {
   var p = localPoint(e);
   zoomAt(p.x, p.y, e.deltaY < 0 ? 1.12 : 1 / 1.12);
 }, { passive: false });
+
+/* Bosses belonging to a component, captured at the start of a drag so the
+   list is not rebuilt on every pointer move. */
+function carriedBosses(componentId) {
+  var out = [];
+  for (var i = 0; i < doc.bosses.length; i++) {
+    if (doc.bosses[i].of === componentId) out.push(doc.bosses[i]);
+  }
+  return out;
+}
+
+function shiftBosses(list, dx, dy) {
+  if (!list || (!dx && !dy)) return;
+  for (var i = 0; i < list.length; i++) {
+    list[i].at[0] += dx;
+    list[i].at[1] += dy;
+  }
+}
+
+/* An attached boss is as tall as the standoff of the component it holds.
+   Called wherever either number could have changed. */
+function syncBossHeights() {
+  for (var i = 0; i < doc.bosses.length; i++) {
+    var b = doc.bosses[i];
+    if (!b.of) continue;
+    var c = findIn(doc.components, b.of);
+    if (c) b.height = c.standoff;
+  }
+}
 
 var CURSORS = {
   n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
@@ -1384,7 +1723,7 @@ window.addEventListener('keydown', function (e) {
       measure.on = false;
       measureBtn.classList.remove('active');
     }
-    selectedId = null;
+    deselect();
     syncControls();
     draw();
     return;
@@ -1439,7 +1778,7 @@ var measureBtn = document.getElementById('measureBtn');
 measureBtn.onclick = function () {
   measure.on = !measure.on;
   measure.a = measure.b = measure.live = null;
-  if (measure.on) { selectedId = null; syncControls(); }
+  if (measure.on) { deselect(); syncControls(); }
   measureBtn.classList.toggle('active', measure.on);
   draw();
 };
@@ -1494,6 +1833,7 @@ function syncControls() {
   var c = selectedComponent();
   compFields.hidden = !c;
   compEmpty.hidden = !!c;
+  syncBossControls();
   if (c) {
     F.name.value = c.name;
     F.x.value = round2(c.at[0]);
@@ -1526,6 +1866,7 @@ function onCompField() {
   c.board = Math.max(0, num(F.board, c.board));
   c.body = Math.max(0, num(F.body, c.body));
   c.colour = colourOr(F.colour.value, c.colour);
+  syncBossHeights();
   scheduleSave();
   draw();
 }
@@ -1583,7 +1924,7 @@ document.getElementById('addCompBtn').onclick = function () {
     colour: PALETTE[doc.components.length % PALETTE.length]
   }, taken);
   doc.components.push(c);
-  selectedId = c.id;
+  select('component', c.id);
   syncControls();
   scheduleSave();
   draw();
@@ -1601,23 +1942,209 @@ document.getElementById('dupCompBtn').onclick = function () {
   copy.id = nextId(taken);
   copy.at = [snap(c.at[0] + 5), snap(c.at[1] - 5)];
   doc.components.push(copy);
-  selectedId = copy.id;
+  select('component', copy.id);
   syncControls();
   scheduleSave();
   draw();
 };
 
 function deleteSelected() {
+  if (sel.kind === 'boss') { deleteBoss(); return; }
   var c = selectedComponent();
   if (!c) return;
   snapshot();
   doc.components.splice(doc.components.indexOf(c), 1);
-  selectedId = null;
+  // Its bosses lose what they were holding; they stay, as free-standing
+  // bosses, because the holes are still in the plate you are about to print.
+  for (var i = 0; i < doc.bosses.length; i++) {
+    if (doc.bosses[i].of === c.id) doc.bosses[i].of = null;
+  }
+  deselect();
   syncControls();
   scheduleSave();
   draw();
 }
 document.getElementById('delCompBtn').onclick = deleteSelected;
+
+
+/* --------------------------------------------------------------------------
+   The boss panel and the print profile
+   -------------------------------------------------------------------------- */
+var bossFields = document.getElementById('bossFields');
+var bossEmpty = document.getElementById('bossEmpty');
+var B = {
+  x: document.getElementById('bossX'),
+  y: document.getElementById('bossY'),
+  size: document.getElementById('bossSize'),
+  fixing: document.getElementById('bossFixing'),
+  of: document.getElementById('bossOf'),
+  height: document.getElementById('bossHeight')
+};
+var profWall = document.getElementById('profWall');
+var profHole = document.getElementById('profHole');
+
+function fillSelect(el, values, labelFor, current) {
+  el.innerHTML = '';
+  for (var i = 0; i < values.length; i++) {
+    var o = document.createElement('option');
+    o.value = values[i] === null ? '' : values[i];
+    o.textContent = labelFor(values[i]);
+    el.appendChild(o);
+  }
+  el.value = current === null ? '' : current;
+}
+
+function syncBossControls() {
+  var b = selectedBoss();
+  bossFields.hidden = !b;
+  bossEmpty.hidden = !!b;
+
+  fillSelect(B.size, SIZES, sizeLabel, b ? b.size : 'M3');
+  fillSelect(B.fixing, FIXINGS, function (f) { return t(f); }, b ? b.fixing : 'selftap');
+
+  // "Holds" lists the components, plus nothing.
+  var ids = [null];
+  for (var i = 0; i < doc.components.length; i++) ids.push(doc.components[i].id);
+  fillSelect(B.of, ids, function (id) {
+    if (id === null) return t('bossNone');
+    var c = findIn(doc.components, id);
+    return (c && c.name) ? c.name : id;
+  }, b ? b.of : null);
+
+  if (b) {
+    B.x.value = round2(b.at[0]);
+    B.y.value = round2(b.at[1]);
+    B.height.value = round2(b.height);
+    // An attached boss cannot have a height of its own, so the box says so
+    // rather than accepting a number it would immediately overwrite.
+    B.height.disabled = !!b.of;
+    document.getElementById('bossDerived').textContent = b.of ? t('bossDerived') : '';
+    profHole.value = round2(holeDia(b));
+    profHole.disabled = false;
+  } else {
+    profHole.value = '';
+    profHole.disabled = true;
+  }
+  profWall.value = doc.profile.wall;
+}
+
+function onBossField() {
+  if (syncing) return;
+  var b = selectedBoss();
+  if (!b) return;
+  b.at = [num(B.x, b.at[0]), num(B.y, b.at[1])];
+  b.size = SIZES.indexOf(B.size.value) >= 0 ? B.size.value : b.size;
+  b.fixing = FIXINGS.indexOf(B.fixing.value) >= 0 ? B.fixing.value : b.fixing;
+  b.of = B.of.value || null;
+  if (!b.of) b.height = Math.max(0.4, num(B.height, b.height));
+  syncBossHeights();
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+for (var bKey in B) {
+  if (Object.prototype.hasOwnProperty.call(B, bKey)) {
+    B[bKey].addEventListener('input', onBossField);
+    B[bKey].addEventListener('change', onBossField);
+    B[bKey].addEventListener('focus', snapshot);
+  }
+}
+
+profWall.addEventListener('focus', snapshot);
+profWall.addEventListener('input', function () {
+  if (syncing) return;
+  doc.profile.wall = Math.max(0.4, num(profWall, doc.profile.wall));
+  scheduleSave();
+  draw();
+});
+
+profHole.addEventListener('focus', snapshot);
+profHole.addEventListener('input', function () {
+  if (syncing) return;
+  var b = selectedBoss();
+  if (!b) return;
+  // Editing the hole edits the profile, not the boss: every M3 self-tapped
+  // hole in the project is the same hole, and they are all wrong together
+  // until the coupon says otherwise.
+  doc.profile.holes[b.size][b.fixing] = Math.max(0.2, num(profHole, holeDia(b)));
+  scheduleSave();
+  draw();
+});
+
+/* A new boss lands on the selected component if there is one -- that is what
+   you are almost always doing -- and otherwise in the middle of the view. */
+document.getElementById('addBossBtn').onclick = function () {
+  snapshot();
+  var taken = {};
+  var i;
+  for (i = 0; i < doc.components.length; i++) taken[doc.components[i].id] = true;
+  for (i = 0; i < doc.bosses.length; i++) taken[doc.bosses[i].id] = true;
+
+  var host = selectedComponent();
+  var at, of = null;
+  if (host) {
+    at = [snap(host.at[0] + 3), snap(host.at[1] + 3)];
+    of = host.id;
+  } else {
+    at = [snap(wx((plot.x0 + plot.x1) / 2)), snap(wy((plot.y0 + plot.y1) / 2))];
+  }
+  var step = gridPitch ? Math.max(gridPitch, 2) : 3;
+  for (var guard = 0; guard < 40 && bossOccupied(at); guard++) {
+    at = [at[0] + step, at[1] + step];
+  }
+
+  var b = normBoss({ at: at, of: of, height: host ? host.standoff : 6 },
+                   taken, of ? makeIdSet(doc.components) : {});
+  doc.bosses.push(b);
+  select('boss', b.id);
+  syncBossHeights();
+  syncControls();
+  scheduleSave();
+  draw();
+};
+
+function makeIdSet(list) {
+  var out = {};
+  for (var i = 0; i < list.length; i++) out[list[i].id] = true;
+  return out;
+}
+
+function bossOccupied(at) {
+  for (var i = 0; i < doc.bosses.length; i++) {
+    var b = doc.bosses[i];
+    if (Math.abs(b.at[0] - at[0]) < 0.01 && Math.abs(b.at[1] - at[1]) < 0.01) return true;
+  }
+  return false;
+}
+
+document.getElementById('dupBossBtn').onclick = function () {
+  var b = selectedBoss();
+  if (!b) return;
+  snapshot();
+  var taken = makeIdSet(doc.components);
+  for (var i = 0; i < doc.bosses.length; i++) taken[doc.bosses[i].id] = true;
+  var copy = normBoss(copyInto({}, b), taken, makeIdSet(doc.components));
+  copy.id = nextId(taken, 'b');
+  copy.at = [snap(b.at[0] + 5), snap(b.at[1])];
+  doc.bosses.push(copy);
+  select('boss', copy.id);
+  syncControls();
+  scheduleSave();
+  draw();
+};
+
+function deleteBoss() {
+  var b = selectedBoss();
+  if (!b) return;
+  snapshot();
+  doc.bosses.splice(doc.bosses.indexOf(b), 1);
+  deselect();
+  syncControls();
+  scheduleSave();
+  draw();
+}
+document.getElementById('delBossBtn').onclick = deleteBoss;
 
 
 /* --------------------------------------------------------------------------
@@ -1644,7 +2171,7 @@ function adopt(raw) {
   var result = normDoc(raw);       // throws if it is not one of ours
   snapshot();
   doc = result.doc;
-  selectedId = null;
+  deselect();
   userAdjusted = false;            // frame the plate we just opened
   syncControls();
   scheduleSave();
@@ -1678,7 +2205,7 @@ document.getElementById('newBtn').onclick = function () {
   if (!confirm(t('confirmNew'))) return;
   snapshot();
   doc = blankDoc();
-  selectedId = null;
+  deselect();
   userAdjusted = false;
   syncControls();
   scheduleSave();
@@ -1718,6 +2245,22 @@ function applyLang() {
   document.getElementById('delCompBtn').textContent = t('remove');
   document.getElementById('compNote').textContent = t('compNote');
 
+  document.getElementById('ttBosses').textContent = t('bosses');
+  document.getElementById('addBossBtn').textContent = t('addBoss');
+  document.getElementById('bossEmpty').textContent = t('noBoss');
+  document.getElementById('lbBossSize').textContent = t('bossSize');
+  document.getElementById('lbBossFixing').textContent = t('bossFixing');
+  document.getElementById('lbBossOf').textContent = t('bossOf');
+  document.getElementById('lbBossHeight').textContent = t('bossHeight');
+  document.getElementById('dupBossBtn').textContent = t('duplicate');
+  document.getElementById('delBossBtn').textContent = t('remove');
+  document.getElementById('bossNote').textContent = t('bossNote');
+
+  document.getElementById('ttProfile').textContent = t('profile');
+  document.getElementById('lbWall').textContent = t('wall');
+  document.getElementById('lbHoleDia').textContent = t('holeDia');
+  document.getElementById('profileNote').textContent = t('profileNote');
+
   document.getElementById('ttPlate').textContent = t('plate');
   document.getElementById('lbW').textContent = t('width');
   document.getElementById('lbH').textContent = t('height');
@@ -1732,6 +2275,7 @@ function applyLang() {
   document.getElementById('viewNote').textContent = t('viewNote');
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
   document.getElementById('langPt').classList.toggle('active', lang === 'pt');
+  syncControls();     // the selects carry translated option labels
   draw();
 }
 
@@ -1829,6 +2373,8 @@ function makeCollapsible(id, openByDefault) {
 makeCollapsible('projectPanel', true);
 makeCollapsible('platePanel', false);
 makeCollapsible('compPanel', true);
+makeCollapsible('bossPanel', true);
+makeCollapsible('profilePanel', false);
 makeCollapsible('viewPanel', false);
 
 FantomaApp.init({

@@ -276,10 +276,11 @@ why the STL is derived rather than stored, why there is no CAD kernel, and why
 tunnels are the default but the ends of a wire are not. Read it before changing
 geometry decisions.
 
-**Built so far: steps 1 and 2.** The drawing surface — plate, grid, rulers, pan
-and zoom, guides, measuring. The document — components with their three
-heights, autosave into this browser, and `.protoplaca.json` to open and save.
-Bosses are step 3, the mesh is step 4.
+**Built so far: steps 1–3.** The drawing surface — plate, grid, rulers, pan and
+zoom, guides, measuring, a cursor crosshair. The document — components with
+their three heights, autosave into this browser, and `.protoplaca.json` to open
+and save. Bosses — screw size, fixing type, height, attached to the component
+they hold. The mesh is step 4.
 
 ---
 

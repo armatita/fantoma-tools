@@ -43,7 +43,7 @@ removes any parsing ambiguity in numeric fields.
 Phase 1 is the smallest thing that is genuinely useful: it answers "where do I
 screw the ESP32 down" without any wire handling at all.
 
-**Phase 1 — plate, components, bosses, STL** (steps 1 and 2 are built)
+**Phase 1 — plate, components, bosses, STL** (steps 1–3 are built)
 
 1. Canvas: grid, rulers, pan and zoom, guidelines, plate outline (rectangle
    first), live mm readouts. Nothing saved yet.
@@ -180,6 +180,54 @@ MIME negotiation from a static host.
 
 Both. They are not alternatives: the store is a safety net, the file is the
 artefact.
+
+### Bosses, and what they belong to
+
+A boss can hold a component down, and says so: `of` carries that component's
+id, or null for a free-standing boss. Two things follow from the relationship,
+and both are the reason it exists.
+
+**Its bosses travel with a component.** Move the ESP32 and the four bosses
+under it move too. They are its mounting holes; leaving them behind would mean
+re-placing them by hand every time the layout changes, which is exactly the
+work this tool is supposed to remove.
+
+**Its height is the component's standoff.** These are not two numbers that
+ought to agree — they are one measurement written down twice. The standoff is
+the clear space under the board; the boss is what holds the board up there. If
+they differ, the board sits crooked or does not sit at all. So an attached boss
+takes the component's standoff and shows the field as not editable; detach it
+and it keeps a height of its own. The value is still written into the file
+either way, so the document stays self-contained and the mesh generator never
+has to chase a reference to find a height.
+
+Deleting a component does not delete its bosses. It clears their `of` and
+leaves them standing, because the holes are still in the plate you are about to
+print. A boss whose `of` points at a component that is not in the file is not a
+reference, and is read back as free-standing.
+
+**The boss's outer diameter is not stored.** It is the hole plus twice the wall
+thickness, both from the print profile. A boss that carried its own outer size
+could disagree with the profile, and then the drawing and the mesh would be
+describing different objects.
+
+### The numbers in the profile are placeholders, and the panel says so
+
+Self-tap and clearance diameters are the conventional tapping and clearance
+sizes — inference from a standard, not a measurement. Insert diameters are
+worse: they vary by brand and by length, and the only way to know yours is to
+push one in. They are in the tool because it needs *a* number to draw, not
+because they are right.
+
+This is the same discipline as everything else here: a label or a datasheet
+that disagrees with reality is the normal case, so the tool states which of its
+numbers were measured and which were assumed. The calibration coupon exists to
+replace every one of them.
+
+Editing a hole diameter edits the profile, not the boss. Every M3 self-tapped
+hole in a project is the same hole; they are all wrong together until the
+coupon says otherwise, and fixing them one at a time would guarantee an
+inconsistent plate.
 
 ### Undo
 
