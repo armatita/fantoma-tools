@@ -43,7 +43,7 @@ removes any parsing ambiguity in numeric fields.
 Phase 1 is the smallest thing that is genuinely useful: it answers "where do I
 screw the ESP32 down" without any wire handling at all.
 
-**Phase 1 — plate, components, bosses, STL** (steps 1–3 are built)
+**Phase 1 — plate, components, bosses, STL** (built)
 
 1. Canvas: grid, rulers, pan and zoom, guidelines, plate outline (rectangle
    first), live mm readouts. Nothing saved yet.
@@ -377,20 +377,89 @@ in a browser with no install, and the case CAD is one specific part built in Pyt
 
 ## Output
 
-**STL** for compatibility — universally accepted, carries no units, and every slicer
-assumes mm, which is what we emit.
+**STL**, binary. Universally accepted, carries no units, and every slicer assumes
+millimetres — which is what we emit. Binary rather than ASCII because ASCII is
+roughly five times the size for the same geometry and no more readable once it is
+past a few thousand facets.
 
-**3MF** as well, because it carries units explicitly and supports per-object colour,
-so component and wire colours can survive into the slicer instead of arriving as an
-anonymous grey blob.
+**3MF is deferred, and the earlier reasoning for it was wrong.** It was justified
+here on two grounds: explicit units, and per-object colour so component and wire
+colours survive into the slicer. The second does not apply and will not for some
+time — **nothing in the printed object has a colour.** The plate, the bosses, the
+retainers and the ribs are one part in one material; the colours belong to
+components and wires, which are drawing annotations and are never printed. That
+leaves explicit units as the only live advantage, over a format where every
+slicer already assumes the right ones.
+
+It earns its place when there is something to colour — multi-material, or
+components exported as reference bodies to check a fit — and not before.
+
+## The mesh
+
+Built from prisms, with no boolean operations, exactly as the geometry section
+above describes: the plate is a box, and each boss is generated **as a tube**
+rather than as a cylinder with a cylinder subtracted from it. Overlapping closed
+volumes go into one file and the slicer unions them.
+
+Bosses are sunk 0.2 mm into the plate rather than resting exactly on it.
+Coincident coplanar faces are a classic source of slicer artefacts, and a little
+overlap makes the union unambiguous. The boss still stands its full height proud
+of the plate, which is the number that matters.
+
+### Holes are blind, and clearance bosses are not done
+
+A tube standing on a solid slab gives a **blind** hole. That is correct for
+self-tapping screws and for heat-set inserts: the screw stops inside the boss and
+nothing protrudes underneath.
+
+A **clearance** hole is different. The screw has to pass through and take a nut,
+so the plate itself needs a hole — which means the slab's top and bottom faces
+stop being rectangles and become rectangles-with-holes. That needs
+polygon-with-holes triangulation, which is the single exception this design
+already identified, and which recessed text needs too.
+
+So clearance holes and recessed text are the same problem, and they get one
+triangulator, built once and tested once. The alternative was a special case for
+circular holes in a rectangle — split the plate into cells holding one hole each
+and zip each hole to its cell — which would work and would be thrown away the
+moment the real triangulator arrived. A subtly wrong triangulation produces a
+mesh that slices wrong, which is the failure this project can least afford to
+have two implementations of.
+
+Until then the export panel says plainly that clearance bosses come out blind.
+The tool is allowed to be incomplete; it is not allowed to be quietly wrong.
+
+### The mesh is checked before it is written
+
+Every edge of a closed surface is shared by exactly two triangles which traverse
+it in opposite directions — so each *directed* edge must appear exactly once
+across the whole file. That single count catches holes in the surface, flipped
+winding and duplicated faces, which are the three ways a generated mesh goes
+wrong. Overlapping solids are fine: each is closed on its own, so the union still
+balances.
+
+It runs before every export, and a mesh that fails is **not written**. A broken
+mesh found on the printer costs an hour and a spool; found here it costs nothing.
+
+It paid for itself immediately: the first tube came out with both of its annulus
+faces wound backwards, which no amount of looking at the drawing would have
+shown.
 
 ---
 
 ## The calibration coupon
 
 **An option in the tool, not a mandatory first step.** A small plate carrying one
-boss of each size in each fixing type, and a few retainers — tunnel and clip, square
-and arched roof — at a couple of wire sizes.
+boss of each size in each fixing type — and, once retainers exist, a few of those
+too: tunnel and clip, square and arched roof, at a couple of wire sizes.
+
+**It is an ordinary project, not a special export path.** Pressing the button
+builds a document and opens it in the editor like any other. Two things follow.
+It exercises the same geometry as everything else, so it tests what you will
+actually print rather than a parallel implementation that could drift. And the
+editor is its legend: clicking a boss tells you which size and fixing it is,
+which is what lets the coupon be useful before there is any way to emboss a
+label on a plate.
 
 One print tells you: the self-tap hole diameter that actually grips in your
 filament, the hole that actually takes your heat-set inserts, whether a square roof

@@ -276,11 +276,18 @@ why the STL is derived rather than stored, why there is no CAD kernel, and why
 tunnels are the default but the ends of a wire are not. Read it before changing
 geometry decisions.
 
-**Built so far: steps 1–3.** The drawing surface — plate, grid, rulers, pan and
-zoom, guides, measuring, a cursor crosshair. The document — components with
-their three heights, autosave into this browser, and `.protoplaca.json` to open
-and save. Bosses — screw size, fixing type, height, attached to the component
-they hold. The mesh is step 4.
+**Phase 1 is built.** The drawing surface — plate, grid, rulers, pan and zoom,
+guides, measuring, a cursor crosshair. The document — components with their
+three heights, autosave into this browser, and `.protoplaca.json` to open and
+save. Bosses — screw size, fixing type, height, attached to the component they
+hold. And binary STL out, with a calibration coupon you can print to find your
+own hole sizes.
+
+Holes are blind, which is right for self-tapping screws and heat-set inserts.
+Clearance bosses are **not** drilled through the plate yet — that needs the same
+triangulation as recessed text and waits for it. The export panel says so.
+
+Wires are phase 2.
 
 ---
 
