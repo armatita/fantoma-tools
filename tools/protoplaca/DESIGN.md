@@ -219,6 +219,19 @@ worse: they vary by brand and by length, and the only way to know yours is to
 push one in. They are in the tool because it needs *a* number to draw, not
 because they are right.
 
+Sizes run M1.4, M1.7, M2, M2.5, M3, M4. The two smallest are there because
+they turn up in small modules and consumer teardowns, and they are the least
+trustworthy rows in the table. **M1.7 is not an ISO metric size at all**, so its
+figures are interpolated from its neighbours rather than read from a standard.
+And heat-set inserts that small may simply not exist — those two numbers are
+extrapolation from the ratio of the larger sizes, which is a polite word for
+invention. Treat them as fiction until an insert is actually in your hand.
+
+There is a printing limit underneath this too: a 1.1 mm hole extruded through a
+0.4 mm nozzle comes out undersized and rough, whatever the table says. At these
+sizes a clearance hole with a nut underneath is often the better fixing, and the
+profile note says so.
+
 This is the same discipline as everything else here: a label or a datasheet
 that disagrees with reality is the normal case, so the tool states which of its
 numbers were measured and which were assumed. The calibration coupon exists to

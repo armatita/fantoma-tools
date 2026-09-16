@@ -360,7 +360,9 @@ var STRINGS = {
     holeDia: 'Hole',
     profileNote: 'The hole shown is for the selected boss. Every number here is '
       + 'a placeholder: the self-tap and clearance figures are standard sizes '
-      + 'rather than measurements, and insert sizes vary by brand. Print the '
+      + 'rather than measurements, and insert sizes vary by brand. At M1.4 and '
+      + 'M1.7 the insert figures are guesses at parts that may not exist, and '
+      + 'a hole that small prints undersized on a 0.4 mm nozzle. Print the '
       + 'calibration coupon and replace them with what actually fits.',
     addComp: 'Add component',
     duplicate: 'Duplicate',
@@ -437,7 +439,9 @@ var STRINGS = {
     profileNote: 'O furo mostrado \u00e9 o da bossa selecionada. Todos estes '
       + 'n\u00fameros s\u00e3o provis\u00f3rios: os valores de autoroscante e de furo '
       + 'passante s\u00e3o medidas padr\u00e3o e n\u00e3o medi\u00e7\u00f5es, e os '
-      + 'insertos variam com a marca. Imprima o cup\u00e3o de calibra\u00e7\u00e3o e '
+      + 'insertos variam com a marca. Em M1.4 e M1.7 os valores de inserto '
+      + 'são palpites sobre peças que podem nem existir, e um furo tão '
+      + 'pequeno sai subdimensionado com um bico de 0,4 mm. Imprima o cup\u00e3o de calibra\u00e7\u00e3o e '
       + 'substitua-os pelo que realmente encaixa.',
     addComp: 'Adicionar componente',
     duplicate: 'Duplicar',
@@ -541,7 +545,9 @@ function defaultProfile() {
     wall: 2,              // mm of material around the hole
     holes: {
       // size:   [ self-tap, heat-set insert, clearance ]
-      M2:  { selftap: 1.6, insert: 3.2, clearance: 2.4 },
+      M1_4:{ selftap: 1.1,  insert: 2.6, clearance: 1.6 },
+      M1_7:{ selftap: 1.35, insert: 2.9, clearance: 2.0 },
+      M2:  { selftap: 1.6,  insert: 3.2, clearance: 2.4 },
       M2_5:{ selftap: 2.1, insert: 3.6, clearance: 2.9 },
       M3:  { selftap: 2.5, insert: 4.0, clearance: 3.4 },
       M4:  { selftap: 3.3, insert: 5.6, clearance: 4.5 }
@@ -549,7 +555,11 @@ function defaultProfile() {
   };
 }
 
-var SIZES = ['M2', 'M2_5', 'M3', 'M4'];
+/* M1.7 is not an ISO metric size, but it turns up constantly in small modules
+   and consumer teardowns, so it is here. Its figures are interpolated from its
+   neighbours rather than taken from a table -- one step further from measured
+   than the rest, and the rest are only standard sizes to begin with. */
+var SIZES = ['M1_4', 'M1_7', 'M2', 'M2_5', 'M3', 'M4'];
 var FIXINGS = ['selftap', 'insert', 'clearance'];
 
 function sizeLabel(key) { return key.replace('_', '.'); }
