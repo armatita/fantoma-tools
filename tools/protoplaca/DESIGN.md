@@ -56,8 +56,8 @@ screw the ESP32 down" without any wire handling at all.
 
 **Phase 2** — wires: drawing, anchoring, colours, names, AWG, length readout.
 (built)
-**Phase 3** — retainers: tunnels and clips (built), auto-placement and
-crossings (not yet).
+**Phase 3** — retainers: tunnels, clips, automatic placement and crossings.
+(built)
 **Phase 4** — the 3D tab: the mesh plus coloured wires and components, collision
 checks.
 **Phase 5** — ribs, recessed text.
@@ -457,6 +457,57 @@ and the plate, because the board is up on its standoffs.
 On by default, with the relief adjustable, and switchable off for anyone who
 would rather have a bare plate.
 
+## Placing retainers automatically
+
+Four rules, and the first is the one that matters.
+
+**The ends of a run are clips.** A crimped Dupont connector is roughly
+2.5 × 6 mm in its housing and will not thread through a 2 mm bore, so a
+ready-made jumper cannot pass through a closed tunnel at all. Sizing every
+tunnel to admit a connector would make them enormous for no gain along the
+middle. Press the connector ends into clips; thread only the bare middle.
+
+**A corner gets one either side, never one on it.** A wire springs out at a
+bend, and a retainer sitting on the bend has to fight it. Two flanking it hold
+the straights, and the corner follows.
+
+**A straight gets one every so often**, from the profile.
+
+**A crossing gets nothing** — see below.
+
+### Deleting an automatic retainer is remembered
+
+An automatic retainer you delete is not removed; it is kept with its origin
+changed to `auto-suppressed`, invisible and absent from the mesh. Pressing the
+auto button again will not put back the very retainer you just decided did not
+belong, which is how this kind of feature usually goes wrong. Hand-placed ones
+are never touched by the auto pass, and they keep it away from their
+neighbourhood. A count of suppressed ones is shown with a button to restore
+them, so the decision is reversible.
+
+## Crossings
+
+Two wires that cross in plan cannot both lie on the plate, so the tool finds
+the crossings and says which wire rides over. **The proposal is that the later
+wire goes over**, which is arbitrary and deliberately so: nothing about two
+wires decides it, only what you want, so the rule need only be predictable.
+
+**No retainer is placed at a crossing.** The document originally called for a
+raised one there, its height set by the lower wire's diameter. That cannot be
+built from the parts this design has: a retainer is a prism swept along its
+wire, so its legs run *across* the lower wire's path and would land on it.
+Doing it properly means a small bridge on fore-and-aft piers — a new kind of
+part, for one case.
+
+Instead the wire underneath is pinned either side of the crossing and the wire
+on top is held either side too, so it rides over on its own stiffness. That is
+what you would do with your hands, and it needs nothing new.
+
+`level` remains in the format and does raise a retainer's opening — its legs
+still reach the plate, which was a bug worth fixing either way, since lifting
+the whole section printed an island floating in the air. A raised clip becomes
+a tunnel, because jaws open at the top have nothing to carry them.
+
 ## Retainer geometry
 
 A retainer is one cross-section swept a short way along the wire. The section
@@ -661,8 +712,18 @@ already follow, and both were found by the closed-surface test:
 - **Crosswise.** Two parallel strokes exactly one pen width apart met face to
   face. A `0` beside an `O` did it, and so did seven other pairs.
 
-All 2116 character pairs and the full alphabet at four sizes now come out
-closed.
+A third case was not systematic at all. At a cap height of 2.4 mm, and only
+there, two particular strokes in SQUARE, CLIP and 26 landed exactly face to
+face. Hunting those one scale at a time is a losing game — the next pen width
+brings a different pair — so the overlap now **varies per stroke** by a few
+microns, derived from the stroke's own coordinates so it stays deterministic.
+Two independently built solids then cannot share an exact face.
+
+That is a fudge, and worth naming as one. It is there because the
+closed-surface test cannot tell a shared face from a crack, and the test is
+worth more kept strict than made lenient.
+
+19 044 character pairs across nine cap heights now come out closed.
 
 ## The calibration coupon
 

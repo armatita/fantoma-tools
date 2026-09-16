@@ -188,6 +188,9 @@
         <div class="row">
           <button type="button" id="couponBtn"></button>
         </div>
+        <div class="row">
+          <button type="button" id="retCouponBtn"></button>
+        </div>
         <div class="note" id="projectNote"></div>
       </section>
 
@@ -349,6 +352,11 @@
         <h2><span id="ttRetainers"></span></h2>
         <div class="row">
           <button type="button" id="addRetBtn"></button>
+          <button type="button" id="autoRetBtn"></button>
+        </div>
+        <div class="note" id="suppressedNote" hidden></div>
+        <div class="row" id="restoreRow" hidden>
+          <button type="button" id="restoreRetBtn"></button>
         </div>
         <div class="note" id="retEmpty"></div>
         <div id="retFields" hidden>
@@ -455,6 +463,11 @@
           <input type="number" id="profRetLen" inputmode="decimal" step="1" min="1">
           <span class="unit">mm</span>
         </div>
+        <div class="field narrow">
+          <label for="profAutoSpacing" id="lbAutoSpacing"></label>
+          <input type="number" id="profAutoSpacing" inputmode="decimal" step="1" min="4">
+          <span class="unit">mm</span>
+        </div>
         <div class="field">
           <label for="profRoof" id="lbRoof"></label>
           <select id="profRoof"></select>
@@ -550,6 +563,12 @@ var STRINGS = {
     retainers: 'Retainers',
     addRet: 'Add retainer',
     retKind: 'Kind',
+    autoRet: 'Place automatically',
+    restoreRet: 'Restore removed',
+    autoSpacing: 'Auto spacing',
+    suppressed: 'automatic retainers you removed are remembered, so placing '
+      + 'again will not put them back',
+    placedN: 'Placed ',
     tunnel: 'Tunnel',
     clip: 'Clip',
     retT: 'Along wire',
@@ -606,6 +625,8 @@ var STRINGS = {
     // explains them. Both are written out rather than taken from the first
     // letter of the fixing's name, which gave a row marked H against a key
     // that said I.
+    retCoupon: 'Retainer coupon',
+    retCouponKey: 'AWG DOWN THE SIDE',
     couponRows: 'SHC',
     couponKey: 'S=SELF-TAP  H=HEAT-SET  C=CLEARANCE',
     couponConfirm: 'Replace the current project with a calibration coupon? '
@@ -715,6 +736,12 @@ var STRINGS = {
     retainers: 'Retentores',
     addRet: 'Adicionar retentor',
     retKind: 'Tipo',
+    autoRet: 'Colocar automaticamente',
+    restoreRet: 'Repor os removidos',
+    autoSpacing: 'Espaçamento automático',
+    suppressed: 'os retentores automáticos que removeu ficam registados, por '
+      + 'isso colocar outra vez não os traz de volta',
+    placedN: 'Colocados ',
     tunnel: 'T\u00fanel',
     clip: 'Mola',
     retT: 'Ao longo do fio',
@@ -768,6 +795,8 @@ var STRINGS = {
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
     coupon: 'Cup\u00e3o de calibra\u00e7\u00e3o',
+    retCoupon: 'Cup\u00e3o de retentores',
+    retCouponKey: 'AWG NA LATERAL',
     couponRows: 'AIF',
     couponKey: 'A=AUTOROSCANTE  I=INSERTO  F=FURO PASSANTE',
     couponConfirm: 'Substituir o projeto atual por um cup\u00e3o de calibra\u00e7\u00e3o? '
@@ -938,6 +967,7 @@ function defaultProfile() {
 
     // Witness lines: the diagram echoed on the plate, so a bare print tells
     // you where everything goes before anything is on it.
+    autoSpacing: 25,      // how far apart on a long straight
     marks: true,
     markWidth: 0.6,
     markHeight: 0.3,
@@ -1181,6 +1211,7 @@ function normProfile(raw) {
   out.retLen = numOr(out.retLen, d.retLen, 1, 60);
   out.roof = (out.roof === 'square') ? 'square' : 'arch';
   out.maxBridge = numOr(out.maxBridge, d.maxBridge, 1, 200);
+  out.autoSpacing = numOr(out.autoSpacing, d.autoSpacing, 4, 200);
   out.marks = (out.marks !== false);
   out.markWidth = numOr(out.markWidth, d.markWidth, 0.2, 5);
   out.markHeight = numOr(out.markHeight, d.markHeight, 0.1, 5);
@@ -1301,6 +1332,7 @@ function normRetainer(raw, taken, wireIds) {
   r.kind = RETAINER_KINDS.indexOf(r.kind) >= 0 ? r.kind : 'tunnel';
   r.origin = RETAINER_ORIGINS.indexOf(r.origin) >= 0 ? r.origin : 'manual';
   r.level = Math.max(0, Math.round(numOr(r.level, 0, 0, 4)));
+  r.roof = (r.roof === 'arch' || r.roof === 'square') ? r.roof : null;   // null = the profile's
   return r;
 }
 
@@ -1811,7 +1843,7 @@ function drawRetainers() {
   for (var i = 0; i < doc.retainers.length; i++) {
     var r = doc.retainers[i];
     var pose = retainerPose(r);
-    if (!pose) continue;
+    if (!pose || r.origin === 'auto-suppressed') continue;
 
     var od = pose.wire.od;
     var clear = numOr(doc.profile.wireClear, 0.4);
@@ -1852,7 +1884,7 @@ function retainerAt(p) {
   for (var i = doc.retainers.length - 1; i >= 0; i--) {
     var r = doc.retainers[i];
     var pose = retainerPose(r);
-    if (!pose) continue;
+    if (!pose || r.origin === 'auto-suppressed') continue;
     var od = pose.wire.od;
     var across = od / 2 + numOr(doc.profile.wireClear, 0.4) + numOr(doc.profile.retWall, 1.2);
     var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
@@ -4216,8 +4248,25 @@ function strokeBox(out, a, b, width, z0, z1) {
    // one pen width apart -- a "0" beside an "O", say -- from meeting face to
    // face. Either way the rule is the same one the bosses follow: solids that
    // overlap are unambiguous, solids that merely touch are not.
-  var hw = width / 2 + JOIN_OVERLAP;
-  var reach = hw + JOIN_OVERLAP;
+  /* Each stroke is built a hair different from its neighbours.
+
+     Widening every stroke by the same fixed amount removed the systematic
+     coincidences -- right-angled corners, and parallel strokes one pen width
+     apart -- but not the accidental ones: at a cap height of 2.4 mm, and only
+     there, two particular strokes in SQUARE, CLIP and 26 landed exactly face
+     to face. Hunting those one scale at a time is a losing game, because the
+     next pen width or size brings a different pair.
+
+     So the overlap varies per stroke, by a few microns, derived from the
+     stroke's own coordinates so it is deterministic. Two independently built
+     solids then cannot share an exact face. That matters because the
+     closed-surface test cannot tell a shared face from a crack, and the test
+     is worth more kept strict than made lenient. */
+  var h = Math.sin(a[0] * 12.9898 + a[1] * 78.233 + b[0] * 37.719 + b[1] * 4.581) * 43758.5453;
+  var jitter = JOIN_OVERLAP * (0.6 + 0.8 * (h - Math.floor(h)));
+
+  var hw = width / 2 + jitter;
+  var reach = hw + jitter;
 
   var ax = a[0] - ux * reach, ay = a[1] - uy * reach;
   var bx = b[0] + ux * reach, by = b[1] + uy * reach;
@@ -4261,6 +4310,212 @@ function textMesh(out, label) {
 
 
 /* --------------------------------------------------------------------------
+   Where crossings are
+   --------------------------------------------------------------------------
+   Two wires that cross in plan cannot both lie on the plate. One has to ride
+   over the other, and the tool needs to know where that happens -- to keep a
+   retainer off the spot, and to say which wire is on top.
+
+   The proposal is that the LATER wire goes over. That is arbitrary, and
+   deliberately so: there is no property of two wires that decides it, only
+   what you want, so the rule just has to be predictable and easy to reverse.
+   -------------------------------------------------------------------------- */
+function segmentCross(a1, a2, b1, b2) {
+  var dax = a2[0] - a1[0], day = a2[1] - a1[1];
+  var dbx = b2[0] - b1[0], dby = b2[1] - b1[1];
+  var den = dax * dby - day * dbx;
+  if (Math.abs(den) < 1e-9) return null;        // parallel
+
+  var t = ((b1[0] - a1[0]) * dby - (b1[1] - a1[1]) * dbx) / den;
+  var u = ((b1[0] - a1[0]) * day - (b1[1] - a1[1]) * dax) / den;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return { at: [a1[0] + dax * t, a1[1] + day * t], ta: t, tb: u };
+}
+
+/* Every place two wires cross, as a fraction along each. A wire is not tested
+   against itself: a wire that crosses its own path is a drawing to fix, not a
+   stacking decision to make. */
+function wireCrossings() {
+  var out = [], i, j, k, m;
+  for (i = 0; i < doc.wires.length; i++) {
+    for (j = i + 1; j < doc.wires.length; j++) {
+      var A = doc.wires[i], B = doc.wires[j];
+      var la = pathLength(A), lb = pathLength(B);
+      if (!la || !lb) continue;
+
+      var runA = 0;
+      for (k = 1; k < A.path.length; k++) {
+        var a1 = A.path[k - 1].at, a2 = A.path[k].at;
+        var lenA = Math.hypot(a2[0] - a1[0], a2[1] - a1[1]);
+        var runB = 0;
+        for (m = 1; m < B.path.length; m++) {
+          var b1 = B.path[m - 1].at, b2 = B.path[m].at;
+          var lenB = Math.hypot(b2[0] - b1[0], b2[1] - b1[1]);
+          var hit = segmentCross(a1, a2, b1, b2);
+          if (hit) {
+            out.push({
+              at: hit.at,
+              over: B.id, under: A.id,          // the later wire rides over
+              tOver: (runB + lenB * hit.tb) / lb,
+              tUnder: (runA + lenA * hit.ta) / la
+            });
+          }
+          runB += lenB;
+        }
+        runA += lenA;
+      }
+    }
+  }
+  return out;
+}
+
+function crossingFor(wireId, tt) {
+  var list = wireCrossings();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].over === wireId && Math.abs(list[i].tOver - tt) < 1e-6) return list[i];
+    if (list[i].under === wireId && Math.abs(list[i].tUnder - tt) < 1e-6) return list[i];
+  }
+  return null;
+}
+
+
+/* --------------------------------------------------------------------------
+   Placing retainers automatically
+   --------------------------------------------------------------------------
+   Four rules, and the first is the one that matters most.
+
+   ENDS ARE CLIPS. A crimped Dupont connector is roughly 2.5 x 6 mm in its
+   housing and will not thread through a 2 mm bore, so a ready-made jumper
+   cannot go through a closed tunnel at all. Sizing every tunnel to pass a
+   connector would make them enormous for no gain along the middle of a run.
+   So: press the connector ends into clips, thread only the bare middle.
+
+   CORNERS GET ONE EITHER SIDE, not one on the corner. A wire springs out at a
+   bend, and a retainer sitting exactly on the bend has to fight it; two
+   retainers flanking it simply hold the two straights and the corner follows.
+
+   STRAIGHTS GET ONE EVERY SO OFTEN, from the profile.
+
+   CROSSINGS GET NOTHING. The wire underneath has a retainer either side
+   instead, and the wire on top flies over -- see DESIGN.md for why that beats
+   a raised retainer sitting on the spot.
+
+   Nothing is placed where you have already put something by hand, or where
+   you deleted an automatic one.
+   -------------------------------------------------------------------------- */
+function autoPlaceRetainers() {
+  snapshot();
+
+  var kept = [];
+  var i, k;
+  for (i = 0; i < doc.retainers.length; i++) {
+    if (doc.retainers[i].origin !== 'auto') kept.push(doc.retainers[i]);
+  }
+  doc.retainers = kept;
+
+  var retLen = numOr(doc.profile.retLen, 6);
+  var spacing = numOr(doc.profile.autoSpacing, 25);
+  var minGap = retLen + 2;
+  var endInset = retLen / 2 + 1;
+  var cornerOff = retLen / 2 + 2;
+  var crossings = wireCrossings();
+  var taken = {};
+  for (i = 0; i < doc.retainers.length; i++) taken[doc.retainers[i].id] = true;
+  var placed = 0;
+
+  for (var wi = 0; wi < doc.wires.length; wi++) {
+    var w = doc.wires[wi];
+    if (w.path.length < 2) continue;
+    var total = pathLength(w);
+    if (total < retLen + 2) continue;
+
+    var want = [];
+    want.push({ s: Math.min(endInset, total / 2), kind: 'clip' });
+    want.push({ s: Math.max(total - endInset, total / 2), kind: 'clip' });
+
+    var run = 0;
+    for (k = 1; k < w.path.length - 1; k++) {
+      run += Math.hypot(w.path[k].at[0] - w.path[k - 1].at[0],
+                        w.path[k].at[1] - w.path[k - 1].at[1]);
+      want.push({ s: run - cornerOff, kind: 'tunnel' });
+      want.push({ s: run + cornerOff, kind: 'tunnel' });
+    }
+
+    for (var d = spacing; d < total - endInset; d += spacing) {
+      want.push({ s: d, kind: 'tunnel' });
+    }
+
+    // The wire underneath a crossing wants holding on both sides of it.
+    for (i = 0; i < crossings.length; i++) {
+      if (crossings[i].under !== w.id) continue;
+      var sc = crossings[i].tUnder * total;
+      want.push({ s: sc - cornerOff, kind: 'tunnel' });
+      want.push({ s: sc + cornerOff, kind: 'tunnel' });
+    }
+
+    want.sort(function (a, b) { return a.s - b.s; });
+
+    var blockedHere = [];
+    for (i = 0; i < crossings.length; i++) {
+      if (crossings[i].over === w.id) blockedHere.push(crossings[i].tOver * total);
+      if (crossings[i].under === w.id) blockedHere.push(crossings[i].tUnder * total);
+    }
+
+    var lastS = -1e9;
+    for (i = 0; i < want.length; i++) {
+      var sPos = want[i].s;
+      if (sPos < retLen / 2 || sPos > total - retLen / 2) continue;
+      if (sPos - lastS < minGap) continue;
+
+      var clash = false;
+      for (k = 0; k < blockedHere.length; k++) {
+        if (Math.abs(sPos - blockedHere[k]) < retLen / 2 + 1) clash = true;
+      }
+      for (k = 0; !clash && k < doc.retainers.length; k++) {
+        var ex = doc.retainers[k];
+        if (ex.wire !== w.id) continue;
+        if (Math.abs(ex.t * total - sPos) < minGap) clash = true;   // yours, or refused
+      }
+      if (clash) continue;
+
+      var r = normRetainer({ wire: w.id, t: sPos / total, kind: want[i].kind, origin: 'auto' },
+                           taken, makeIdSet(doc.wires));
+      r.wire = w.id;
+      doc.retainers.push(r);
+      lastS = sPos;
+      placed++;
+    }
+  }
+
+  deselect();
+  syncControls();
+  scheduleSave();
+  draw();
+  return placed;
+}
+
+function suppressedCount() {
+  var n = 0;
+  for (var i = 0; i < doc.retainers.length; i++) {
+    if (doc.retainers[i].origin === 'auto-suppressed') n++;
+  }
+  return n;
+}
+
+function restoreSuppressed() {
+  snapshot();
+  var kept = [];
+  for (var i = 0; i < doc.retainers.length; i++) {
+    if (doc.retainers[i].origin !== 'auto-suppressed') kept.push(doc.retainers[i]);
+  }
+  doc.retainers = kept;
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+
+/* --------------------------------------------------------------------------
    Retainer geometry
    --------------------------------------------------------------------------
    A retainer is one cross-section swept a short way along the wire. The
@@ -4284,19 +4539,26 @@ function textMesh(out, label) {
    needs. A pointed arch never exceeds 45 degrees of overhang, so nothing is
    bridged and nothing sags. Both are offered because the coupon should settle
    it rather than an argument. */
-function tunnelSection(bore, height, wall, roof) {
+function tunnelSection(bore, height, wall, roof, floor) {
   var hb = bore / 2;
   var out = [];
   var i, n = 10;
+  var f = floor || 0;          // how far above the plate the opening starts
 
+  /* `floor` is what a raised retainer needs. Lifting the whole section
+     instead -- which is what this did at first -- puts the legs in the air
+     and prints an island floating over the plate. The opening moves up; the
+     legs always start at zero. */
   if (roof === 'square') {
     out.push([-(hb + wall), 0]);
-    out.push([-(hb + wall), height + wall]);
-    out.push([hb + wall, height + wall]);
+    out.push([-(hb + wall), f + height + wall]);
+    out.push([hb + wall, f + height + wall]);
     out.push([hb + wall, 0]);
     out.push([hb, 0]);
-    out.push([hb, height]);
-    out.push([-hb, height]);
+    out.push([hb, f]);
+    out.push([hb, f + height]);
+    out.push([-hb, f + height]);
+    out.push([-hb, f]);
     out.push([-hb, 0]);
     return out;
   }
@@ -4313,9 +4575,9 @@ function tunnelSection(bore, height, wall, roof) {
     return pts;
   }
 
-  var spring = Math.max(0, height - bore * 0.35);
-  var apexIn = height;
-  var apexOut = height + wall;
+  var spring = f + Math.max(0, height - bore * 0.35);
+  var apexIn = f + height;
+  var apexOut = f + height + wall;
 
   out.push([-(hb + wall), 0]);
   out.push([-(hb + wall), spring]);
@@ -4327,12 +4589,14 @@ function tunnelSection(bore, height, wall, roof) {
   out.push([hb + wall, 0]);
 
   out.push([hb, 0]);
+  out.push([hb, f]);
   out.push([hb, spring]);
   var rin = arch(hb, spring, apexIn);
   for (i = 0; i < rin.length; i++) out.push(rin[i]);
   var lin = arch(-hb, spring, apexIn);
   for (i = lin.length - 2; i >= 0; i--) out.push(lin[i]);       // likewise
   out.push([-hb, spring]);
+  out.push([-hb, f]);
   out.push([-hb, 0]);
   return out;
 }
@@ -4408,6 +4672,7 @@ function sweepSection(out, section, at, dir, len, z0) {
 }
 
 function retainerMesh(out, r) {
+  if (r.origin === 'auto-suppressed') return true;
   var pose = retainerPose(r);
   if (!pose) return true;                      // nothing to draw, not a failure
 
@@ -4417,16 +4682,19 @@ function retainerMesh(out, r) {
   var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
   var z0 = doc.plate.thickness - WELD;
 
-  /* A retainer stacked over another wire starts higher: the wire below it,
-     plus its clearance, plus a floor to carry it. */
-  var lift = r.level * (od + clear + wall);
+  /* A raised retainer keeps its feet on the plate and moves its OPENING up,
+     so a wire can pass underneath. A clip cannot do that -- its jaws are open
+     at the top and there is nothing to carry them -- so a raised clip becomes
+     a tunnel, which is what it would have to be. */
+  var floor = r.level * (od + clear + wall);
 
-  if (r.kind === 'clip') {
-    return sweepSection(out, clipSection(od, clear, wall, 1), pose.at, pose.dir, len, z0 + lift)
-        && sweepSection(out, clipSection(od, clear, wall, -1), pose.at, pose.dir, len, z0 + lift);
+  if (r.kind === 'clip' && !floor) {
+    return sweepSection(out, clipSection(od, clear, wall, 1), pose.at, pose.dir, len, z0)
+        && sweepSection(out, clipSection(od, clear, wall, -1), pose.at, pose.dir, len, z0);
   }
-  return sweepSection(out, tunnelSection(od + clear * 2, od + clear * 2, wall, doc.profile.roof),
-                      pose.at, pose.dir, len, z0 + lift);
+  return sweepSection(out, tunnelSection(od + clear * 2, od + clear * 2, wall,
+                                         r.roof || doc.profile.roof, floor),
+                      pose.at, pose.dir, len, z0);
 }
 
 
@@ -4477,7 +4745,7 @@ function blockedRanges(w) {
   var out = [];
   for (var i = 0; i < doc.retainers.length; i++) {
     var r = doc.retainers[i];
-    if (r.wire !== w.id) continue;
+    if (r.wire !== w.id || r.origin === 'auto-suppressed') continue;
     var pose = retainerPose(r);
     if (!pose) continue;
     var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
@@ -4905,6 +5173,7 @@ var profWireClear = document.getElementById('profWireClear');
 var profRetWall = document.getElementById('profRetWall');
 var profRetLen = document.getElementById('profRetLen');
 var profRoof = document.getElementById('profRoof');
+var profAutoSpacing = document.getElementById('profAutoSpacing');
 var profMarks = document.getElementById('profMarks');
 var profMarkHeight = document.getElementById('profMarkHeight');
 
@@ -4921,6 +5190,13 @@ function syncRetainerControls() {
   fillSelect(profMarks, ['on', 'off'], function (k) { return t(k); },
              doc.profile.marks === false ? 'off' : 'on');
   profMarkHeight.value = doc.profile.markHeight;
+  profAutoSpacing.value = doc.profile.autoSpacing;
+  var sup = suppressedCount();
+  document.getElementById('suppressedNote').hidden = !sup;
+  document.getElementById('restoreRow').hidden = !sup;
+  if (sup) {
+    document.getElementById('suppressedNote').textContent = sup + ' · ' + t('suppressed');
+  }
   profWireClear.value = doc.profile.wireClear;
   profRetWall.value = doc.profile.retWall;
   profRetLen.value = doc.profile.retLen;
@@ -4957,13 +5233,15 @@ function onRetProfile() {
   doc.profile.wireClear = Math.max(0, num(profWireClear, doc.profile.wireClear));
   doc.profile.retWall = Math.max(0.4, num(profRetWall, doc.profile.retWall));
   doc.profile.retLen = Math.max(1, num(profRetLen, doc.profile.retLen));
+  doc.profile.autoSpacing = Math.max(4, num(profAutoSpacing, doc.profile.autoSpacing));
   doc.profile.roof = profRoof.value === 'square' ? 'square' : 'arch';
   doc.profile.marks = profMarks.value !== 'off';
   doc.profile.markHeight = Math.max(0.1, num(profMarkHeight, doc.profile.markHeight));
   scheduleSave();
   draw();
 }
-[profWireClear, profRetWall, profRetLen, profRoof, profMarks, profMarkHeight].forEach(function (el) {
+[profWireClear, profRetWall, profRetLen, profRoof, profMarks, profMarkHeight,
+ profAutoSpacing].forEach(function (el) {
   el.addEventListener('input', onRetProfile);
   el.addEventListener('change', onRetProfile);
   el.addEventListener('focus', snapshot);
@@ -4991,13 +5269,23 @@ function deleteRetainer() {
   var r = selectedRetainer();
   if (!r) return;
   snapshot();
-  doc.retainers.splice(doc.retainers.indexOf(r), 1);
+  /* An automatic one is not removed, it is remembered as removed. Otherwise
+     pressing the auto button again would put back the very retainer you had
+     just decided did not belong, which is the way this feature usually goes
+     wrong. A manual one you placed yourself simply goes. */
+  if (r.origin === 'auto') r.origin = 'auto-suppressed';
+  else doc.retainers.splice(doc.retainers.indexOf(r), 1);
   deselect();
   syncControls();
   scheduleSave();
   draw();
 }
 document.getElementById('delRetBtn').onclick = deleteRetainer;
+
+document.getElementById('autoRetBtn').onclick = function () {
+  say(t('placedN') + autoPlaceRetainers());
+};
+document.getElementById('restoreRetBtn').onclick = restoreSuppressed;
 
 
 /* --------------------------------------------------------------------------
@@ -5133,6 +5421,89 @@ function couponDoc() {
   return d;
 }
 
+/* --------------------------------------------------------------------------
+   The retainer coupon
+   --------------------------------------------------------------------------
+   A second coupon, not an extension of the first. They answer different
+   questions at different times: hole sizes are settled once, and retention is
+   tested when there is wire in hand. Putting both on one plate would mean
+   reprinting eighteen bosses to try a tunnel.
+
+   A row per wire gauge, a column per kind. The wires are in the document so
+   the retainers have something to sit on and the witness lines show where to
+   lay the real ones.
+   -------------------------------------------------------------------------- */
+function retainerCouponDoc() {
+  var d = blankDoc();
+  d.name = t('retCoupon');
+
+  var gauges = [26, 22, 18];
+  var kinds = [
+    { kind: 'tunnel', roof: 'arch' },
+    { kind: 'tunnel', roof: 'square' },
+    { kind: 'clip', roof: null }
+  ];
+
+  var colPitch = 26, rowPitch = 15;
+  var left = 18, bottom = 13;
+
+  d.plate.w = left + (kinds.length - 1) * colPitch + left;
+  d.plate.h = bottom + (gauges.length - 1) * rowPitch + 14;
+
+  var taken = {};
+  var i, j;
+  for (i = 0; i < gauges.length; i++) {
+    var y = bottom + i * rowPitch;
+    var w = normWire({
+      name: gauges[i] + 'AWG',
+      awg: gauges[i],
+      path: [{ at: [6, y] }, { at: [d.plate.w - 6, y] }]
+    }, taken, {});
+    w.od = odForAwg(gauges[i]);
+    d.wires.push(w);
+
+    for (j = 0; j < kinds.length; j++) {
+      var centre = left + j * colPitch;
+      var r = normRetainer({
+        wire: w.id,
+        t: centre / (d.plate.w - 12),
+        kind: kinds[j].kind,
+        origin: 'manual'
+      }, taken, {});
+      r.wire = w.id;
+      r.roof = kinds[j].roof;
+      d.retainers.push(r);
+    }
+
+    d.texts.push(normText({
+      text: String(gauges[i]),
+      at: [7, y + 2.5],
+      size: 2.4, align: 'centre'
+    }, taken));
+  }
+
+  var heads = [t('roofArch'), t('roofSquare'), t('clip')];
+  for (j = 0; j < kinds.length; j++) {
+    d.texts.push(normText({
+      text: heads[j],
+      at: [left + j * colPitch, d.plate.h - 8],
+      size: 2.4, align: 'centre'
+    }, taken));
+  }
+  d.texts.push(normText({
+    text: t('retCouponKey'),
+    at: [d.plate.w / 2, 3],
+    size: 2, align: 'centre'
+  }, taken));
+
+  return d;
+}
+
+document.getElementById('retCouponBtn').onclick = function () {
+  if (!confirm(t('couponConfirm'))) return;
+  adopt(retainerCouponDoc());
+};
+
 document.getElementById('couponBtn').onclick = function () {
   if (!confirm(t('couponConfirm'))) return;
   adopt(couponDoc());
@@ -5193,6 +5564,7 @@ function applyLang() {
   document.getElementById('exportNote').textContent = t('exportNote');
   document.getElementById('clearanceWarn').textContent = t('clearanceWarn');
   document.getElementById('couponBtn').textContent = t('coupon');
+  document.getElementById('retCouponBtn').textContent = t('retCoupon');
 
   document.getElementById('ttWires').textContent = t('wires');
   document.getElementById('wireEmpty').textContent = t('noWire');
@@ -5209,6 +5581,9 @@ function applyLang() {
   document.getElementById('addRetBtn').textContent = t('addRet');
   document.getElementById('retEmpty').textContent = t('noRet');
   document.getElementById('lbRetKind').textContent = t('retKind');
+  document.getElementById('autoRetBtn').textContent = t('autoRet');
+  document.getElementById('restoreRetBtn').textContent = t('restoreRet');
+  document.getElementById('lbAutoSpacing').textContent = t('autoSpacing');
   document.getElementById('lbRetT').textContent = t('retT');
   document.getElementById('lbRetLevel').textContent = t('retLevel');
   document.getElementById('delRetBtn').textContent = t('remove');
