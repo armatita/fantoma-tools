@@ -140,6 +140,9 @@
         <button type="button" class="tool" id="dimsBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="12" height="7"/><path d="M4 14.5h12M4 13v3M16 13v3"/></svg>
         </button>
+        <button type="button" class="tool" id="alignBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="4.2" r="2.1"/><circle cx="10" cy="15.8" r="2.1"/><path d="M10 6.8v6.4" stroke-dasharray="2 1.6"/><path d="M5.5 4.2h2M12.5 4.2h2M5.5 15.8h2M12.5 15.8h2"/></svg>
+        </button>
         <span class="gap"></span>
         <button type="button" class="tool" id="measureBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14.5L14.5 5.5"/><circle cx="5" cy="15" r="1.7"/><circle cx="15" cy="5" r="1.7"/></svg>
@@ -451,6 +454,7 @@ var STRINGS = {
     measure: 'Measure',
     crosshair: 'Crosshair',
     dimensions: 'Dimensions',
+    align: 'Align bosses',
     clearGuides: 'Clear guides',
     zoom: 'Zoom',
     hintIdle: 'drag to pan · wheel to zoom · drag off a ruler for a guide',
@@ -545,6 +549,7 @@ var STRINGS = {
     measure: 'Medir',
     crosshair: 'Mira',
     dimensions: 'Dimens\u00f5es',
+    align: 'Alinhar bossas',
     clearGuides: 'Limpar guias',
     zoom: 'Ampliação',
     hintIdle: 'arraste para deslocar · roda para ampliar · arraste de uma régua para uma guia',
@@ -1167,6 +1172,7 @@ var COL = {
   guide: '#ffb648',
   measure: '#4dd8ff',
   select: '#f4f4f2',
+  align: '#5ee88f',
   boss: '#c8c6c9',
   crosshair: 'rgba(244,244,242,0.30)'
 };
@@ -1376,7 +1382,7 @@ function drawRulers() {
 
 /* A small plaque of text with a dark backing, so it stays readable over the
    grid, over a component, or over nothing. */
-function plaque(lines, x, y) {
+function plaque(lines, x, y, colour) {
   ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1391,7 +1397,7 @@ function plaque(lines, x, y) {
 
   ctx.fillStyle = 'rgba(13,13,18,0.88)';
   ctx.fillRect(x, y, boxW, boxH);
-  ctx.strokeStyle = COL.measure;
+  ctx.strokeStyle = colour || COL.measure;
   ctx.lineWidth = 1;
   ctx.strokeRect(crisp(x), crisp(y), Math.round(boxW), Math.round(boxH));
 
@@ -1411,6 +1417,8 @@ function plaque(lines, x, y) {
    the number read most often and it belongs under the eye. */
 var crosshair = true;
 var showDims = false;   // off by default: it is a lot of ink on a busy plate
+var alignSnap = true;
+var alignHints = [];    // drawn only while a boss is being dragged
 
 function drawCursor() {
   if (!crosshair || !cursor) return;
@@ -1425,6 +1433,33 @@ function drawCursor() {
   ctx.setLineDash([]);
 
   plaque(['(' + mm(cursor.x, 2) + ', ' + mm(cursor.y, 2) + ')'], px + 14, py + 14);
+}
+
+/* The ruler between a dragged boss and the sibling it just snapped to. The
+   line says "these two agree"; the number is the hole spacing, which is the
+   measurement you took with calipers in the first place. */
+function drawAlignHints() {
+  for (var i = 0; i < alignHints.length; i++) {
+    var h = alignHints[i];
+    var ax = sx(h.from[0]), ay = sy(h.from[1]);
+    var bx = sx(h.to[0]), by = sy(h.to[1]);
+
+    ctx.strokeStyle = COL.align;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 3]);
+    line(ax, ay, bx, by);
+    ctx.setLineDash([]);
+
+    // End ticks, so it reads as a dimension rather than a stray line.
+    var vx = bx - ax, vy = by - ay;
+    var len = Math.hypot(vx, vy) || 1;
+    var px = -vy / len * 4, py = vx / len * 4;
+    line(ax - px, ay - py, ax + px, ay + py);
+    line(bx - px, by - py, bx + px, by + py);
+
+    var d = Math.hypot(h.to[0] - h.from[0], h.to[1] - h.from[1]);
+    plaque([mm(d, 2) + ' mm'], (ax + bx) / 2 + 8, (ay + by) / 2 + 8, COL.align);
+  }
 }
 
 function drawMeasure() {
@@ -1477,6 +1512,7 @@ function render() {
   drawGuides();
   drawSelection();
   drawCursor();
+  drawAlignHints();
   drawMeasure();
 
   ctx.restore();
@@ -1694,8 +1730,9 @@ cv.addEventListener('pointermove', function (e) {
   } else if (drag && drag.kind === 'moveBoss') {
     var mb = selectedBoss();
     if (mb) {
-      mb.at[0] = snap(drag.at[0] + (p.x - drag.from.x) / view.scale);
-      mb.at[1] = snap(drag.at[1] - (p.y - drag.from.y) / view.scale);
+      mb.at = alignBoss(mb,
+        drag.at[0] + (p.x - drag.from.x) / view.scale,
+        drag.at[1] - (p.y - drag.from.y) / view.scale);
       syncControls();
       scheduleSave();
     }
@@ -1732,6 +1769,7 @@ function endPointer(e) {
     if (onItsRuler || zone === 'corner') removeGuide(drag.guide);
   }
   drag = null;
+  alignHints = [];
   draw();
 }
 cv.addEventListener('pointerup', endPointer);
@@ -1752,6 +1790,65 @@ cv.addEventListener('wheel', function (e) {
   var p = localPoint(e);
   zoomAt(p.x, p.y, e.deltaY < 0 ? 1.12 : 1 / 1.12);
 }, { passive: false });
+
+/* Snap a dragged boss onto the centre line of a boss holding the same thing.
+
+   Mounting holes on one board are a pattern -- a rectangle, a row -- so a new
+   hole almost always shares an X or a Y with one already placed. Holes on a
+   DIFFERENT component share nothing, which is why `of` has to match: bosses
+   under the ESP32 must not drag on bosses under the buzzer. Free-standing
+   bosses form their own group, since scattered ones still want to line up.
+
+   Three things this gets right that a naive version would not:
+
+   - The tolerance is in SCREEN pixels, converted to mm here. In mm it would
+     feel sticky zoomed in and be unreachable zoomed out.
+   - Alignment beats the grid. Snapping to a sibling's X only to have a 1 mm
+     grid pull you straight back off it would make the feature useless.
+   - The axes are independent. The fourth hole of a four-hole rectangle lines
+     up with one sibling across and a different one down, so both can snap at
+     once and both say so.
+*/
+var ALIGN_TOL_PX = 6;
+
+function alignBoss(boss, x, y) {
+  alignHints = [];
+  if (!alignSnap) return [snap(x), snap(y)];
+
+  var tol = ALIGN_TOL_PX / view.scale;
+  var bestX = null, bestY = null;
+
+  for (var i = 0; i < doc.bosses.length; i++) {
+    var o = doc.bosses[i];
+    if (o === boss || o.of !== boss.of) continue;
+
+    var dx = Math.abs(o.at[0] - x);
+    if (dx <= tol) {
+      // Closest alignment wins; among equals, the nearest sibling, because
+      // that is the spacing you are actually setting.
+      var awayX = Math.abs(o.at[1] - y);
+      if (!bestX || dx < bestX.d - 1e-9 || (Math.abs(dx - bestX.d) < 1e-9 && awayX < bestX.away)) {
+        bestX = { o: o, d: dx, away: awayX };
+      }
+    }
+
+    var dy = Math.abs(o.at[1] - y);
+    if (dy <= tol) {
+      var awayY = Math.abs(o.at[0] - x);
+      if (!bestY || dy < bestY.d - 1e-9 || (Math.abs(dy - bestY.d) < 1e-9 && awayY < bestY.away)) {
+        bestY = { o: o, d: dy, away: awayY };
+      }
+    }
+  }
+
+  var outX = bestX ? bestX.o.at[0] : snap(x);
+  var outY = bestY ? bestY.o.at[1] : snap(y);
+
+  if (bestX) alignHints.push({ from: [outX, outY], to: bestX.o.at.slice() });
+  if (bestY) alignHints.push({ from: [outX, outY], to: bestY.o.at.slice() });
+
+  return [outX, outY];
+}
 
 /* Bosses belonging to a component, captured at the start of a drag so the
    list is not rebuilt on every pointer move. */
@@ -1908,6 +2005,14 @@ dimsBtn.onclick = function () {
   showDims = !showDims;
   dimsBtn.classList.toggle('active', showDims);
   store.set('showDims', showDims);
+  draw();
+};
+
+var alignBtn = document.getElementById('alignBtn');
+alignBtn.onclick = function () {
+  alignSnap = !alignSnap;
+  alignBtn.classList.toggle('active', alignSnap);
+  store.set('alignSnap', alignSnap);
   draw();
 };
 
@@ -2689,6 +2794,7 @@ function applyLang() {
   tip('fitBtn', t('fit'));
   tip('crosshairBtn', t('crosshair'));
   tip('dimsBtn', t('dimensions'));
+  tip('alignBtn', t('align'));
   tip('measureBtn', t('measure'));
   tip('clearGuidesBtn', t('clearGuides'));
   document.getElementById('viewNote').textContent = t('viewNote');
@@ -2717,6 +2823,9 @@ crosshairBtn.classList.toggle('active', crosshair);
 
 showDims = store.get('showDims') === true;
 dimsBtn.classList.toggle('active', showDims);
+
+alignSnap = store.get('alignSnap') !== false;   // on unless turned off
+alignBtn.classList.toggle('active', alignSnap);
 
 /* What this browser remembered goes through the same door as an opened file.
    If it is corrupt or from a version that never existed, we start clean rather

@@ -497,8 +497,9 @@ buttons bind by id so moving them is moving markup.
 beside the canvas are for typing numbers; the things you reach for while drawing
 belong above the drawing, where taking them does not cost you sight of it.
 
-On it: Fit, Cursor readout, Dimensions, Measure, Clear guides. The View panel
-keeps only the grid pitch, which is a choice rather than an action.
+On it: Fit, Cursor readout, Dimensions, Align bosses, Measure, Clear guides.
+The View panel keeps only the grid pitch, which is a choice rather than an
+action.
 
 Its buttons hold an SVG, so their label is the tooltip — `applyLang` sets
 `title` rather than `textContent`, because writing text into them would throw
@@ -524,6 +525,36 @@ headings hit it with their chevron.
   to be the bigger win. **It is what makes the calibration coupon readable.**
   Eighteen near-identical rings become a labelled grid, which is what lets the
   coupon work before there is any way to emboss text on a plate.
+
+### Aligning bosses
+
+Dragging a boss snaps it onto the centre line of another boss **holding the same
+component**, and draws a ruler between them with the centre-to-centre distance.
+
+The `of` restriction is the whole idea. Mounting holes on one board are a
+pattern — a rectangle, a row — so a new hole almost always shares an X or a Y
+with one already placed. Holes under a different component share nothing, and
+letting them attract each other would be noise. Free-standing bosses form their
+own group, since scattered ones still want to line up.
+
+Four things it has to get right, each of which would make the feature useless on
+its own:
+
+- **The tolerance is in screen pixels**, converted to millimetres at the current
+  zoom. Fixed in mm it would feel sticky zoomed in and be unreachable zoomed out.
+- **Alignment beats the grid.** Landing on a sibling's X only for a 1 mm grid to
+  pull you straight off it again would defeat the point, so when both apply the
+  grid stands aside.
+- **The axes are independent.** The fourth hole of a four-hole rectangle lines up
+  with one sibling across and a different one down. Both snap, and both say so.
+- **Typing a number bypasses all of it.** A coordinate you read off calipers is
+  the one number the tool must never quietly adjust.
+
+The distance readout is the part that earns its keep beyond tidiness: it is the
+hole spacing, which is the measurement you took from the real part.
+
+Not done, and worth considering later: equal-spacing snapping for a third hole
+in a row, and the same treatment for components against each other.
 
 **A default colour palette for components**, with a custom colour still
 available. Picking from a handful is less work than deciding a hex value, and
