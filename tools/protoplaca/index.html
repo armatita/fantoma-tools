@@ -342,6 +342,49 @@
         <div class="note" id="wireNote"></div>
       </section>
 
+      <section class="panel" id="textPanel">
+        <h2><span id="ttTexts"></span></h2>
+        <div class="row">
+          <button type="button" id="addTextBtn"></button>
+        </div>
+        <div class="note" id="textEmpty"></div>
+        <div id="textFields" hidden>
+          <div class="field">
+            <label for="txtString" id="lbTxtString"></label>
+            <input type="text" id="txtString" maxlength="40">
+          </div>
+          <div class="field narrow">
+            <label for="txtX">X</label>
+            <input type="number" id="txtX" inputmode="decimal" step="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="txtY">Y</label>
+            <input type="number" id="txtY" inputmode="decimal" step="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="txtSize" id="lbTxtSize"></label>
+            <input type="number" id="txtSize" inputmode="decimal" step="0.5" min="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="txtStroke" id="lbTxtStroke"></label>
+            <input type="number" id="txtStroke" inputmode="decimal" step="0.1" min="0.2">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="txtHeight" id="lbTxtHeight"></label>
+            <input type="number" id="txtHeight" inputmode="decimal" step="0.2" min="0.1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="row">
+            <button type="button" id="delTextBtn"></button>
+          </div>
+        </div>
+        <div class="note" id="textNote"></div>
+      </section>
+
       <section class="panel" id="profilePanel">
         <h2><span id="ttProfile"></span></h2>
         <div class="field narrow">
@@ -446,6 +489,17 @@ var STRINGS = {
     components: 'Components',
     bosses: 'Bosses',
     wires: 'Wires',
+    texts: 'Text',
+    addText: 'Add text',
+    txtString: 'Text',
+    txtSize: 'Height',
+    txtStroke: 'Pen',
+    txtRaise: 'Raised',
+    noText: 'Nothing selected. Add a label, or click one on the plate.',
+    textNote: 'Raised lettering, drawn with a single pen stroke. Keep the pen at '
+      + 'two nozzle widths or more \u2014 0.8 mm on a 0.4 mm nozzle \u2014 or it comes '
+      + 'out as a broken line.',
+    hintText: 'drag to move \u00b7 Delete removes it',
     wireName: 'Name',
     awg: 'AWG',
     od: 'Outside \u00f8',
@@ -467,6 +521,12 @@ var STRINGS = {
     triangles: 'Triangles',
     downloadStl: 'Download STL',
     coupon: 'Calibration coupon',
+    // One letter per fixing, in the order of FIXINGS, and the key that
+    // explains them. Both are written out rather than taken from the first
+    // letter of the fixing's name, which gave a row marked H against a key
+    // that said I.
+    couponRows: 'SHC',
+    couponKey: 'S=SELF-TAP  H=HEAT-SET  C=CLEARANCE',
     couponConfirm: 'Replace the current project with a calibration coupon? '
       + 'Anything not saved to a file is lost.',
     exportNote: 'The plate and its bosses, in millimetres. Self-tapping and '
@@ -570,6 +630,17 @@ var STRINGS = {
     components: 'Componentes',
     bosses: 'Bossas',
     wires: 'Fios',
+    texts: 'Texto',
+    addText: 'Adicionar texto',
+    txtString: 'Texto',
+    txtSize: 'Altura',
+    txtStroke: 'Tra\u00e7o',
+    txtRaise: 'Relevo',
+    noText: 'Nada selecionado. Adicione uma etiqueta, ou clique numa que esteja na placa.',
+    textNote: 'Letras em relevo, desenhadas com um tra\u00e7o \u00fanico. Mantenha o '
+      + 'tra\u00e7o com duas larguras de bico ou mais \u2014 0,8 mm num bico de 0,4 mm '
+      + '\u2014 ou sai como uma linha partida.',
+    hintText: 'arraste para mover \u00b7 Delete apaga',
     wireName: 'Nome',
     awg: 'AWG',
     od: '\u00d8 exterior',
@@ -592,6 +663,8 @@ var STRINGS = {
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
     coupon: 'Cup\u00e3o de calibra\u00e7\u00e3o',
+    couponRows: 'AIF',
+    couponKey: 'A=AUTOROSCANTE  I=INSERTO  F=FURO PASSANTE',
     couponConfirm: 'Substituir o projeto atual por um cup\u00e3o de calibra\u00e7\u00e3o? '
       + 'Tudo o que n\u00e3o esteja guardado num ficheiro perde-se.',
     exportNote: 'A placa e as suas bossas, em mil\u00edmetros. As bossas '
@@ -720,6 +793,7 @@ function blankDoc() {
     components: [],       // see normComponent for the fields
     bosses: [],           // see normBoss
     wires: [],            // see normWire
+    texts: [],            // see normText
     guides: []            // { axis: 'x' | 'y', v: mm }
   };
 }
@@ -856,10 +930,14 @@ function selectedWire() {
   return sel.kind === 'wire' ? findIn(doc.wires, sel.id) : null;
 }
 
+function selectedText() {
+  return sel.kind === 'text' ? findIn(doc.texts, sel.id) : null;
+}
+
 /* Whatever is selected, of whichever kind. Used by the things that do not
    care -- delete, and the "is anything selected" hint. */
 function selectedAny() {
-  return selectedComponent() || selectedBoss() || selectedWire();
+  return selectedComponent() || selectedBoss() || selectedWire() || selectedText();
 }
 
 
@@ -1049,6 +1127,22 @@ function wirePoints(w) {
   return out;
 }
 
+/* Raised lettering on the plate. `of` is not offered: a label belongs to the
+   plate, not to a component, because it is usually naming the empty space
+   beside one rather than the part itself. */
+function normText(raw, taken) {
+  var x = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  x.id = (typeof x.id === 'string' && x.id && !taken[x.id]) ? x.id : nextId(taken, 'x');
+  taken[x.id] = true;
+  x.text = typeof x.text === 'string' ? x.text.slice(0, 40) : 'TEXT';
+  x.at = pairOr(x.at, [10, 10]);
+  x.size = numOr(x.size, 4, 1, 100);          // cap height
+  x.stroke = numOr(x.stroke, 0.8, 0.2, 10);   // pen width
+  x.height = numOr(x.height, 0.6, 0.1, 10);   // how far it stands proud
+  x.align = (x.align === 'centre') ? 'centre' : 'left';
+  return x;
+}
+
 function normGuide(raw) {
   if (!raw || typeof raw !== 'object') return null;
   if (raw.axis !== 'x' && raw.axis !== 'y') return null;
@@ -1095,6 +1189,10 @@ function normDoc(raw) {
   var wl = (raw.wires && raw.wires.length) ? raw.wires : [];
   out.wires = [];
   for (var n = 0; n < wl.length; n++) out.wires.push(normWire(wl[n], taken, componentIds));
+
+  var xl = (raw.texts && raw.texts.length) ? raw.texts : [];
+  out.texts = [];
+  for (var q = 0; q < xl.length; q++) out.texts.push(normText(xl[q], taken));
 
   var gs = (raw.guides && raw.guides.length) ? raw.guides : [];
   out.guides = [];
@@ -1426,7 +1524,59 @@ function drawWires() {
   }
 }
 
+function textBox(x) {
+  var w = textWidth(x.text, x.size);
+  var left = x.align === 'centre' ? x.at[0] - w / 2 : x.at[0];
+  return { x: left, y: x.at[1], w: w, h: x.size };
+}
+
+function drawTexts() {
+  for (var i = 0; i < doc.texts.length; i++) {
+    var x = doc.texts[i];
+    var box = textBox(x);
+    var strokes = textStrokes(x.text, x.size);
+
+    ctx.strokeStyle = COL.text;
+    ctx.lineWidth = Math.max(1, x.stroke * view.scale);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (var k = 0; k < strokes.length; k++) {
+      var line = strokes[k];
+      if (line.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(sx(box.x + line[0][0]), sy(box.y + line[0][1]));
+      for (var m = 1; m < line.length; m++) {
+        ctx.lineTo(sx(box.x + line[m][0]), sy(box.y + line[m][1]));
+      }
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+  }
+}
+
+function textAt(p) {
+  var wx1 = wx(p.x), wy1 = wy(p.y);
+  for (var i = doc.texts.length - 1; i >= 0; i--) {
+    var b = textBox(doc.texts[i]);
+    if (wx1 >= b.x && wx1 <= b.x + b.w && wy1 >= b.y && wy1 <= b.y + b.h) return doc.texts[i];
+  }
+  return null;
+}
+
 function drawSelection() {
+  var xt = selectedText();
+  if (xt) {
+    var tb = textBox(xt);
+    ctx.strokeStyle = COL.select;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(crisp(sx(tb.x) - 2), crisp(sy(tb.y + tb.h) - 2),
+                   Math.round(tb.w * view.scale) + 4, Math.round(tb.h * view.scale) + 4);
+    ctx.setLineDash([]);
+    return;
+  }
+
   var w = selectedWire();
   if (w && w.path.length) {
     for (var i = 0; i < w.path.length; i++) {
@@ -1543,6 +1693,7 @@ var COL = {
   select: '#f4f4f2',
   align: '#5ee88f',
   boss: '#c8c6c9',
+  text: '#e8e6e3',
   crosshair: 'rgba(244,244,242,0.30)'
 };
 
@@ -1803,6 +1954,8 @@ function hoverTarget(p) {
   }
   var w = wireAt(p);
   if (w) return { text: w.name || t('wires'), colour: w.colour };
+  var xt = textAt(p);
+  if (xt) return { text: xt.text, colour: COL.text };
   var c = componentAt(p);
   if (c) return { text: c.name || t('components'), colour: c.colour };
   return null;
@@ -1916,6 +2069,7 @@ function render() {
   drawComponents();
   drawBosses();
   drawWires();
+  drawTexts();
   drawGuides();
   drawSelection();
   drawCursor();
@@ -1966,6 +2120,8 @@ function updateStatus() {
     hint.textContent = t('hintGuide');
   } else if (tool === 'wire') {
     hint.textContent = t('hintWire');
+  } else if (sel.kind === 'text') {
+    hint.textContent = t('hintText');
   } else if (sel.kind === 'wire') {
     hint.textContent = t('hintWireSel');
   } else if (sel.kind === 'boss') {
@@ -2106,6 +2262,16 @@ cv.addEventListener('pointerdown', function (e) {
     // Bosses are picked before components. A boss usually sits on top of the
     // component it holds down, and the small target has to win or it can never
     // be clicked at all.
+    var onText = textAt(p);
+    if (onText) {
+      select('text', onText.id);
+      snapshot();
+      drag = { kind: 'moveText', id: onText.id, from: p, at: onText.at.slice() };
+      syncControls();
+      draw();
+      return;
+    }
+
     var onWire = wireAt(p);
     if (onWire && !bossAt(p)) {
       select('wire', onWire.id);
@@ -2195,6 +2361,14 @@ cv.addEventListener('pointermove', function (e) {
       syncControls();
       scheduleSave();
     }
+  } else if (drag && drag.kind === 'moveText') {
+    var mt = selectedText();
+    if (mt) {
+      mt.at = [snap(drag.at[0] + (p.x - drag.from.x) / view.scale),
+               snap(drag.at[1] - (p.y - drag.from.y) / view.scale)];
+      syncControls();
+      scheduleSave();
+    }
   } else if (drag && drag.kind === 'moveBoss') {
     var mb = selectedBoss();
     if (mb) {
@@ -2223,7 +2397,7 @@ cv.addEventListener('pointermove', function (e) {
   } else {
     var grip = handleAt(p);
     if (grip) cv.style.cursor = gripCursor(grip.id);
-    else if (bossAt(p) || componentAt(p) || guideAt(p)) cv.style.cursor = 'move';
+    else if (bossAt(p) || textAt(p) || componentAt(p) || guideAt(p)) cv.style.cursor = 'move';
     else cv.style.cursor = 'default';
   }
   draw();
@@ -2672,6 +2846,7 @@ function syncControls() {
   compEmpty.hidden = !!c;
   syncBossControls();
   syncWireControls();
+  syncTextControls();
   if (c) {
     F.name.value = c.name;
     F.x.value = round2(c.at[0]);
@@ -2790,6 +2965,7 @@ document.getElementById('dupCompBtn').onclick = function () {
 function deleteSelected() {
   if (sel.kind === 'boss') { deleteBoss(); return; }
   if (sel.kind === 'wire') { deleteWire(); return; }
+  if (sel.kind === 'text') { deleteText(); return; }
   var c = selectedComponent();
   if (!c) return;
   snapshot();
@@ -3456,6 +3632,8 @@ function buildMesh() {
 
   if (!plateMesh(out)) return null;
 
+  for (var x = 0; x < doc.texts.length; x++) textMesh(out, doc.texts[x]);
+
   for (var i = 0; i < doc.bosses.length; i++) {
     var b = doc.bosses[i];
     var h = bossHeightOf(b);
@@ -3473,6 +3651,173 @@ function buildMesh() {
   }
   return out;
 }
+
+/* --------------------------------------------------------------------------
+   A stroke font, and text made of prisms
+   --------------------------------------------------------------------------
+   Each glyph is a few polylines drawn with a single pen, on a box 6 wide and
+   10 tall with the baseline at 0. Rendering one means laying a rectangle along
+   every stroke and standing it up off the plate -- so text is a union of
+   boxes, which is the same geometry as everything else here and needs nothing
+   the mesh cannot already do.
+
+   RAISED, not engraved. Engraved text means punching the glyph's outline
+   through the plate's top face, which needs the outline of a stroke rather
+   than the stroke itself, and the triangulator. Raised text needs neither, it
+   stays legible after handling, and it does not collect the dust and stringing
+   that a fine groove does. Engraved text is still worth having later, for
+   labelling a plate that something sits on top of.
+
+   The font is here rather than fetched because this page works offline, and a
+   web font would be the first thing to break that. It only has to be legible
+   at 3 mm on a printed coupon, which is a much easier job than reading well.
+   -------------------------------------------------------------------------- */
+var GLYPH_W = 6, GLYPH_H = 10, GLYPH_GAP = 2;
+
+var FONT = {
+  'A': [[[0,0],[3,10],[6,0]], [[1.2,3.5],[4.8,3.5]]],
+  'B': [[[0,0],[0,10],[4,10],[5.5,8.5],[4,5.5],[0,5.5]], [[4,5.5],[5.5,3],[4,0],[0,0]]],
+  'C': [[[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5]]],
+  'D': [[[0,0],[0,10],[4,10],[6,8],[6,2],[4,0],[0,0]]],
+  'E': [[[6,10],[0,10],[0,0],[6,0]], [[0,5],[4.5,5]]],
+  'F': [[[6,10],[0,10],[0,0]], [[0,5],[4.5,5]]],
+  'G': [[[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5],[6,4.5],[3.5,4.5]]],
+  'H': [[[0,0],[0,10]], [[6,0],[6,10]], [[0,5],[6,5]]],
+  'I': [[[1,10],[5,10]], [[3,10],[3,0]], [[1,0],[5,0]]],
+  'J': [[[5,10],[5,2],[3.5,0],[1.5,0],[0,2]]],
+  'K': [[[0,0],[0,10]], [[6,10],[0,4.5]], [[2,6.2],[6,0]]],
+  'L': [[[0,10],[0,0],[6,0]]],
+  'M': [[[0,0],[0,10],[3,5],[6,10],[6,0]]],
+  'N': [[[0,0],[0,10],[6,0],[6,10]]],
+  'O': [[[1.5,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0]]],
+  'P': [[[0,0],[0,10],[4.5,10],[6,8.5],[6,6.5],[4.5,5],[0,5]]],
+  'Q': [[[1.5,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0]], [[3.5,2.5],[6,0]]],
+  'R': [[[0,0],[0,10],[4.5,10],[6,8.5],[6,6.5],[4.5,5],[0,5]], [[3,5],[6,0]]],
+  'S': [[[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,6.5],[1.5,5],[4.5,5],[6,3.5],[6,1.5],[4.5,0],[1.5,0],[0,1.5]]],
+  'T': [[[0,10],[6,10]], [[3,10],[3,0]]],
+  'U': [[[0,10],[0,2],[1.5,0],[4.5,0],[6,2],[6,10]]],
+  'V': [[[0,10],[3,0],[6,10]]],
+  'W': [[[0,10],[1.5,0],[3,6],[4.5,0],[6,10]]],
+  'X': [[[0,0],[6,10]], [[0,10],[6,0]]],
+  'Y': [[[0,10],[3,5],[6,10]], [[3,5],[3,0]]],
+  'Z': [[[0,10],[6,10],[0,0],[6,0]]],
+  '0': [[[1.5,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0]], [[1.5,2],[4.5,8]]],
+  '1': [[[1,8],[3,10],[3,0]], [[1,0],[5,0]]],
+  '2': [[[0,8.5],[1.5,10],[4.5,10],[6,8.5],[6,7],[0,0],[6,0]]],
+  '3': [[[0,10],[6,10],[3,5.5]], [[3,5.5],[4.5,5.5],[6,4],[6,1.5],[4.5,0],[1.5,0],[0,1.5]]],
+  '4': [[[4.5,0],[4.5,10],[0,3],[6,3]]],
+  '5': [[[6,10],[0,10],[0,5.5],[4.5,5.5],[6,4],[6,1.5],[4.5,0],[1.5,0],[0,1.5]]],
+  '6': [[[5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5],[6,3.5],[4.5,5],[1.5,5],[0,3.5]]],
+  '7': [[[0,10],[6,10],[2,0]]],
+  '8': [[[1.5,5],[0,6.5],[0,8.5],[1.5,10],[4.5,10],[6,8.5],[6,6.5],[4.5,5],[1.5,5],[0,3.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5],[6,3.5],[4.5,5]]],
+  '9': [[[1,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,6.5],[1.5,5],[4.5,5],[6,6.5]]],
+  '.': [[[2.6,0],[3.4,0]]],
+  ',': [[[3.4,0.8],[2.4,-1]]],
+  '-': [[[1,5],[5,5]]],
+  '+': [[[1,5],[5,5]], [[3,3],[3,7]]],
+  '/': [[[0,0],[6,10]]],
+  '=': [[[1,3.5],[5,3.5]], [[1,6.5],[5,6.5]]],
+  ':': [[[2.6,2],[3.4,2]], [[2.6,7],[3.4,7]]],
+  '(': [[[4.5,10],[2,7],[2,3],[4.5,0]]],
+  ')': [[[1.5,10],[4,7],[4,3],[1.5,0]]],
+  ' ': []
+};
+
+/* The strokes of a string, in millimetres, with its left edge at 0 and its
+   baseline at 0. Anything the font does not have becomes a space rather than
+   nothing, so a missing character leaves a visible gap instead of silently
+   shortening the label. */
+function textStrokes(str, size) {
+  var k = size / GLYPH_H;
+  var out = [], pen = 0;
+  var text = String(str).toUpperCase();
+
+  for (var i = 0; i < text.length; i++) {
+    var g = FONT[text.charAt(i)];
+    if (g) {
+      for (var p1 = 0; p1 < g.length; p1++) {
+        var line = [];
+        for (var p2 = 0; p2 < g[p1].length; p2++) {
+          line.push([(pen + g[p1][p2][0]) * k, g[p1][p2][1] * k]);
+        }
+        out.push(line);
+      }
+    }
+    pen += GLYPH_W + GLYPH_GAP;
+  }
+  out.width = (pen - GLYPH_GAP) * k;
+  return out;
+}
+
+function textWidth(str, size) {
+  var n = String(str).length;
+  return n ? ((n * (GLYPH_W + GLYPH_GAP)) - GLYPH_GAP) * size / GLYPH_H : 0;
+}
+
+/* One stroke, as a box standing on the plate.
+
+   Each end is extended by half the pen width plus a hair. The half width makes
+   a right-angled corner come out solid rather than nicked; the hair is what
+   makes the two boxes OVERLAP there instead of meeting exactly. Meeting
+   exactly puts a corner of one box on a corner of the other, and coincident
+   edges are a degeneracy -- the same reason a blind boss is sunk into the
+   plate rather than rested on it. Ten microns is far below anything a printer
+   resolves and far above anything the closed-surface test rounds away. */
+var JOIN_OVERLAP = 0.01;
+
+function strokeBox(out, a, b, width, z0, z1) {
+  var dx = b[0] - a[0], dy = b[1] - a[1];
+  var len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1e-9) { dx = 1; dy = 0; len = 1; }
+  var ux = dx / len, uy = dy / len;
+  // The hair goes on BOTH axes. Lengthwise it keeps a right-angled corner from
+   // resting corner-on-corner; crosswise it keeps two parallel strokes exactly
+   // one pen width apart -- a "0" beside an "O", say -- from meeting face to
+   // face. Either way the rule is the same one the bosses follow: solids that
+   // overlap are unambiguous, solids that merely touch are not.
+  var hw = width / 2 + JOIN_OVERLAP;
+  var reach = hw + JOIN_OVERLAP;
+
+  var ax = a[0] - ux * reach, ay = a[1] - uy * reach;
+  var bx = b[0] + ux * reach, by = b[1] + uy * reach;
+  var px = -uy * hw, py = ux * hw;
+
+  var c = [[ax + px, ay + py], [ax - px, ay - py], [bx - px, by - py], [bx + px, by + py]];
+  if (ringArea(c) < 0) c.reverse();            // keep it counter-clockwise
+
+  quad(out, [c[0][0], c[0][1], z1], [c[1][0], c[1][1], z1],
+            [c[2][0], c[2][1], z1], [c[3][0], c[3][1], z1]);      // top
+  quad(out, [c[3][0], c[3][1], z0], [c[2][0], c[2][1], z0],
+            [c[1][0], c[1][1], z0], [c[0][0], c[0][1], z0]);      // bottom
+  for (var i = 0; i < 4; i++) {
+    var q1 = c[i], q2 = c[(i + 1) % 4];
+    quad(out, [q1[0], q1[1], z0], [q2[0], q2[1], z0],
+              [q2[0], q2[1], z1], [q1[0], q1[1], z1]);
+  }
+}
+
+function textMesh(out, label) {
+  var t = doc.plate.thickness;
+  var strokes = textStrokes(label.text, label.size);
+  var ox = label.at[0], oy = label.at[1];
+  if (label.align === 'centre') ox -= strokes.width / 2;
+
+  for (var i = 0; i < strokes.length; i++) {
+    var line = strokes[i];
+    for (var k = 1; k < line.length; k++) {
+      strokeBox(out,
+        [ox + line[k - 1][0], oy + line[k - 1][1]],
+        [ox + line[k][0], oy + line[k][1]],
+        label.stroke, t - WELD, t + label.height);
+    }
+    if (line.length === 1) {
+      strokeBox(out, [ox + line[0][0], oy + line[0][1]],
+                     [ox + line[0][0], oy + line[0][1]],
+                     label.stroke, t - WELD, t + label.height);
+    }
+  }
+}
+
 
 /* --------------------------------------------------------------------------
    Is it actually closed?
@@ -3742,6 +4087,85 @@ document.getElementById('delWireBtn').onclick = deleteWire;
 
 
 /* --------------------------------------------------------------------------
+   The text panel
+   -------------------------------------------------------------------------- */
+var textFields = document.getElementById('textFields');
+var textEmpty = document.getElementById('textEmpty');
+var TX = {
+  text: document.getElementById('txtString'),
+  x: document.getElementById('txtX'),
+  y: document.getElementById('txtY'),
+  size: document.getElementById('txtSize'),
+  stroke: document.getElementById('txtStroke'),
+  height: document.getElementById('txtHeight')
+};
+
+function syncTextControls() {
+  var x = selectedText();
+  textFields.hidden = !x;
+  textEmpty.hidden = !!x;
+  if (!x) return;
+  TX.text.value = x.text;
+  TX.x.value = round2(x.at[0]);
+  TX.y.value = round2(x.at[1]);
+  TX.size.value = x.size;
+  TX.stroke.value = x.stroke;
+  TX.height.value = x.height;
+}
+
+function onTextField() {
+  if (syncing) return;
+  var x = selectedText();
+  if (!x) return;
+  x.text = TX.text.value.slice(0, 40);
+  x.at = [num(TX.x, x.at[0]), num(TX.y, x.at[1])];
+  x.size = Math.max(1, num(TX.size, x.size));
+  x.stroke = Math.max(0.2, num(TX.stroke, x.stroke));
+  x.height = Math.max(0.1, num(TX.height, x.height));
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+for (var txKey in TX) {
+  if (Object.prototype.hasOwnProperty.call(TX, txKey)) {
+    TX[txKey].addEventListener('input', onTextField);
+    TX[txKey].addEventListener('focus', snapshot);
+  }
+}
+
+document.getElementById('addTextBtn').onclick = function () {
+  snapshot();
+  var taken = {};
+  var i;
+  for (i = 0; i < doc.texts.length; i++) taken[doc.texts[i].id] = true;
+  var x = normText({
+    text: 'LABEL',
+    at: [snap(wx((plot.x0 + plot.x1) / 2)), snap(wy((plot.y0 + plot.y1) / 2))]
+  }, taken);
+  doc.texts.push(x);
+  select('text', x.id);
+  syncControls();
+  scheduleSave();
+  draw();
+  TX.text.focus();
+  TX.text.select();
+};
+
+function deleteText() {
+  var x = selectedText();
+  if (!x) return;
+  snapshot();
+  doc.texts.splice(doc.texts.indexOf(x), 1);
+  deselect();
+  syncControls();
+  scheduleSave();
+  draw();
+}
+document.getElementById('delTextBtn').onclick = deleteText;
+
+
+/* --------------------------------------------------------------------------
    Export
    -------------------------------------------------------------------------- */
 var triCount = document.getElementById('triCount');
@@ -3809,21 +4233,68 @@ function couponDoc() {
   var d = blankDoc();
   d.name = t('coupon');
 
-  var pitch = 14, margin = 10;
-  d.plate.w = margin * 2 + (SIZES.length - 1) * pitch;
-  d.plate.h = margin * 2 + (FIXINGS.length - 1) * pitch;
+  /* A column per screw size, a row per fixing, with room round the edges for
+     the labels. The plate is sized from the layout rather than the other way
+     round, so adding a screw size later widens the coupon instead of crowding
+     it. */
+  var pitch = 15;
+  var left = 14, bottom = 14;             // to the first boss centre
+  var rowLabelX = 5;                      // the S / I / C column
+  var keyY = 3.5;                         // the key along the bottom
+  var headGap = 4;                        // boss edge to column heading
+
+  d.plate.w = left + (SIZES.length - 1) * pitch + left;
+  d.plate.h = bottom + (FIXINGS.length - 1) * pitch + 12;
 
   var taken = {};
-  for (var i = 0; i < SIZES.length; i++) {
-    for (var j = 0; j < FIXINGS.length; j++) {
+  var i, j;
+  for (i = 0; i < SIZES.length; i++) {
+    for (j = 0; j < FIXINGS.length; j++) {
       d.bosses.push(normBoss({
-        at: [margin + i * pitch, margin + j * pitch],
+        at: [left + i * pitch, bottom + j * pitch],
         size: SIZES[i],
         fixing: FIXINGS[j],
         height: 8
       }, taken, {}));
     }
   }
+
+  /* Labelled on the plate itself, which is what makes the coupon usable away
+     from the screen. A heading per column, a letter per row, and a key along
+     the bottom -- the fixing names are far too long to repeat eighteen times
+     on a plate this size. */
+  var prev = doc;
+  doc = d;                                 // bossOuterDia reads the profile
+  var widest = 0;
+  for (i = 0; i < d.bosses.length; i++) {
+    widest = Math.max(widest, bossOuterDia(d.bosses[i]) / 2);
+  }
+  doc = prev;
+
+  var topRow = bottom + (FIXINGS.length - 1) * pitch;
+  var headY = topRow + widest + headGap;
+  var size = 2.6;
+
+  for (i = 0; i < SIZES.length; i++) {
+    d.texts.push(normText({
+      text: sizeLabel(SIZES[i]),
+      at: [left + i * pitch, headY],
+      size: size, align: 'centre'
+    }, taken));
+  }
+  for (j = 0; j < FIXINGS.length; j++) {
+    d.texts.push(normText({
+      text: t('couponRows').charAt(j) || String(j + 1),
+      at: [rowLabelX, bottom + j * pitch - size / 2],
+      size: size, align: 'centre'
+    }, taken));
+  }
+  d.texts.push(normText({
+    text: t('couponKey'),
+    at: [d.plate.w / 2, keyY],
+    size: 2.2, align: 'centre'
+  }, taken));
+
   return d;
 }
 
@@ -3898,6 +4369,16 @@ function applyLang() {
   document.getElementById('delWireBtn').textContent = t('remove');
   document.getElementById('wireNote').textContent = t('wireNote');
   tip('wireBtn', t('wires'));
+
+  document.getElementById('ttTexts').textContent = t('texts');
+  document.getElementById('addTextBtn').textContent = t('addText');
+  document.getElementById('textEmpty').textContent = t('noText');
+  document.getElementById('lbTxtString').textContent = t('txtString');
+  document.getElementById('lbTxtSize').textContent = t('txtSize');
+  document.getElementById('lbTxtStroke').textContent = t('txtStroke');
+  document.getElementById('lbTxtHeight').textContent = t('txtRaise');
+  document.getElementById('delTextBtn').textContent = t('remove');
+  document.getElementById('textNote').textContent = t('textNote');
 
   document.getElementById('ttProfile').textContent = t('profile');
   document.getElementById('lbWall').textContent = t('wall');
@@ -4034,6 +4515,7 @@ makeCollapsible('platePanel', false);
 makeCollapsible('compPanel', true);
 makeCollapsible('bossPanel', true);
 makeCollapsible('wirePanel', true);
+makeCollapsible('textPanel', true);
 makeCollapsible('profilePanel', false);
 makeCollapsible('exportPanel', true);
 makeCollapsible('viewPanel', false);

@@ -302,6 +302,10 @@ Clearance bosses are now cut through the plate, so a screw can pass and take a
 nut. Self-tapping and heat-set bosses keep their blind holes, which is what
 they want.
 
+Raised text is in, from a stroke font, so the calibration coupon now labels
+every hole on the plate itself: a column per screw size, a row per fixing, and
+a key along the bottom.
+
 Retainers — the tunnels and clips that hold the wires down — are phase 3.
 
 ---

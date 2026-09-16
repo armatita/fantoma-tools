@@ -581,6 +581,39 @@ shown.
 
 ---
 
+## Text
+
+Raised lettering, from a stroke font written into the page. Each glyph is a few
+polylines drawn with a single pen; rendering one lays a box along every stroke
+and stands it off the plate. So text is a union of boxes — the same geometry as
+everything else here, needing nothing the mesh could not already do.
+
+**Raised, not engraved.** Engraving means punching the glyph's *outline*
+through the top face, which needs the outline of a stroke rather than the
+stroke itself, and the triangulator. Raised text needs neither, stays legible
+after handling, and does not collect the dust and stringing a fine groove does.
+Engraved text is still worth having for labelling a plate something sits on top
+of, and the triangulator is now there for it.
+
+The font is in the page rather than fetched, because this tool works offline
+and a web font would be the first thing to break that. It only has to be
+legible at 3 mm on a printed part, which is a far easier job than reading well.
+
+### Strokes overlap, they never merely touch
+
+Every stroke is drawn a hair longer and a hair wider than nominal — ten
+microns, well under what a printer resolves. Both are the same rule the bosses
+already follow, and both were found by the closed-surface test:
+
+- **Lengthwise.** Extending each end by exactly half the pen width made a
+  right-angled corner rest corner-on-corner rather than overlap. Every glyph
+  with a square joint — L, E, B, D, F, G, P, R, 5, 8 — came out unclosed.
+- **Crosswise.** Two parallel strokes exactly one pen width apart met face to
+  face. A `0` beside an `O` did it, and so did seven other pairs.
+
+All 2116 character pairs and the full alphabet at four sizes now come out
+closed.
+
 ## The calibration coupon
 
 **An option in the tool, not a mandatory first step.** A small plate carrying one
