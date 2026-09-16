@@ -469,12 +469,12 @@ var STRINGS = {
     coupon: 'Calibration coupon',
     couponConfirm: 'Replace the current project with a calibration coupon? '
       + 'Anything not saved to a file is lost.',
-    exportNote: 'The plate and its bosses, in millimetres. Holes are blind: a '
-      + 'screw stops inside the boss, which is what self-tapping and heat-set '
-      + 'inserts want.',
-    clearanceWarn: 'This plate has clearance bosses. Their holes do NOT yet go '
-      + 'through the plate, so they export blind and a screw cannot pass. '
-      + 'Drilling through needs the same work as recessed text and waits for it.',
+    exportNote: 'The plate and its bosses, in millimetres. Self-tapping and '
+      + 'heat-set bosses get a blind hole, which is what they want; clearance '
+      + 'bosses are cut through the plate so a screw can pass and take a nut.',
+    clearanceWarn: 'Some clearance holes were left out: a hole has to sit '
+      + 'clear of the plate edge and of every other hole, or there is not '
+      + 'enough material left between them to cut.',
     meshBroken: 'The mesh did not come out closed, so nothing was exported. '
       + 'This is a bug — please report what is on the plate.',
     addBoss: 'Add boss',
@@ -594,12 +594,13 @@ var STRINGS = {
     coupon: 'Cup\u00e3o de calibra\u00e7\u00e3o',
     couponConfirm: 'Substituir o projeto atual por um cup\u00e3o de calibra\u00e7\u00e3o? '
       + 'Tudo o que n\u00e3o esteja guardado num ficheiro perde-se.',
-    exportNote: 'A placa e as suas bossas, em mil\u00edmetros. Os furos s\u00e3o cegos: '
-      + 'o parafuso p\u00e1ra dentro da bossa, que \u00e9 o que autoroscantes e '
-      + 'insertos t\u00e9rmicos querem.',
-    clearanceWarn: 'Esta placa tem bossas de furo passante. Os furos ainda N\u00c3O '
-      + 'atravessam a placa, por isso saem cegos e nenhum parafuso passa. '
-      + 'Atravessar exige o mesmo trabalho que o texto gravado, e espera por ele.',
+    exportNote: 'A placa e as suas bossas, em mil\u00edmetros. As bossas '
+      + 'autoroscantes e de inserto levam furo cego, que \u00e9 o que querem; as de '
+      + 'furo passante s\u00e3o abertas atrav\u00e9s da placa para o parafuso passar e '
+      + 'levar porca.',
+    clearanceWarn: 'Alguns furos passantes ficaram de fora: um furo tem de '
+      + 'ficar afastado da borda da placa e de todos os outros furos, ou n\u00e3o '
+      + 'sobra material suficiente entre eles para o abrir.',
     meshBroken: 'A malha n\u00e3o ficou fechada, por isso nada foi exportado. '
       + 'Isto \u00e9 um erro do programa \u2014 diga o que est\u00e1 na placa.',
     addBoss: 'Adicionar bossa',
@@ -3069,6 +3070,237 @@ document.getElementById('delBossBtn').onclick = deleteBoss;
    tested triangulator rather than two hacks. Until then the export says so.
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   Triangulating a polygon with holes
+   --------------------------------------------------------------------------
+   The one exception to "no booleans". A rectangle with circular holes in it,
+   and later a plate face with glyph outlines punched through it, cannot be
+   expressed as a union of prisms -- the face itself has to be cut up into
+   triangles that avoid the holes.
+
+   Ear clipping, with holes bridged into the outer ring first. Written here
+   rather than pulled from a CDN because this page is self-contained and works
+   offline, and a script tag would be the first thing to break that.
+
+   The risk in hand-rolling it is a subtly wrong triangulation, which produces
+   a mesh that slices wrong rather than one that fails loudly. That is answered
+   by checking the output rather than trusting it: the triangles must sum to
+   the polygon's own area, they must all wind the same way, and the solid built
+   from them must still pass the closed-surface test before anything is written.
+   -------------------------------------------------------------------------- */
+var TRI_EPS = 1e-9;
+
+function ringArea(r) {
+  var a = 0;
+  for (var i = 0; i < r.length; i++) {
+    var p1 = r[i], p2 = r[(i + 1) % r.length];
+    a += p1[0] * p2[1] - p2[0] * p1[1];
+  }
+  return a / 2;
+}
+
+/* Outer rings run counter-clockwise, holes clockwise. Getting this wrong makes
+   a hole add material instead of removing it. */
+function oriented(ring, wantCCW) {
+  return ((ringArea(ring) < 0) === wantCCW) ? ring.slice().reverse() : ring.slice();
+}
+
+/* --------------------------------------------------------------------------
+   Sweep the shape in horizontal bands.
+
+   Take every y where any vertex sits, and consider the strips between
+   consecutive ones. Inside a strip no vertex occurs, so every edge crossing it
+   is a plain straight segment from top to bottom. Sort those crossings by x
+   and pair them off: first-to-second is material, second-to-third is not,
+   third-to-fourth is material again. Each pair is a trapezoid, and a trapezoid
+   is two triangles.
+
+   WHY THIS AND NOT EAR CLIPPING. Ear clipping needs the holes bridged into the
+   outer ring first, and the bridges are where it goes wrong: two holes whose
+   rays reach the same corner pinch the polygon there and the clipping stalls.
+   The first attempt here did exactly that -- 70 triangles out of 106 on a
+   four-hole plate. Giving each bridge its own landing point fixed that case
+   and broke two holes sharing a horizontal line instead. That is the point at
+   which a reference implementation reaches for intersection repair and
+   recursive splitting, and this file would rather have an algorithm with no
+   such cases at all.
+
+   The sweep has none. It never asks whether a triangle is valid, so it cannot
+   get that question wrong; it just slices the shape into strips. It produces
+   more, thinner triangles than ear clipping, which matters for rendering and
+   not at all for a slicer, which only reads the surface.
+   -------------------------------------------------------------------------- */
+/* Put a vertex on every ring wherever any ring has one.
+
+   The sweep cuts the shape at every vertex height, so a face triangle can end
+   up with a corner partway along an edge that the wall beside it treats as a
+   single straight segment. Geometrically that is fine -- the volume comes out
+   exact -- but the surface is not closed: the face has a vertex the wall does
+   not, and the edges no longer pair up. A T-junction, and a crack.
+
+   Splitting first means the faces and the walls are built from one and the
+   same set of points, so nothing can be left unmatched. It also makes the
+   sweep's interpolation land exactly on existing vertices rather than near
+   them, which keeps the arithmetic exact rather than merely close.
+*/
+function splitRingsAtVertexHeights(rings) {
+  var ys = [], i, k;
+  for (i = 0; i < rings.length; i++) {
+    for (k = 0; k < rings[i].length; k++) ys.push(rings[i][k][1]);
+  }
+  ys.sort(function (m, n) { return m - n; });
+
+  var out = [];
+  for (i = 0; i < rings.length; i++) {
+    var r = rings[i], split = [];
+    for (k = 0; k < r.length; k++) {
+      var a = r[k], b = r[(k + 1) % r.length];
+      split.push(a);
+      if (a[1] === b[1]) continue;
+
+      var lo = Math.min(a[1], b[1]), hi = Math.max(a[1], b[1]);
+      var cuts = [];
+      for (var j = 0; j < ys.length; j++) {
+        if (ys[j] > lo + TRI_EPS && ys[j] < hi - TRI_EPS) {
+          if (!cuts.length || Math.abs(cuts[cuts.length - 1] - ys[j]) > TRI_EPS) cuts.push(ys[j]);
+        }
+      }
+      if (a[1] > b[1]) cuts.reverse();
+      for (j = 0; j < cuts.length; j++) {
+        var t = (cuts[j] - a[1]) / (b[1] - a[1]);
+        split.push([a[0] + t * (b[0] - a[0]), cuts[j]]);
+      }
+    }
+    out.push(split);
+  }
+  return out;
+}
+
+/* Triangulate a face. Rings must already have been through
+   splitRingsAtVertexHeights, so every edge spans exactly one band.
+
+   Two things have to be true of the result, and only the second is obvious.
+   The triangles must cover the right area -- and they must CONFORM: no
+   triangle may have a corner partway along another triangle's edge. A
+   non-conforming face looks perfect and measures perfect, and still leaves the
+   solid open, because an edge shared by three triangles instead of two is a
+   crack. Both T-junctions this went through were found that way, by the
+   closed-surface test rather than by looking. */
+function triangulate(outer, holes) {
+  var rings = [oriented(outer, true)];
+  var i, k;
+  for (i = 0; i < holes.length; i++) rings.push(oriented(holes[i], false));
+
+  var edges = [], ys = [];
+  for (i = 0; i < rings.length; i++) {
+    var r = rings[i];
+    for (k = 0; k < r.length; k++) {
+      var a = r[k], b = r[(k + 1) % r.length];
+      ys.push(a[1]);
+      if (a[1] !== b[1]) edges.push([a, b]);       // horizontal edges cross nothing
+    }
+  }
+  if (!edges.length) return null;
+  ys.sort(function (m, n) { return m - n; });
+
+  /* Every x at which anything meets this height. A band's floor and the band
+     below it share this list, so their horizontal edges are cut identically
+     and pair up instead of leaving a T. */
+  function crossingsAt(y) {
+    var xs = [];
+    for (var e = 0; e < edges.length; e++) {
+      var ay = edges[e][0][1], by = edges[e][1][1];
+      if (Math.min(ay, by) > y + TRI_EPS || Math.max(ay, by) < y - TRI_EPS) continue;
+      var t = (y - ay) / (by - ay);
+      xs.push(edges[e][0][0] + t * (edges[e][1][0] - edges[e][0][0]));
+    }
+    xs.sort(function (m, n) { return m - n; });
+    var uniq = [];
+    for (var q = 0; q < xs.length; q++) {
+      if (!uniq.length || xs[q] - uniq[uniq.length - 1] > TRI_EPS) uniq.push(xs[q]);
+    }
+    return uniq;
+  }
+
+  function chain(x0, x1, y, all) {
+    var out = [[x0, y]];
+    for (var q = 0; q < all.length; q++) {
+      if (all[q] > x0 + TRI_EPS && all[q] < x1 - TRI_EPS) out.push([all[q], y]);
+    }
+    out.push([x1, y]);
+    return out;
+  }
+
+  var tris = [];
+  for (var band = 0; band < ys.length - 1; band++) {
+    var y0 = ys[band], y1 = ys[band + 1];
+    if (y1 - y0 <= TRI_EPS) continue;
+    var ym = (y0 + y1) / 2;
+
+    var spans = [];
+    for (i = 0; i < edges.length; i++) {
+      var ed = edges[i], eay = ed[0][1], eby = ed[1][1];
+      if (Math.min(eay, eby) > ym || Math.max(eay, eby) < ym) continue;
+      // Take the endpoint's own x when the band boundary IS the endpoint.
+      // a + (b - a) is not always exactly b in floating point, and one ulp of
+      // disagreement between a face vertex and the wall vertex beside it is a
+      // crack as far as a strict check is concerned.
+      var dy = eby - eay;
+      spans.push([
+        (eay === y0) ? ed[0][0] : (eby === y0) ? ed[1][0]
+          : ed[0][0] + (y0 - eay) / dy * (ed[1][0] - ed[0][0]),
+        (eby === y1) ? ed[1][0] : (eay === y1) ? ed[0][0]
+          : ed[0][0] + (y1 - eay) / dy * (ed[1][0] - ed[0][0])
+      ]);
+    }
+    if (spans.length < 2) continue;
+    spans.sort(function (m, n) { return (m[0] + m[1]) - (n[0] + n[1]); });
+
+    var lowXs = crossingsAt(y0), highXs = crossingsAt(y1);
+
+    for (i = 0; i + 1 < spans.length; i += 2) {
+      var L = spans[i], R = spans[i + 1];
+      var bot = chain(L[0], R[0], y0, lowXs);
+      var top = chain(L[1], R[1], y1, highXs);
+
+      // Zip the two chains into a strip, always advancing whichever side is
+      // behind, so no triangle straddles a vertex on the other side.
+      var bi = 0, ti = 0;
+      while (bi < bot.length - 1 || ti < top.length - 1) {
+        var useBottom;
+        if (ti >= top.length - 1) useBottom = true;
+        else if (bi >= bot.length - 1) useBottom = false;
+        else useBottom = bot[bi + 1][0] <= top[ti + 1][0];
+
+        var t3;
+        if (useBottom) { t3 = [bot[bi], bot[bi + 1], top[ti]]; bi++; }
+        else { t3 = [bot[bi], top[ti + 1], top[ti]]; ti++; }
+        if (ringArea(t3) > TRI_EPS) tris.push(t3);
+      }
+    }
+  }
+
+  /* The pieces must add up to the whole: outer area minus the holes, against
+     the sum of the triangles. */
+  var want = Math.abs(ringArea(oriented(outer, true)));
+  for (i = 0; i < holes.length; i++) want -= Math.abs(ringArea(holes[i]));
+
+  var got = 0;
+  for (i = 0; i < tris.length; i++) got += Math.abs(ringArea(tris[i]));
+  if (Math.abs(got - want) > Math.max(1e-6, want * 1e-6)) return null;
+
+  return tris;
+}
+
+function circleRing(cx, cy, r, segments) {
+  var out = [];
+  for (var i = 0; i < segments; i++) {
+    var a = i / segments * Math.PI * 2;
+    out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return out;
+}
+
 /* Sunk slightly into the plate rather than resting exactly on it. Coincident
    coplanar faces are a classic source of slicer artefacts, and 0.2 mm of
    overlap makes the union unambiguous. The boss still stands `height` proud of
@@ -3142,16 +3374,102 @@ function bossHeightOf(b) {
   return b.height;
 }
 
+/* Clearance holes that can actually be cut: inside the plate with a little
+   material left around them, and not touching each other. A hole that fails
+   either test is skipped rather than allowed to produce a broken face, and the
+   export panel says how many. */
+var HOLE_MARGIN = 0.5;
+
+function plateHoles() {
+  var out = [], skipped = 0, i, k;
+  for (i = 0; i < doc.bosses.length; i++) {
+    var b = doc.bosses[i];
+    if (b.fixing !== 'clearance') continue;
+    var r = holeDia(b) / 2;
+    var x = b.at[0], y = b.at[1];
+
+    var ok = x - r > HOLE_MARGIN && y - r > HOLE_MARGIN
+          && x + r < doc.plate.w - HOLE_MARGIN && y + r < doc.plate.h - HOLE_MARGIN;
+
+    for (k = 0; ok && k < out.length; k++) {
+      var o = out[k];
+      if (Math.hypot(o.x - x, o.y - y) < o.r + r + HOLE_MARGIN) ok = false;
+    }
+    if (ok) out.push({ x: x, y: y, r: r });
+    else skipped++;
+  }
+  out.skipped = skipped;
+  return out;
+}
+
+/* The plate. A plain box while nothing goes through it; a pair of triangulated
+   faces with walls down each hole once something does. */
+function plateMesh(out) {
+  var t = doc.plate.thickness, w = doc.plate.w, h = doc.plate.h;
+  var holes = plateHoles();
+
+  if (!holes.length) { boxMesh(out, 0, 0, 0, w, h, t); return true; }
+
+  var rings = [], i, k;
+  for (i = 0; i < holes.length; i++) {
+    rings.push(circleRing(holes[i].x, holes[i].y, holes[i].r, segmentsFor(holes[i].r)));
+  }
+
+  // Every ring gains a vertex wherever any ring has one, so the faces and the
+  // walls below are cut from an identical set of points.
+  var all = splitRingsAtVertexHeights(
+    [oriented([[0, 0], [w, 0], [w, h], [0, h]], true)].concat(rings));
+  var outerRing = all[0];
+  var holeRings = all.slice(1);
+
+  var faces = triangulate(outerRing, holeRings);
+  if (!faces) return false;                  // refused; caller must not export
+
+  for (i = 0; i < faces.length; i++) {
+    var f = faces[i];
+    tri(out, f[0][0], f[0][1], t, f[1][0], f[1][1], t, f[2][0], f[2][1], t);   // top, +Z
+    tri(out, f[0][0], f[0][1], 0, f[2][0], f[2][1], 0, f[1][0], f[1][1], 0);   // bottom, -Z
+  }
+
+  // The outside of the plate, from the same split ring the faces used.
+  var oring = oriented(outerRing, true);
+  for (k = 0; k < oring.length; k++) {
+    var a1 = oring[k], a2 = oring[(k + 1) % oring.length];
+    quad(out, [a1[0], a1[1], 0], [a2[0], a2[1], 0], [a2[0], a2[1], t], [a1[0], a1[1], t]);
+  }
+
+  // The bore through the plate. Its normals face the axis, because the hole is
+  // where the material is not.
+  for (i = 0; i < holeRings.length; i++) {
+    var ring = oriented(holeRings[i], false);   // clockwise seen from above
+    for (k = 0; k < ring.length; k++) {
+      var p1 = ring[k], p2 = ring[(k + 1) % ring.length];
+      quad(out, [p1[0], p1[1], 0], [p2[0], p2[1], 0], [p2[0], p2[1], t], [p1[0], p1[1], t]);
+    }
+  }
+  return true;
+}
+
 function buildMesh() {
   var out = [];
   var t = doc.plate.thickness;
 
-  boxMesh(out, 0, 0, 0, doc.plate.w, doc.plate.h, t);
+  if (!plateMesh(out)) return null;
 
   for (var i = 0; i < doc.bosses.length; i++) {
     var b = doc.bosses[i];
     var h = bossHeightOf(b);
-    tubeMesh(out, b.at[0], b.at[1], t - WELD, t + h, holeDia(b) / 2, bossOuterDia(b) / 2);
+
+    /* A blind boss is sunk 0.2 mm into the plate: those faces end up strictly
+       inside solid material, which is harmless and makes the union unambiguous.
+
+       A clearance boss must not be. Sinking it would put its bore wall inside
+       the HOLE, where it would duplicate the wall the plate already owns --
+       two coincident surfaces facing the same way, which is a real degeneracy
+       rather than a harmless internal face. So the plate owns the bore from 0
+       to the plate top, and the tube owns it from there up; they meet exactly. */
+    var z0 = (b.fixing === 'clearance') ? t : t - WELD;
+    tubeMesh(out, b.at[0], b.at[1], z0, t + h, holeDia(b) / 2, bossOuterDia(b) / 2);
   }
   return out;
 }
@@ -3172,8 +3490,16 @@ function meshProblems(tris) {
   var seen = {};
   var i, k;
 
+  /* Vertices are matched to a nanometre rather than bit for bit. Two points a
+     millionth of a millimetre apart are the same point by any physical
+     standard -- the STL this becomes stores float32, which is far coarser --
+     and holding the check to exact equality makes it report cracks that do not
+     exist while adding nothing it would otherwise catch. */
+  function q(v) { return Math.round(v * 1e6) / 1e6; }
+
   function key(t, a, b) {
-    return t[a] + ',' + t[a + 1] + ',' + t[a + 2] + '|' + t[b] + ',' + t[b + 1] + ',' + t[b + 2];
+    return q(t[a]) + ',' + q(t[a + 1]) + ',' + q(t[a + 2])
+      + '|' + q(t[b]) + ',' + q(t[b + 1]) + ',' + q(t[b + 2]);
   }
 
   for (i = 0; i < tris.length; i++) {
@@ -3436,17 +3762,23 @@ function anyHoleTooSmall() {
 }
 
 function syncExport() {
-  var tris = buildMesh().length;
+  var mesh = buildMesh();
+  var tris = mesh ? mesh.length : 0;
   // 50 bytes a triangle plus an 84-byte header, so the size is exact rather
   // than an estimate.
   var kb = Math.round((84 + tris * 50) / 1024);
   triCount.textContent = tris + '  (' + kb + ' kB)';
-  clearanceWarn.hidden = !hasClearance();
+  clearanceWarn.hidden = plateHoles().skipped === 0;
   document.getElementById('smallHoleWarn').hidden = !anyHoleTooSmall();
 }
 
 document.getElementById('stlBtn').onclick = function () {
   var mesh = buildMesh();
+  if (!mesh) {
+    console.error('[protoplaca] the plate face could not be triangulated');
+    say(t('meshBroken'));
+    return;
+  }
   var check = meshProblems(mesh);
   if (!check.ok) {
     // Refuse rather than hand over something that will slice wrong. A broken

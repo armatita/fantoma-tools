@@ -298,6 +298,10 @@ and outside diameter, drawn at their real width so congestion is visible. The
 length readout gives its parts and says plainly that retainer climbs are not
 in it yet.
 
+Clearance bosses are now cut through the plate, so a screw can pass and take a
+nut. Self-tapping and heat-set bosses keep their blind holes, which is what
+they want.
+
 Retainers — the tunnels and clips that hold the wires down — are phase 3.
 
 ---

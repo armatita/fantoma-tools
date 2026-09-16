@@ -490,25 +490,75 @@ Coincident coplanar faces are a classic source of slicer artefacts, and a little
 overlap makes the union unambiguous. The boss still stands its full height proud
 of the plate, which is the number that matters.
 
-### Holes are blind, and clearance bosses are not done
+### Blind holes, and holes that go through
 
-A tube standing on a solid slab gives a **blind** hole. That is correct for
-self-tapping screws and for heat-set inserts: the screw stops inside the boss and
-nothing protrudes underneath.
+A tube standing on a solid slab gives a **blind** hole, which is what
+self-tapping screws and heat-set inserts want: the screw stops inside the boss
+and nothing protrudes underneath. Those bosses are sunk 0.2 mm into the plate,
+where the sunk faces end up strictly inside solid material — harmless, and it
+makes the union unambiguous.
 
-A **clearance** hole is different. The screw has to pass through and take a nut,
-so the plate itself needs a hole — which means the slab's top and bottom faces
-stop being rectangles and become rectangles-with-holes. That needs
-polygon-with-holes triangulation, which is the single exception this design
-already identified, and which recessed text needs too.
+A **clearance** hole goes through, so a screw can pass and take a nut, and it
+must not be sunk. Sinking it would put the tube's bore wall inside the *hole*,
+duplicating the wall the plate already owns — two coincident surfaces facing
+the same way, which is a real degeneracy rather than a harmless internal face.
+So the plate owns the bore from 0 to its own top, the tube owns it from there
+up, and they meet exactly.
 
-So clearance holes and recessed text are the same problem, and they get one
-triangulator, built once and tested once. The alternative was a special case for
-circular holes in a rectangle — split the plate into cells holding one hole each
-and zip each hole to its cell — which would work and would be thrown away the
-moment the real triangulator arrived. A subtly wrong triangulation produces a
-mesh that slices wrong, which is the failure this project can least afford to
-have two implementations of.
+A hole is only cut if it sits clear of the plate edge and of every other hole,
+with 0.5 mm of material to spare. One that fails is skipped and the export
+panel says so, rather than producing a face that cannot be triangulated.
+
+### How the face is triangulated, and the two attempts that failed
+
+The plate's faces stop being rectangles once anything goes through them, so
+they have to be cut into triangles that avoid the holes. This is the one
+exception to "no booleans", and it is written here rather than pulled from a
+CDN because the page is self-contained and works offline.
+
+**It is a horizontal sweep, not ear clipping.** Take every height at which any
+vertex sits and consider the strips between them. Inside a strip no vertex
+occurs, so every edge crossing it is a straight segment; sort the crossings by
+x and pair them off, and each pair is a trapezoid.
+
+Ear clipping was tried first and abandoned, twice:
+
+- Bridging each hole to the nearest ring **vertex** put several bridges on the
+  same corner of the plate, pinching the polygon there. Clipping stalled at 70
+  triangles out of 106.
+- Giving each bridge its **own** landing point fixed that and broke two holes
+  sharing a horizontal line instead.
+
+That is the point at which a reference implementation reaches for intersection
+repair and recursive splitting. The sweep has none of those cases: it never
+asks whether a triangle is valid, so it cannot get that question wrong. It
+makes more and thinner triangles, which matters for rendering and not at all
+for a slicer, which reads only the surface.
+
+### Conforming, which is not the same as correct
+
+A face can cover exactly the right area and still leave the solid open. If one
+triangle has a corner partway along another's edge — a T-junction — the edges
+no longer pair up, and that is a crack. It measures perfect and looks perfect.
+
+Two rounds of it were found here, both by the closed-surface test and neither
+by looking:
+
+- The sweep put vertices along the plate's outline that the side walls, built
+  from the four corners, knew nothing about. Fixed by splitting every ring at
+  every vertex height *before* triangulating, so faces and walls are cut from
+  one set of points.
+- The strips' own horizontal boundaries did not line up where the number of
+  crossings changed. Fixed by splitting each strip's top and bottom at every
+  crossing on that line, and zipping the two chains into a strip.
+
+A third failure was not a crack at all: `a + (b - a)` is not always exactly `b`
+in floating point, so a face vertex could sit one ulp from the wall vertex
+beside it. The interpolation now takes the endpoint's own coordinate when the
+boundary *is* the endpoint, and the check matches vertices to a nanometre
+rather than bit for bit — the STL it becomes stores float32, which is far
+coarser, so exact equality was reporting cracks that did not exist.
+
 
 Until then the export panel says plainly that clearance bosses come out blind.
 The tool is allowed to be incomplete; it is not allowed to be quietly wrong.
