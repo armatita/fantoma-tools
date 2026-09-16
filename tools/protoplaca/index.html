@@ -57,7 +57,16 @@
   .panel h2 {
     font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
     color: #4dd8ff; margin: 0 0 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; cursor: pointer; user-select: none;
   }
+  .panel h2:focus-visible { outline: 1px solid #4dd8ff; outline-offset: 3px; }
+  .panel h2 .chev {
+    font-size: 9px; color: #6b6b76; transition: transform 0.15s ease;
+  }
+  .panel.closed h2 { margin-bottom: 0; }
+  .panel.closed .pbody { display: none; }
+  .panel.closed h2 .chev { transform: rotate(-90deg); }
   .field { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #9a9aa4; }
   .field label { flex: 1; }
   .field input[type=number], .field select {
@@ -114,8 +123,8 @@
     </div>
 
     <div>
-      <section class="panel">
-        <h2 id="ttProject"></h2>
+      <section class="panel" id="projectPanel">
+        <h2><span id="ttProject"></span></h2>
         <div class="field">
           <label for="docName" id="lbDocName"></label>
           <input type="text" id="docName" maxlength="60">
@@ -128,8 +137,8 @@
         <div class="note" id="projectNote"></div>
       </section>
 
-      <section class="panel">
-        <h2 id="ttPlate"></h2>
+      <section class="panel" id="platePanel">
+        <h2><span id="ttPlate"></span></h2>
         <div class="field">
           <label for="plateW" id="lbW"></label>
           <input type="number" id="plateW" inputmode="decimal" min="10" max="500" step="1" value="120">
@@ -147,8 +156,8 @@
         </div>
       </section>
 
-      <section class="panel">
-        <h2 id="ttComponents"></h2>
+      <section class="panel" id="compPanel">
+        <h2><span id="ttComponents"></span></h2>
         <div class="row">
           <button type="button" id="addCompBtn"></button>
         </div>
@@ -205,8 +214,8 @@
         <div class="note" id="compNote"></div>
       </section>
 
-      <section class="panel">
-        <h2 id="ttView"></h2>
+      <section class="panel" id="viewPanel">
+        <h2><span id="ttView"></span></h2>
         <div class="field">
           <label for="gridSel" id="lbGrid"></label>
           <select id="gridSel">
@@ -953,6 +962,33 @@ function drawRulers() {
   ctx.fillText('mm', RULER / 2, RULER / 2);
 }
 
+/* A small plaque of text with a dark backing, so it stays readable over the
+   grid, over a component, or over nothing. */
+function plaque(lines, x, y) {
+  ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  var padX = 6, padY = 4, lineH = 14, w = 0, i;
+  for (i = 0; i < lines.length; i++) w = Math.max(w, ctx.measureText(lines[i]).width);
+  var boxW = w + padX * 2, boxH = lines.length * lineH + padY * 2;
+
+  // Keep it inside the drawing rather than half off the edge.
+  x = Math.min(Math.max(x, plot.x0 + 2), plot.x1 - boxW - 2);
+  y = Math.min(Math.max(y, plot.y0 + 2), plot.y1 - boxH - 2);
+
+  ctx.fillStyle = 'rgba(13,13,18,0.88)';
+  ctx.fillRect(x, y, boxW, boxH);
+  ctx.strokeStyle = COL.measure;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(crisp(x), crisp(y), Math.round(boxW), Math.round(boxH));
+
+  ctx.fillStyle = '#f4f4f2';
+  for (i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], x + padX, y + padY + i * lineH);
+  }
+}
+
 function drawMeasure() {
   if (!measure.a) return;
   var b = measure.b || measure.live;
@@ -970,6 +1006,16 @@ function drawMeasure() {
   ctx.fillStyle = COL.measure;
   ctx.beginPath(); ctx.arc(ax, ay, 3, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI * 2); ctx.fill();
+
+  // The reading goes next to the line. It was in the status bar, which is the
+  // wrong place twice over: it is not where you are looking, and it shares
+  // that strip with the hints, so selecting anything replaced it.
+  var dx = b.x - measure.a.x, dy = b.y - measure.a.y;
+  plaque(
+    [t('dist') + ' ' + mm(Math.sqrt(dx * dx + dy * dy), 2) + ' mm',
+     '\u0394x ' + mm(dx, 2) + '   \u0394y ' + mm(dy, 2)],
+    (ax + bx) / 2 + 10, (ay + by) / 2 + 10
+  );
 }
 
 function render() {
@@ -1021,10 +1067,6 @@ function updateStatus() {
     hint.textContent = t('hintGuide');
   } else if (selectedId) {
     hint.textContent = t('hintComponent');
-  } else if (measure.a && measure.b) {
-    var dx = measure.b.x - measure.a.x, dy = measure.b.y - measure.a.y;
-    hint.textContent = 'Δx ' + mm(dx, 2) + '  Δy ' + mm(dy, 2)
-      + '  ' + t('dist') + ' ' + mm(Math.sqrt(dx * dx + dy * dy), 2) + ' mm';
   } else {
     hint.textContent = t('hintIdle');
   }
@@ -1299,6 +1341,10 @@ window.addEventListener('keydown', function (e) {
 
   if (e.key === 'Escape') {
     measure.a = measure.b = measure.live = null;
+    if (measure.on) {
+      measure.on = false;
+      measureBtn.classList.remove('active');
+    }
     selectedId = null;
     syncControls();
     draw();
@@ -1354,6 +1400,7 @@ var measureBtn = document.getElementById('measureBtn');
 measureBtn.onclick = function () {
   measure.on = !measure.on;
   measure.a = measure.b = measure.live = null;
+  if (measure.on) { selectedId = null; syncControls(); }
   measureBtn.classList.toggle('active', measure.on);
   draw();
 };
@@ -1669,6 +1716,69 @@ if (remembered) {
 applyLang();
 syncControls();
 render();     // synchronous, so the first paint is already the right size
+
+/* --------------------------------------------------------------------------
+   Collapsible panels
+   --------------------------------------------------------------------------
+   On a desk screen the panels are taller than the window, so reaching a
+   control means scrolling the drawing out of sight -- which is the one thing
+   you were looking at when you went for the control.
+
+   The bodies are wrapped here rather than in the markup so that a panel added
+   later collapses too, without anyone having to remember to wrap it.
+
+   Defaults: the panels you set once (Plate, View) start closed, the ones you
+   work in stay open. After that your own choice is remembered.
+   -------------------------------------------------------------------------- */
+var panelState = store.get('panels') || {};
+
+function makeCollapsible(id, openByDefault) {
+  var section = document.getElementById(id);
+  var head = section.querySelector('h2');
+
+  // The heading's text lives in a span of its own, because applyLang writes
+  // that text on every language switch -- writing it on the h2 itself would
+  // take the chevron with it.
+  var body = document.createElement('div');
+  body.className = 'pbody';
+  while (head.nextSibling) body.appendChild(head.nextSibling);
+  section.appendChild(body);
+
+  var chev = document.createElement('span');
+  chev.className = 'chev';
+  chev.textContent = '\u25bc';
+  head.appendChild(chev);
+
+  head.setAttribute('role', 'button');
+  head.tabIndex = 0;
+
+  function apply(open) {
+    section.classList.toggle('closed', !open);
+    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function toggle() {
+    var open = section.classList.contains('closed');
+    apply(open);
+    panelState[id] = open;
+    store.set('panels', panelState);
+    // The canvas is sized by the layout, so a panel that changes the page
+    // height can change it. Let the renderer notice.
+    draw();
+  }
+
+  head.addEventListener('click', toggle);
+  head.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+
+  apply(typeof panelState[id] === 'boolean' ? panelState[id] : openByDefault);
+}
+
+makeCollapsible('projectPanel', true);
+makeCollapsible('platePanel', false);
+makeCollapsible('compPanel', true);
+makeCollapsible('viewPanel', false);
 
 FantomaApp.init({
   toolId: 'protoplaca',

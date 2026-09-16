@@ -100,21 +100,46 @@ One JSON object. Schema sketch, not final:
 }
 ```
 
-### Why a position and a size, and not an outline
+### Shape: a bounding box now, an outline later
 
-An earlier draft of this sketch gave the plate and each component an `outline`
-polygon. Building the editor made it obvious that this was the wrong primitive.
-You arrive at a component by putting calipers on a real part, and what you read
-off is a width and a height. Nobody types an outline. A position and a size are
-what the panel asks for, what the grid snaps, and what the resize handles move.
+A component carries `at` and `size` — where its bottom-left corner is, and how
+big it is. That is the whole shape today, and every part is a rectangle.
 
-Arbitrary outlines are not ruled out — an L-shaped board can get an optional
-`outline` later, and a rectangle stays the fast path. But shipping the general
-case first would have made every common action harder in order to serve a part
-neither of us owns.
+**This is staging, not a decision that components are rectangles.** The original
+sketch said `outline` for a reason worth keeping: plenty of real parts are
+rectangles with something taken out of them — a notch, a cutout, a corner
+clipped off a board — and a bounding box cannot say so. A shape you can only
+approximate is a shape you will mis-measure against later, which is exactly the
+failure this tool exists to prevent.
 
-Rotation is not in the format yet either. When it arrives it is one more field
-on a component, not a change to the two that are there.
+The path there, when it is worth taking:
+
+- `at` and `size` stay, and keep meaning what they mean: placement, and the
+  extent the grid snaps and the resize handles move. They become the bounding
+  box rather than the shape.
+- An optional `outline` is added, in component-local millimetres with 0,0 at
+  the component's own bottom-left. A component without one is the rectangle its
+  bounding box describes — so nothing already saved changes meaning, and the
+  common case still needs no polygon.
+- Editing an outline needs its own interface (add, drag and remove vertices),
+  which is the real cost and the real reason it is not in this step.
+
+**Surface detail is further out still and is explicitly cosmetic** — a
+ventilation grille, a speaker's hole pattern, silkscreen — drawn on a component
+so you recognise it at a glance rather than reading its label. Worth having
+eventually, worth nothing until the parts themselves are right, and it must
+never affect the generated geometry.
+
+Rotation is the same shape of problem: one more field on a component when it
+arrives, not a change to what is already written.
+
+### Why the panel asks for numbers, not shapes
+
+Whatever the format can express, the editor's fast path stays typing. You
+arrive at a component by putting calipers on a real part and reading off a
+width and a height. That is true whether the component is a plain rectangle or
+a rectangle with a notch, so the numeric fields are the primary way in and any
+outline editing sits on top of them.
 
 ### Unknown fields survive a load
 
@@ -327,6 +352,33 @@ none are written inline in the markup. Retrofitting that is miserable, and the c
 of doing it from the start is close to zero.
 
 Portuguese here means European Portuguese, not Brazilian.
+
+---
+
+## Interface, planned but not built
+
+Raised while using the first working build, and worth having. None of it
+changes the document or the geometry — it is all about getting at the tool.
+
+**A toolbar above the drawing, icons with tooltips.** The panels beside the
+canvas are for typing numbers; the things you reach for while drawing belong
+above the drawing, where taking them does not cost you sight of it.
+
+What goes on it:
+
+- **Measure**, as a toggle — moved off the View panel.
+- **Clear guides**, as a push button — likewise.
+- **Cursor readout**, as a toggle. Dashed lines from the pointer to both axes
+  and the coordinate in text beside it, `(17.32, 15.14)`, while the pointer is
+  over the drawing. The status bar already carries the numbers; this puts them
+  where the eye already is.
+- **Component dimensions**, as a toggle. Each component's size and origin shown
+  under its name, when there is room for them.
+
+**A default colour palette for components**, with a custom colour still
+available. Picking from a handful is less work than deciding a hex value, and
+Model Viewer already establishes the pattern in this repo. The palette itself
+is not chosen yet.
 
 ---
 
