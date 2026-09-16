@@ -55,6 +55,7 @@ screw the ESP32 down" without any wire handling at all.
 4. STL out: slab plus boss tubes. Export. Print the calibration coupon.
 
 **Phase 2** — wires: drawing, anchoring, colours, names, AWG, length readout.
+(built)
 **Phase 3** — retainers: auto-placement, tunnels and clips, crossings.
 **Phase 4** — the 3D tab: the mesh plus coloured wires and components, collision
 checks.
@@ -89,8 +90,12 @@ One JSON object. Schema sketch, not final:
                    "height": 6 } ],
   "wires":     [ { "id": "w1", "name": "SDA", "colour": "#e33", "awg": 24,
                    "od": 1.6,              // AWG only supplies the default
-                   "path": [ /* anchors and free points */ ],
-                   "slack": 20 } ],
+                   "slack": 20,
+                   "path": [               // plate coordinates, not local ones
+                     { "at": [30, 44], "of": "c1" },   // attached to a board
+                     { "at": [30, 34] },               // free corner
+                     { "at": [80, 40], "of": "c2" }
+                   ] } ],
   "retainers": [ { "id": "r1", "wire": "w1", "t": 0.42,
                    "kind": "tunnel",       // or "clip"
                    "origin": "auto",       // or "manual", "auto-suppressed"
@@ -180,6 +185,46 @@ MIME negotiation from a static host.
 
 Both. They are not alternatives: the store is a safety net, the file is the
 artefact.
+
+### Wires
+
+A path of points in plate coordinates, each optionally carrying `of`: the
+component that end is attached to.
+
+**World coordinates, not component-local offsets.** An anchored point then
+travels with its component exactly as a boss does — one pattern in the file
+rather than two — and a point whose component has been deleted stops following
+anything while staying exactly where it stood. With local offsets it would have
+jumped to wherever the offset happened to land, which is the sort of silent
+damage you only notice after printing.
+
+**Angle snapping while drawing.** The next point is pulled onto a horizontal, a
+vertical or a 45° diagonal from the point before it, because that is what tidy
+wiring looks like and because a run one degree off square is invisible on screen
+and obvious on the plate. The angle is checked *before* the grid and the result
+re-snapped along the locked axis; doing it the other way round lets the grid pull
+a point a fraction off the line it was just locked to.
+
+**Drawn at true insulated width.** Not decoration: six 24 AWG wires are 8.4 mm of
+jacket side by side, and seeing that they will not fit through a gap is the
+reason to draw the plan before building it.
+
+**AWG supplies a default outside diameter and nothing more.** The gauge fixes the
+conductor; the jacket decides the outside, and silicone 24 AWG is appreciably
+fatter than PVC 24 AWG. The shipped defaults are typical PVC hookup wire —
+assumed, not measured — and the OD stays editable per wire. Changing the gauge
+offers its default; typing a diameter keeps what you typed.
+
+### The length readout, and what it does not yet include
+
+Reported as its parts, never as one number: **flat run**, **standoff climbs**,
+**slack**, then the total. The point of it is to tell you which jumper to reach
+for, and a total you cannot see inside is a total you cannot check.
+
+It is labelled *at least*, and it means it. **The climbs over retainers are not
+in it**, because retainers do not exist yet; they arrive in phase 3 and can only
+add. This is stated in the panel rather than left to be discovered, because a
+readout that quietly under-reports is worse than no readout: you would cut to it.
 
 ### Bosses, and what they belong to
 

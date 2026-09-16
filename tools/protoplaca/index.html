@@ -149,6 +149,9 @@
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="4.2" r="2.1"/><circle cx="10" cy="15.8" r="2.1"/><path d="M10 6.8v6.4" stroke-dasharray="2 1.6"/><path d="M5.5 4.2h2M12.5 4.2h2M5.5 15.8h2M12.5 15.8h2"/></svg>
         </button>
         <span class="gap"></span>
+        <button type="button" class="tool" id="wireBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15h4l3-10h4l3 5"/><circle cx="3" cy="15" r="1.6"/><circle cx="17" cy="10" r="1.6"/></svg>
+        </button>
         <button type="button" class="tool" id="measureBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14.5L14.5 5.5"/><circle cx="5" cy="15" r="1.7"/><circle cx="15" cy="5" r="1.7"/></svg>
         </button>
@@ -305,6 +308,40 @@
         <div class="note" id="bossNote"></div>
       </section>
 
+      <section class="panel" id="wirePanel">
+        <h2><span id="ttWires"></span></h2>
+        <div class="note" id="wireEmpty"></div>
+        <div id="wireFields" hidden>
+          <div class="field">
+            <label for="wireName" id="lbWireName"></label>
+            <input type="text" id="wireName" maxlength="40">
+          </div>
+          <div class="field">
+            <label for="wireAwg" id="lbAwg"></label>
+            <select id="wireAwg"></select>
+          </div>
+          <div class="field narrow">
+            <label for="wireOd" id="lbOd"></label>
+            <input type="number" id="wireOd" inputmode="decimal" step="0.1" min="0.1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="wireSlack" id="lbSlack"></label>
+            <input type="number" id="wireSlack" inputmode="decimal" step="5" min="0">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field">
+            <label for="wireColour" id="lbWireColour"></label>
+            <input type="color" id="wireColour">
+          </div>
+          <div class="note" id="lengthBreakdown"></div>
+          <div class="row">
+            <button type="button" id="delWireBtn"></button>
+          </div>
+        </div>
+        <div class="note" id="wireNote"></div>
+      </section>
+
       <section class="panel" id="profilePanel">
         <h2><span id="ttProfile"></span></h2>
         <div class="field narrow">
@@ -408,6 +445,24 @@ var STRINGS = {
       + 'copy, or to move the project to another machine.',
     components: 'Components',
     bosses: 'Bosses',
+    wires: 'Wires',
+    wireName: 'Name',
+    awg: 'AWG',
+    od: 'Outside \u00f8',
+    slack: 'Slack',
+    noWire: 'Nothing selected. Pick the wire tool and click along the route, or '
+      + 'click a wire on the plate.',
+    wireNote: 'Start or end a run on a component and the wire attaches to it, so '
+      + 'moving the board takes the wire with it. AWG sets a default outside '
+      + 'diameter, but the jacket decides it \u2014 measure yours if it matters.',
+    hintWire: 'click to place a point \u00b7 double-click to finish \u00b7 Esc to abandon',
+    hintWireSel: 'drag a square to move it \u00b7 Delete removes the wire',
+    lenFlat: 'flat run',
+    lenClimb: 'standoff climbs',
+    lenSlack: 'slack',
+    lenTotal: 'at least',
+    lenPending: 'Retainer climbs are not in this yet \u2014 they arrive with phase 3, '
+      + 'and they can only make it longer.',
     exportTitle: 'Print',
     triangles: 'Triangles',
     downloadStl: 'Download STL',
@@ -514,6 +569,25 @@ var STRINGS = {
       + 'máquina.',
     components: 'Componentes',
     bosses: 'Bossas',
+    wires: 'Fios',
+    wireName: 'Nome',
+    awg: 'AWG',
+    od: '\u00d8 exterior',
+    slack: 'Folga',
+    noWire: 'Nada selecionado. Escolha a ferramenta de fio e clique ao longo do '
+      + 'percurso, ou clique num fio que esteja na placa.',
+    wireNote: 'Comece ou termine um percurso sobre um componente e o fio fica-lhe '
+      + 'preso, por isso mover a placa leva o fio com ela. O AWG define um '
+      + 'di\u00e2metro exterior por omiss\u00e3o, mas quem decide \u00e9 o isolamento '
+      + '\u2014 me\u00e7a o seu se isso importar.',
+    hintWire: 'clique para colocar um ponto \u00b7 duplo clique para terminar \u00b7 Esc abandona',
+    hintWireSel: 'arraste um quadrado para o mover \u00b7 Delete apaga o fio',
+    lenFlat: 'percurso plano',
+    lenClimb: 'subidas do espa\u00e7ador',
+    lenSlack: 'folga',
+    lenTotal: 'pelo menos',
+    lenPending: 'As subidas pelos retentores ainda n\u00e3o entram nesta conta \u2014 '
+      + 'chegam na fase 3, e s\u00f3 a podem tornar maior.',
     exportTitle: 'Imprimir',
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
@@ -644,6 +718,7 @@ function blankDoc() {
     profile: defaultProfile(),
     components: [],       // see normComponent for the fields
     bosses: [],           // see normBoss
+    wires: [],            // see normWire
     guides: []            // { axis: 'x' | 'y', v: mm }
   };
 }
@@ -776,10 +851,14 @@ function selectedBoss() {
   return sel.kind === 'boss' ? findIn(doc.bosses, sel.id) : null;
 }
 
+function selectedWire() {
+  return sel.kind === 'wire' ? findIn(doc.wires, sel.id) : null;
+}
+
 /* Whatever is selected, of whichever kind. Used by the things that do not
    care -- delete, and the "is anything selected" hint. */
 function selectedAny() {
-  return selectedComponent() || selectedBoss();
+  return selectedComponent() || selectedBoss() || selectedWire();
 }
 
 
@@ -918,6 +997,57 @@ function normProfile(raw) {
   return out;
 }
 
+/* --------------------------------------------------------------------------
+   Wires
+   --------------------------------------------------------------------------
+   A path of points in PLATE coordinates, each optionally carrying `of`: the
+   component it is attached to.
+
+   World coordinates rather than component-local offsets, deliberately. An
+   anchored point then travels with its component exactly as a boss does --
+   one pattern in this file, not two -- and a point whose component has been
+   deleted degrades to a free point exactly where it already was, instead of
+   jumping to wherever a local offset happens to land.
+
+   AWG fixes the conductor; it does NOT fix the outside diameter, because the
+   jacket does. Silicone-jacketed 24 AWG is appreciably fatter than PVC 24 AWG.
+   So the gauge supplies a default and the OD stays editable per wire, and the
+   defaults below are typical PVC hookup wire -- assumed, not measured.
+   -------------------------------------------------------------------------- */
+var AWGS = [30, 28, 26, 24, 22, 20, 18];
+var AWG_OD = { 30: 0.8, 28: 0.9, 26: 1.1, 24: 1.4, 22: 1.7, 20: 2.1, 18: 2.4 };
+var WIRE_PALETTE = ['#e0534f', '#4dd8ff', '#5ee88f', '#ffb648', '#f4f4f2', '#b45cff'];
+
+function odForAwg(awg) { return AWG_OD[awg] || 1.4; }
+
+function normPoint(raw, componentIds) {
+  var pt = { at: pairOr(raw && raw.at, [0, 0]) };
+  if (raw && typeof raw.of === 'string' && componentIds[raw.of]) pt.of = raw.of;
+  return pt;
+}
+
+function normWire(raw, taken, componentIds) {
+  var w = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  w.id = (typeof w.id === 'string' && w.id && !taken[w.id]) ? w.id : nextId(taken, 'w');
+  taken[w.id] = true;
+  w.name = typeof w.name === 'string' ? w.name.slice(0, 40) : '';
+  w.colour = colourOr(w.colour, WIRE_PALETTE[0]);
+  w.awg = AWGS.indexOf(w.awg) >= 0 ? w.awg : 24;
+  w.od = numOr(w.od, odForAwg(w.awg), 0.1, 20);
+  w.slack = numOr(w.slack, 20, 0, 500);
+
+  var src = (raw && raw.path && raw.path.length) ? raw.path : [];
+  w.path = [];
+  for (var i = 0; i < src.length; i++) w.path.push(normPoint(src[i], componentIds));
+  return w;
+}
+
+function wirePoints(w) {
+  var out = [];
+  for (var i = 0; i < w.path.length; i++) out.push(w.path[i].at);
+  return out;
+}
+
 function normGuide(raw) {
   if (!raw || typeof raw !== 'object') return null;
   if (raw.axis !== 'x' && raw.axis !== 'y') return null;
@@ -960,6 +1090,10 @@ function normDoc(raw) {
   var bl = (raw.bosses && raw.bosses.length) ? raw.bosses : [];
   out.bosses = [];
   for (var m = 0; m < bl.length; m++) out.bosses.push(normBoss(bl[m], taken, componentIds));
+
+  var wl = (raw.wires && raw.wires.length) ? raw.wires : [];
+  out.wires = [];
+  for (var n = 0; n < wl.length; n++) out.wires.push(normWire(wl[n], taken, componentIds));
 
   var gs = (raw.guides && raw.guides.length) ? raw.guides : [];
   out.guides = [];
@@ -1051,6 +1185,37 @@ function handleAt(p) {
   var hs = handlesOf(c);
   for (var i = 0; i < hs.length; i++) {
     if (Math.abs(hs[i].x - p.x) <= HANDLE && Math.abs(hs[i].y - p.y) <= HANDLE) return hs[i];
+  }
+  return null;
+}
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  var vx = bx - ax, vy = by - ay;
+  var len2 = vx * vx + vy * vy;
+  var t = len2 ? ((px - ax) * vx + (py - ay) * vy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  var dx = px - (ax + t * vx), dy = py - (ay + t * vy);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function wireAt(p) {
+  for (var i = doc.wires.length - 1; i >= 0; i--) {
+    var w = doc.wires[i];
+    var tol = Math.max(4, w.od * view.scale / 2 + 2);
+    for (var k = 1; k < w.path.length; k++) {
+      var a = w.path[k - 1].at, b = w.path[k].at;
+      if (distToSegment(p.x, p.y, sx(a[0]), sy(a[1]), sx(b[0]), sy(b[1])) <= tol) return w;
+    }
+  }
+  return null;
+}
+
+function wireVertexAt(p) {
+  var w = selectedWire();
+  if (!w) return null;
+  for (var i = 0; i < w.path.length; i++) {
+    if (Math.abs(sx(w.path[i].at[0]) - p.x) <= HANDLE
+     && Math.abs(sy(w.path[i].at[1]) - p.y) <= HANDLE) return { wire: w, index: i };
   }
   return null;
 }
@@ -1178,7 +1343,84 @@ function drawBosses() {
   }
 }
 
+/* Wires are drawn at their real insulated width. That is not decoration: six
+   24 AWG wires are 8.4 mm of jacket side by side, and seeing that they will
+   not fit through a gap is the reason to draw the plan before building it. */
+function drawWires() {
+  for (var i = 0; i < doc.wires.length; i++) {
+    var w = doc.wires[i];
+    if (w.path.length < 1) continue;
+
+    var pts = wirePoints(w);
+    var live = (wireDraw && wireDraw.id === w.id) ? wireDraw.live : null;
+
+    ctx.strokeStyle = w.colour;
+    ctx.lineWidth = Math.max(1.5, w.od * view.scale);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.85;
+
+    ctx.beginPath();
+    ctx.moveTo(sx(pts[0][0]), sy(pts[0][1]));
+    for (var k = 1; k < pts.length; k++) ctx.lineTo(sx(pts[k][0]), sy(pts[k][1]));
+    ctx.stroke();
+
+    if (live) {
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sx(pts[pts.length - 1][0]), sy(pts[pts.length - 1][1]));
+      ctx.lineTo(sx(live[0]), sy(live[1]));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+
+    // An anchored end is marked, so it is visible which ends will follow a
+    // component when it moves and which are free.
+    for (var a = 0; a < w.path.length; a++) {
+      if (!w.path[a].of) continue;
+      ctx.strokeStyle = w.colour;
+      ctx.beginPath();
+      ctx.arc(sx(w.path[a].at[0]), sy(w.path[a].at[1]), 3.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    if (showDims && w.name && pts.length > 1) {
+      // On the middle of the LONGEST run, not on a vertex. A vertex is usually
+      // a corner tucked against a component, which is the one place a label
+      // has nothing to sit on.
+      var bestLen = -1, mid = pts[0];
+      for (var m = 1; m < pts.length; m++) {
+        var seg = Math.hypot(pts[m][0] - pts[m - 1][0], pts[m][1] - pts[m - 1][1]);
+        if (seg > bestLen) {
+          bestLen = seg;
+          mid = [(pts[m][0] + pts[m - 1][0]) / 2, (pts[m][1] + pts[m - 1][1]) / 2];
+        }
+      }
+      ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = w.colour;
+      ctx.fillText(w.name, sx(mid[0]), sy(mid[1]) - 5);
+    }
+  }
+}
+
 function drawSelection() {
+  var w = selectedWire();
+  if (w && w.path.length) {
+    for (var i = 0; i < w.path.length; i++) {
+      var px = sx(w.path[i].at[0]), py = sy(w.path[i].at[1]);
+      ctx.fillStyle = COL.bg;
+      ctx.fillRect(px - HANDLE / 2, py - HANDLE / 2, HANDLE, HANDLE);
+      ctx.strokeStyle = COL.select;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(crisp(px - HANDLE / 2), crisp(py - HANDLE / 2), HANDLE, HANDLE);
+    }
+    return;
+  }
+
   var b = selectedBoss();
   if (b) {
     var bx = sx(b.at[0]), by = sy(b.at[1]);
@@ -1617,6 +1859,7 @@ function render() {
   drawGrid();
   drawComponents();
   drawBosses();
+  drawWires();
   drawGuides();
   drawSelection();
   drawCursor();
@@ -1634,7 +1877,23 @@ function render() {
    Status bar
    -------------------------------------------------------------------------- */
 var cursor = null;        // world coords, or null when off the plot area
-var measure = { on: false, a: null, b: null, live: null };
+var measure = { a: null, b: null, live: null };
+
+/* What a click on the drawing means. Two booleans were enough for one mode;
+   a third would have meant remembering to turn each of the others off at
+   every entry point, which is how modes quietly overlap. */
+var tool = 'select';        // 'select' | 'measure' | 'wire'
+
+function setTool(next) {
+  tool = (tool === next) ? 'select' : next;
+  measure.a = measure.b = measure.live = null;
+  if (tool !== 'wire') cancelWire();
+  if (tool !== 'select') deselect();
+  measureBtn.classList.toggle('active', tool === 'measure');
+  wireBtn.classList.toggle('active', tool === 'wire');
+  syncControls();
+  draw();
+}
 
 function updateStatus() {
   document.getElementById('curX').textContent = cursor ? mm(cursor.x, 2) : '—';
@@ -1643,12 +1902,16 @@ function updateStatus() {
     t('zoom') + ' ' + mm(view.scale, 2) + ' px/mm';
 
   var hint = document.getElementById('hint');
-  if (measure.on && measure.a && !measure.b) {
+  if (tool === 'measure' && measure.a && !measure.b) {
     hint.textContent = t('hintMeasureEnd');
-  } else if (measure.on && !measure.a) {
+  } else if (tool === 'measure' && !measure.a) {
     hint.textContent = t('hintMeasureStart');
   } else if (drag && drag.kind === 'guide') {
     hint.textContent = t('hintGuide');
+  } else if (tool === 'wire') {
+    hint.textContent = t('hintWire');
+  } else if (sel.kind === 'wire') {
+    hint.textContent = t('hintWireSel');
   } else if (sel.kind === 'boss') {
     hint.textContent = t('hintBoss');
   } else if (hasSelection()) {
@@ -1743,7 +2006,16 @@ cv.addEventListener('pointerdown', function (e) {
     doc.guides.push(gx);
     drag = { kind: 'guide', guide: gx };
   } else if (zone === 'plot') {
-    if (measure.on) {
+    if (tool === 'wire') {
+      if (!wireDraw) startWire(wx(p.x), wy(p.y));
+      else addWirePoint(wx(p.x), wy(p.y));
+      syncControls();
+      scheduleSave();
+      draw();
+      return;
+    }
+
+    if (tool === 'measure') {
       if (!measure.a || measure.b) {
         measure.a = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
         measure.b = null;
@@ -1755,6 +2027,14 @@ cv.addEventListener('pointerdown', function (e) {
     }
     // Order matters: a resize grip sits on top of its own component, and a
     // component may sit on top of a guide. Pick the smallest target first.
+    var vtx = wireVertexAt(p);
+    if (vtx) {
+      snapshot();
+      drag = { kind: 'moveVertex', id: vtx.wire.id, index: vtx.index };
+      draw();
+      return;
+    }
+
     var grip = handleAt(p);
     if (grip) {
       var sel = selectedComponent();
@@ -1770,6 +2050,14 @@ cv.addEventListener('pointerdown', function (e) {
     // Bosses are picked before components. A boss usually sits on top of the
     // component it holds down, and the small target has to win or it can never
     // be clicked at all.
+    var onWire = wireAt(p);
+    if (onWire && !bossAt(p)) {
+      select('wire', onWire.id);
+      syncControls();
+      draw();
+      return;
+    }
+
     var boss = bossAt(p);
     if (boss) {
       select('boss', boss.id);
@@ -1787,7 +2075,8 @@ cv.addEventListener('pointerdown', function (e) {
       drag = {
         kind: 'move', id: comp.id, from: p, at: comp.at.slice(),
         // Bosses that belong to this component travel with it.
-        carried: carriedBosses(comp.id)
+        carried: carriedBosses(comp.id),
+        carriedPts: carriedPoints(comp.id)
       };
       syncControls();
       draw();
@@ -1832,6 +2121,21 @@ cv.addEventListener('pointermove', function (e) {
       moving.at[0] = snap(drag.at[0] + (p.x - drag.from.x) / view.scale);
       moving.at[1] = snap(drag.at[1] - (p.y - drag.from.y) / view.scale);
       shiftBosses(drag.carried, moving.at[0] - was0, moving.at[1] - was1);
+      shiftPoints(drag.carriedPts, moving.at[0] - was0, moving.at[1] - was1);
+      syncControls();
+      scheduleSave();
+    }
+  } else if (drag && drag.kind === 'moveVertex') {
+    var vw = findIn(doc.wires, drag.id);
+    if (vw && vw.path[drag.index]) {
+      var prev = vw.path[drag.index - 1];
+      var raw = [wx(p.x), wy(p.y)];
+      // A vertex being dragged squares up against its neighbour, the same way
+      // it would have if it had been placed there in the first place.
+      var placed = prev ? snapAngle(prev.at, raw[0], raw[1]) : [snap(raw[0]), snap(raw[1])];
+      var a = anchorFor(placed[0], placed[1]);
+      if (a) { vw.path[drag.index] = { at: a.at, of: a.of }; }
+      else { vw.path[drag.index] = { at: placed }; }
       syncControls();
       scheduleSave();
     }
@@ -1853,7 +2157,12 @@ cv.addEventListener('pointermove', function (e) {
     userAdjusted = true;
     view.x0 = drag.x0 - (p.x - drag.from.x) / view.scale;
     view.y0 = drag.y0 + (p.y - drag.from.y) / view.scale;
-  } else if (measure.on && measure.a && !measure.b) {
+  } else if (wireDraw) {
+    var dw = drawingWire();
+    if (dw && dw.path.length) {
+      wireDraw.live = snapAngle(dw.path[dw.path.length - 1].at, wx(p.x), wy(p.y));
+    }
+  } else if (tool === 'measure' && measure.a && !measure.b) {
     measure.live = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
   } else {
     var grip = handleAt(p);
@@ -1889,6 +2198,18 @@ cv.addEventListener('pointerleave', function () {
 });
 
 cv.addEventListener('dblclick', function (e) {
+  if (wireDraw) {
+    var w = drawingWire();
+    // The second click of the double already placed a point on top of the
+    // first one's; drop it rather than leaving a zero-length segment.
+    if (w && w.path.length > 2) {
+      var a = w.path[w.path.length - 1].at, b = w.path[w.path.length - 2].at;
+      if (Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9) w.path.pop();
+    }
+    finishWire();
+    draw();
+    return;
+  }
   var g = guideAt(localPoint(e));
   if (g) { removeGuide(g); draw(); }
 });
@@ -1898,6 +2219,113 @@ cv.addEventListener('wheel', function (e) {
   var p = localPoint(e);
   zoomAt(p.x, p.y, e.deltaY < 0 ? 1.12 : 1 / 1.12);
 }, { passive: false });
+
+/* --------------------------------------------------------------------------
+   Drawing a wire
+   --------------------------------------------------------------------------
+   Click to place a point, double-click to finish, Escape to abandon.
+
+   Between clicks the next point is pulled onto a horizontal, a vertical or a
+   45-degree diagonal from the point before it, because that is what wiring
+   actually looks like when it is done tidily -- and because a run that is one
+   degree off square is invisible on screen and obvious on the plate.
+
+   The angle snap is checked BEFORE the grid, then the result is re-snapped
+   along the locked axis. Doing it the other way round lets the grid pull a
+   point a fraction off the line it was just locked to.
+   -------------------------------------------------------------------------- */
+var ANGLE_TOL_PX = 10;
+var wireDraw = null;    // { wire: <wire>, live: [x,y] } while drawing
+
+function snapAngle(from, x, y) {
+  var tol = ANGLE_TOL_PX / view.scale;
+  var dx = x - from[0], dy = y - from[1];
+
+  if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) return [from[0], from[1]];
+  if (Math.abs(dx) <= tol) return [from[0], snap(y)];
+  if (Math.abs(dy) <= tol) return [snap(x), from[1]];
+
+  if (Math.abs(Math.abs(dx) - Math.abs(dy)) <= tol) {
+    // Lock to 45 degrees by taking the longer run and mirroring it.
+    var run = snap(Math.max(Math.abs(dx), Math.abs(dy)));
+    return [from[0] + (dx < 0 ? -run : run), from[1] + (dy < 0 ? -run : run)];
+  }
+  return [snap(x), snap(y)];
+}
+
+/* Where a wire meets a component: the nearest point on its outline. Starting
+   or ending a run on a board should attach to the board, so that moving the
+   board later takes the wire with it rather than stranding it. */
+function anchorFor(x, y) {
+  var best = null;
+  for (var i = 0; i < doc.components.length; i++) {
+    var c = doc.components[i];
+    var x0 = c.at[0], y0 = c.at[1], x1 = x0 + c.size[0], y1 = y0 + c.size[1];
+    if (x < x0 || x > x1 || y < y0 || y > y1) continue;
+
+    // Inside it: push out to whichever edge is closest.
+    var dl = x - x0, dr = x1 - x, db = y - y0, dt = y1 - y;
+    var m = Math.min(dl, dr, db, dt);
+    var at = (m === dl) ? [x0, y] : (m === dr) ? [x1, y] : (m === db) ? [x, y0] : [x, y1];
+    if (!best || m < best.d) best = { d: m, of: c.id, at: at };
+  }
+  return best ? { of: best.of, at: [snap(best.at[0]), snap(best.at[1])] } : null;
+}
+
+function startWire(x, y) {
+  snapshot();
+  var taken = {};
+  var i;
+  for (i = 0; i < doc.components.length; i++) taken[doc.components[i].id] = true;
+  for (i = 0; i < doc.bosses.length; i++) taken[doc.bosses[i].id] = true;
+  for (i = 0; i < doc.wires.length; i++) taken[doc.wires[i].id] = true;
+
+  var w = normWire({ colour: WIRE_PALETTE[doc.wires.length % WIRE_PALETTE.length] },
+                   taken, makeIdSet(doc.components));
+  var a = anchorFor(x, y);
+  w.path = [a ? { at: a.at, of: a.of } : { at: [snap(x), snap(y)] }];
+  doc.wires.push(w);
+  wireDraw = { id: w.id, live: w.path[0].at.slice() };
+  select('wire', w.id);
+}
+
+function addWirePoint(x, y) {
+  var w = drawingWire();
+  if (!w) return;
+  var last = w.path[w.path.length - 1].at;
+  var pt = snapAngle(last, x, y);
+  if (Math.abs(pt[0] - last[0]) < 1e-9 && Math.abs(pt[1] - last[1]) < 1e-9) return;
+
+  var a = anchorFor(pt[0], pt[1]);
+  w.path.push(a ? { at: a.at, of: a.of } : { at: pt });
+}
+
+function drawingWire() {
+  return wireDraw ? findIn(doc.wires, wireDraw.id) : null;
+}
+
+/* A wire needs two points to be a wire. One point is an abandoned gesture, so
+   finishing on one throws it away rather than leaving a dot on the plate. */
+function finishWire() {
+  var w = drawingWire();
+  wireDraw = null;
+  if (!w) return;
+  if (w.path.length < 2) {
+    doc.wires.splice(doc.wires.indexOf(w), 1);
+    deselect();
+  }
+  syncControls();
+  scheduleSave();
+}
+
+function cancelWire() {
+  var w = drawingWire();
+  wireDraw = null;
+  if (w) {
+    doc.wires.splice(doc.wires.indexOf(w), 1);
+    deselect();
+  }
+}
 
 /* Snap a dragged boss onto the centre line of a boss holding the same thing.
 
@@ -1976,6 +2404,26 @@ function shiftBosses(list, dx, dy) {
   }
 }
 
+/* Wire ends attached to a component, captured when its drag starts. */
+function carriedPoints(componentId) {
+  var out = [];
+  for (var i = 0; i < doc.wires.length; i++) {
+    var path = doc.wires[i].path;
+    for (var k = 0; k < path.length; k++) {
+      if (path[k].of === componentId) out.push(path[k]);
+    }
+  }
+  return out;
+}
+
+function shiftPoints(list, dx, dy) {
+  if (!list || (!dx && !dy)) return;
+  for (var i = 0; i < list.length; i++) {
+    list[i].at[0] += dx;
+    list[i].at[1] += dy;
+  }
+}
+
 /* An attached boss is as tall as the standoff of the component it holds.
    Called wherever either number could have changed. */
 function syncBossHeights() {
@@ -2044,10 +2492,7 @@ window.addEventListener('keydown', function (e) {
 
   if (e.key === 'Escape') {
     measure.a = measure.b = measure.live = null;
-    if (measure.on) {
-      measure.on = false;
-      measureBtn.classList.remove('active');
-    }
+    if (tool !== 'select') setTool('select');
     deselect();
     syncControls();
     draw();
@@ -2100,13 +2545,8 @@ document.getElementById('fitBtn').onclick = function () {
 };
 
 var measureBtn = document.getElementById('measureBtn');
-measureBtn.onclick = function () {
-  measure.on = !measure.on;
-  measure.a = measure.b = measure.live = null;
-  if (measure.on) { deselect(); syncControls(); }
-  measureBtn.classList.toggle('active', measure.on);
-  draw();
-};
+measureBtn.onclick = function () { setTool('measure'); };
+wireBtn.onclick = function () { setTool('wire'); };
 
 var dimsBtn = document.getElementById('dimsBtn');
 dimsBtn.onclick = function () {
@@ -2175,6 +2615,7 @@ function syncControls() {
   compFields.hidden = !c;
   compEmpty.hidden = !!c;
   syncBossControls();
+  syncWireControls();
   if (c) {
     F.name.value = c.name;
     F.x.value = round2(c.at[0]);
@@ -2292,6 +2733,7 @@ document.getElementById('dupCompBtn').onclick = function () {
 
 function deleteSelected() {
   if (sel.kind === 'boss') { deleteBoss(); return; }
+  if (sel.kind === 'wire') { deleteWire(); return; }
   var c = selectedComponent();
   if (!c) return;
   snapshot();
@@ -2300,6 +2742,14 @@ function deleteSelected() {
   // bosses, because the holes are still in the plate you are about to print.
   for (var i = 0; i < doc.bosses.length; i++) {
     if (doc.bosses[i].of === c.id) doc.bosses[i].of = null;
+  }
+  // Wire ends stay exactly where they are and simply stop following anything,
+  // which is why the path holds world coordinates rather than local offsets.
+  for (var k = 0; k < doc.wires.length; k++) {
+    var path = doc.wires[k].path;
+    for (var m = 0; m < path.length; m++) {
+      if (path[m].of === c.id) delete path[m].of;
+    }
   }
   deselect();
   syncControls();
@@ -2806,6 +3256,111 @@ document.getElementById('newBtn').onclick = function () {
 
 
 /* --------------------------------------------------------------------------
+   The wire panel
+   -------------------------------------------------------------------------- */
+var wireFields = document.getElementById('wireFields');
+var wireEmpty = document.getElementById('wireEmpty');
+var WF = {
+  name: document.getElementById('wireName'),
+  awg: document.getElementById('wireAwg'),
+  od: document.getElementById('wireOd'),
+  slack: document.getElementById('wireSlack'),
+  colour: document.getElementById('wireColour')
+};
+
+/* --------------------------------------------------------------------------
+   How long a wire actually needs to be
+   --------------------------------------------------------------------------
+   Reported as its parts rather than as one number, because the point of it is
+   to tell you which jumper to reach for, and a total you cannot see inside is
+   a total you cannot check.
+
+   The flat run is the path on the plate. The climbs are the standoffs at each
+   attached end -- the wire has to get up to a pin sitting that far above the
+   plate. Slack is whatever you want spare.
+
+   It is labelled "at least", and it means it: the climbs over retainers are
+   not in here because retainers do not exist yet. They can only add. A
+   readout that quietly under-reports is worse than none, because you would
+   cut to it.
+   -------------------------------------------------------------------------- */
+function wireLength(w) {
+  var flat = 0, i;
+  for (i = 1; i < w.path.length; i++) {
+    var a = w.path[i - 1].at, b = w.path[i].at;
+    flat += Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
+  }
+
+  var climb = 0;
+  for (i = 0; i < w.path.length; i++) {
+    if (!w.path[i].of) continue;
+    var c = findIn(doc.components, w.path[i].of);
+    if (c) climb += c.standoff;
+  }
+
+  return { flat: flat, climb: climb, slack: w.slack, total: flat + climb + w.slack };
+}
+
+function syncWireControls() {
+  var w = selectedWire();
+  wireFields.hidden = !w;
+  wireEmpty.hidden = !!w;
+
+  fillSelect(WF.awg, AWGS, function (a) { return String(a); }, w ? w.awg : 24);
+  if (!w) return;
+
+  WF.name.value = w.name;
+  WF.od.value = round2(w.od);
+  WF.slack.value = w.slack;
+  WF.colour.value = w.colour;
+
+  var L = wireLength(w);
+  document.getElementById('lengthBreakdown').innerHTML =
+    '<b style="color:#f4f4f2">' + t('lenTotal') + ' ' + mm(L.total / 10, 1) + ' cm</b><br>'
+    + t('lenFlat') + ' ' + mm(L.flat, 1) + ' \u00b7 '
+    + t('lenClimb') + ' ' + mm(L.climb, 1) + ' \u00b7 '
+    + t('lenSlack') + ' ' + mm(L.slack, 1) + ' mm<br>'
+    + '<span style="color:#6b6b76">' + t('lenPending') + '</span>';
+}
+
+function onWireField() {
+  if (syncing) return;
+  var w = selectedWire();
+  if (!w) return;
+  var wasAwg = w.awg;
+  w.name = WF.name.value.slice(0, 40);
+  w.awg = AWGS.indexOf(parseInt(WF.awg.value, 10)) >= 0 ? parseInt(WF.awg.value, 10) : w.awg;
+  // Changing the gauge offers its default diameter; typing a diameter keeps it.
+  w.od = (w.awg !== wasAwg) ? odForAwg(w.awg) : Math.max(0.1, num(WF.od, w.od));
+  w.slack = Math.max(0, num(WF.slack, w.slack));
+  w.colour = colourOr(WF.colour.value, w.colour);
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+for (var wKey in WF) {
+  if (Object.prototype.hasOwnProperty.call(WF, wKey)) {
+    WF[wKey].addEventListener('input', onWireField);
+    WF[wKey].addEventListener('change', onWireField);
+    WF[wKey].addEventListener('focus', snapshot);
+  }
+}
+
+function deleteWire() {
+  var w = selectedWire();
+  if (!w) return;
+  snapshot();
+  doc.wires.splice(doc.wires.indexOf(w), 1);
+  deselect();
+  syncControls();
+  scheduleSave();
+  draw();
+}
+document.getElementById('delWireBtn').onclick = deleteWire;
+
+
+/* --------------------------------------------------------------------------
    Export
    -------------------------------------------------------------------------- */
 var triCount = document.getElementById('triCount');
@@ -2946,6 +3501,17 @@ function applyLang() {
   document.getElementById('clearanceWarn').textContent = t('clearanceWarn');
   document.getElementById('couponBtn').textContent = t('coupon');
 
+  document.getElementById('ttWires').textContent = t('wires');
+  document.getElementById('wireEmpty').textContent = t('noWire');
+  document.getElementById('lbWireName').textContent = t('wireName');
+  document.getElementById('lbAwg').textContent = t('awg');
+  document.getElementById('lbOd').textContent = t('od');
+  document.getElementById('lbSlack').textContent = t('slack');
+  document.getElementById('lbWireColour').textContent = t('colour');
+  document.getElementById('delWireBtn').textContent = t('remove');
+  document.getElementById('wireNote').textContent = t('wireNote');
+  tip('wireBtn', t('wires'));
+
   document.getElementById('ttProfile').textContent = t('profile');
   document.getElementById('lbWall').textContent = t('wall');
   document.getElementById('lbHoleDia').textContent = t('holeDia');
@@ -3080,6 +3646,7 @@ makeCollapsible('projectPanel', true);
 makeCollapsible('platePanel', false);
 makeCollapsible('compPanel', true);
 makeCollapsible('bossPanel', true);
+makeCollapsible('wirePanel', true);
 makeCollapsible('profilePanel', false);
 makeCollapsible('exportPanel', true);
 makeCollapsible('viewPanel', false);

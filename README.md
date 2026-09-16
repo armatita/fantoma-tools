@@ -292,7 +292,13 @@ The print profile carries the hole sizes, and each one says where it came from
 self-tap pilots are measured, from the sweeps in `print_tests/`. Nothing is
 promoted to measured without you measuring it.
 
-Wires are phase 2.
+**Phase 2 is built too**: wires drawn point by point with snapping to square
+and 45°, ends that attach to the component they start on, colour, name, AWG
+and outside diameter, drawn at their real width so congestion is visible. The
+length readout gives its parts and says plainly that retainer climbs are not
+in it yet.
+
+Retainers — the tunnels and clips that hold the wires down — are phase 3.
 
 ---
 
