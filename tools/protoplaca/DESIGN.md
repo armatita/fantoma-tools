@@ -434,6 +434,29 @@ answer, and the final say is yours regardless.
 
 ---
 
+## Witness lines
+
+The diagram echoed on the plate: the outline of every component and the route
+of every wire, raised a few tenths of a millimetre. A bare print then tells you
+where each board sits and which way each wire runs *before* anything is on it,
+which is the moment you most need to know.
+
+They reuse the box-per-stroke the lettering already uses, so they inherit its
+overlap rule and cost no new machinery.
+
+**A wire's line breaks wherever a retainer sits.** A line under a wire lifts
+the wire off the plate, and the tunnel over it has only the profile's slack to
+give -- a 0.3 mm rib through 0.4 mm of clearance eats most of it. Breaking the
+line reads correctly as well as measuring correctly: the retainer already marks
+that stretch, so a line through it would say the same thing twice and charge
+the wire for it.
+
+Component outlines need no such break. Nothing lies in the gap between a board
+and the plate, because the board is up on its standoffs.
+
+On by default, with the relief adjustable, and switchable off for anyone who
+would rather have a bare plate.
+
 ## Retainer geometry
 
 A retainer is one cross-section swept a short way along the wire. The section

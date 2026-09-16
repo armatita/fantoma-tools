@@ -460,6 +460,15 @@
           <select id="profRoof"></select>
         </div>
         <div class="field">
+          <label for="profMarks" id="lbMarks"></label>
+          <select id="profMarks"></select>
+        </div>
+        <div class="field narrow">
+          <label for="profMarkHeight" id="lbMarkHeight"></label>
+          <input type="number" id="profMarkHeight" inputmode="decimal" step="0.1" min="0.1">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field">
           <label for="profSource" id="lbProfSource"></label>
         </div>
         <input type="text" id="profSource" maxlength="80" style="width:100%">
@@ -557,6 +566,10 @@ var STRINGS = {
     roof: 'Roof',
     roofArch: 'Arched',
     roofSquare: 'Square',
+    marks: 'Witness lines',
+    markHeight: 'Line relief',
+    on: 'On',
+    off: 'Off',
     texts: 'Text',
     addText: 'Add text',
     txtString: 'Text',
@@ -718,6 +731,10 @@ var STRINGS = {
     roof: 'Tecto',
     roofArch: 'Em arco',
     roofSquare: 'Quadrado',
+    marks: 'Linhas de refer\u00eancia',
+    markHeight: 'Relevo da linha',
+    on: 'Ligadas',
+    off: 'Desligadas',
     texts: 'Texto',
     addText: 'Adicionar texto',
     txtString: 'Texto',
@@ -918,6 +935,13 @@ function defaultProfile() {
     retLen: 6,            // how far a retainer runs along the wire
     roof: 'arch',         // 'arch' or 'square'
     maxBridge: 20,        // measured: the longest span that prints unsupported
+
+    // Witness lines: the diagram echoed on the plate, so a bare print tells
+    // you where everything goes before anything is on it.
+    marks: true,
+    markWidth: 0.6,
+    markHeight: 0.3,
+
     holes: {
       // size:   [ self-tap, heat-set insert, clearance ]
       M1_4:{ selftap: 1.1,  insert: 2.6, clearance: 1.6 },
@@ -1157,6 +1181,9 @@ function normProfile(raw) {
   out.retLen = numOr(out.retLen, d.retLen, 1, 60);
   out.roof = (out.roof === 'square') ? 'square' : 'arch';
   out.maxBridge = numOr(out.maxBridge, d.maxBridge, 1, 200);
+  out.marks = (out.marks !== false);
+  out.markWidth = numOr(out.markWidth, d.markWidth, 0.2, 5);
+  out.markHeight = numOr(out.markHeight, d.markHeight, 0.1, 5);
   out.source = typeof out.source === 'string' ? out.source.slice(0, 80) : d.source;
   var holes = copyInto({}, (raw && raw.holes) || {});
   for (var i = 0; i < SIZES.length; i++) {
@@ -4040,6 +4067,8 @@ function buildMesh() {
 
   if (!plateMesh(out)) return null;
 
+  markMesh(out);
+
   for (var x = 0; x < doc.texts.length; x++) textMesh(out, doc.texts[x]);
 
   for (var rr = 0; rr < doc.retainers.length; rr++) {
@@ -4398,6 +4427,121 @@ function retainerMesh(out, r) {
   }
   return sweepSection(out, tunnelSection(od + clear * 2, od + clear * 2, wall, doc.profile.roof),
                       pose.at, pose.dir, len, z0 + lift);
+}
+
+
+/* --------------------------------------------------------------------------
+   Witness lines
+   --------------------------------------------------------------------------
+   The diagram, echoed on the plate: the outline of every component and the
+   route of every wire, raised a fraction of a millimetre. A bare print then
+   tells you where each board sits and which way each wire runs, before
+   anything is on it -- which is the moment you most need to know.
+
+   They are drawn with the same box-per-stroke the lettering uses, so they
+   inherit its overlap rule and cost no new machinery.
+
+   THE ONE COMPLICATION. A line under a wire lifts the wire off the plate, and
+   the tunnel over it only has the profile's slack to give -- a 0.3 mm rib
+   through a 0.4 mm clearance eats most of it. So a wire's line BREAKS wherever
+   a retainer sits. That looks right as well as measuring right: the retainer
+   is already marking that stretch, so a line through it would be saying the
+   same thing twice and charging the wire for it.
+   -------------------------------------------------------------------------- */
+function pathLength(w) {
+  var total = 0;
+  for (var i = 1; i < w.path.length; i++) {
+    total += Math.hypot(w.path[i].at[0] - w.path[i - 1].at[0],
+                        w.path[i].at[1] - w.path[i - 1].at[1]);
+  }
+  return total;
+}
+
+function pointAtLength(w, s) {
+  var run = 0;
+  for (var i = 1; i < w.path.length; i++) {
+    var a = w.path[i - 1].at, b = w.path[i].at;
+    var len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (run + len >= s || i === w.path.length - 1) {
+      var f = len ? Math.max(0, Math.min(1, (s - run) / len)) : 0;
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+    }
+    run += len;
+  }
+  return w.path[w.path.length - 1].at.slice();
+}
+
+/* The stretches of a wire a retainer is standing on, as arc length. */
+function blockedRanges(w) {
+  var total = pathLength(w);
+  var out = [];
+  for (var i = 0; i < doc.retainers.length; i++) {
+    var r = doc.retainers[i];
+    if (r.wire !== w.id) continue;
+    var pose = retainerPose(r);
+    if (!pose) continue;
+    var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
+    var pad = numOr(doc.profile.markWidth, 0.6);
+    var c = r.t * total;
+    out.push([c - len / 2 - pad, c + len / 2 + pad]);
+  }
+  out.sort(function (a, b) { return a[0] - b[0]; });
+  return out;
+}
+
+function markMesh(out) {
+  if (doc.profile.marks === false) return;
+
+  var wdt = numOr(doc.profile.markWidth, 0.6);
+  var z0 = doc.plate.thickness - WELD;
+  var z1 = doc.plate.thickness + numOr(doc.profile.markHeight, 0.3);
+  var i, k;
+
+  // Component outlines. Nothing lies in the gap between board and plate, so
+  // these need no interruption.
+  for (i = 0; i < doc.components.length; i++) {
+    var c = doc.components[i];
+    var x0 = c.at[0], y0 = c.at[1], x1 = x0 + c.size[0], y1 = y0 + c.size[1];
+    var box = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    for (k = 0; k < 4; k++) {
+      strokeBox(out, box[k], box[(k + 1) % 4], wdt, z0, z1);
+    }
+  }
+
+  // Wire routes, minus whatever a retainer is already standing on.
+  for (i = 0; i < doc.wires.length; i++) {
+    var w = doc.wires[i];
+    if (w.path.length < 2) continue;
+    var total = pathLength(w);
+    if (total <= 0) continue;
+
+    var blocked = blockedRanges(w);
+    var cursor = 0;
+    for (k = 0; k <= blocked.length; k++) {
+      var stop = (k < blocked.length) ? Math.min(total, blocked[k][0]) : total;
+      if (stop > cursor + 0.05) emitRun(out, w, cursor, stop, wdt, z0, z1);
+      if (k < blocked.length) cursor = Math.max(cursor, blocked[k][1]);
+      if (cursor >= total) break;
+    }
+  }
+}
+
+/* One stretch of a wire's route, following its corners rather than cutting
+   across them. */
+function emitRun(out, w, from, to, wdt, z0, z1) {
+  var pts = [pointAtLength(w, from)];
+  var run = 0;
+  for (var i = 1; i < w.path.length; i++) {
+    var a = w.path[i - 1].at, b = w.path[i].at;
+    run += Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (run > from && run < to) pts.push(b.slice());
+  }
+  pts.push(pointAtLength(w, to));
+
+  for (var k = 1; k < pts.length; k++) {
+    if (Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]) < 0.05) continue;
+    strokeBox(out, pts[k - 1], pts[k], wdt, z0, z1);
+  }
 }
 
 
@@ -4761,6 +4905,8 @@ var profWireClear = document.getElementById('profWireClear');
 var profRetWall = document.getElementById('profRetWall');
 var profRetLen = document.getElementById('profRetLen');
 var profRoof = document.getElementById('profRoof');
+var profMarks = document.getElementById('profMarks');
+var profMarkHeight = document.getElementById('profMarkHeight');
 
 function syncRetainerControls() {
   var r = selectedRetainer();
@@ -4772,6 +4918,9 @@ function syncRetainerControls() {
              function (k) { return t(k === 'arch' ? 'roofArch' : 'roofSquare'); },
              doc.profile.roof);
 
+  fillSelect(profMarks, ['on', 'off'], function (k) { return t(k); },
+             doc.profile.marks === false ? 'off' : 'on');
+  profMarkHeight.value = doc.profile.markHeight;
   profWireClear.value = doc.profile.wireClear;
   profRetWall.value = doc.profile.retWall;
   profRetLen.value = doc.profile.retLen;
@@ -4809,10 +4958,12 @@ function onRetProfile() {
   doc.profile.retWall = Math.max(0.4, num(profRetWall, doc.profile.retWall));
   doc.profile.retLen = Math.max(1, num(profRetLen, doc.profile.retLen));
   doc.profile.roof = profRoof.value === 'square' ? 'square' : 'arch';
+  doc.profile.marks = profMarks.value !== 'off';
+  doc.profile.markHeight = Math.max(0.1, num(profMarkHeight, doc.profile.markHeight));
   scheduleSave();
   draw();
 }
-[profWireClear, profRetWall, profRetLen, profRoof].forEach(function (el) {
+[profWireClear, profRetWall, profRetLen, profRoof, profMarks, profMarkHeight].forEach(function (el) {
   el.addEventListener('input', onRetProfile);
   el.addEventListener('change', onRetProfile);
   el.addEventListener('focus', snapshot);
@@ -5066,6 +5217,8 @@ function applyLang() {
   document.getElementById('lbRetWall').textContent = t('retWall');
   document.getElementById('lbRetLen').textContent = t('retLenLbl');
   document.getElementById('lbRoof').textContent = t('roof');
+  document.getElementById('lbMarks').textContent = t('marks');
+  document.getElementById('lbMarkHeight').textContent = t('markHeight');
 
   document.getElementById('ttTexts').textContent = t('texts');
   document.getElementById('addTextBtn').textContent = t('addText');
