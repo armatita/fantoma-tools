@@ -696,6 +696,24 @@ headings hit it with their chevron.
   Eighteen near-identical rings become a labelled grid, which is what lets the
   coupon work before there is any way to emboss text on a plate.
 
+### Light or dark, for the drawing only
+
+The panels stay dark, as the rest of the tools in this repo are. The drawing is
+the part you stare at, and a plate is a white thing in real life, so it gets a
+switch of its own on the toolbar, remembered per browser.
+
+**Shapes keep exactly the colour they were given.** A colour someone chose
+means something, and quietly altering it would be worse than letting a pale
+wire look pale. Two things make that survivable:
+
+- **A casing under every wire**, in the theme's ink rather than the wire's own
+  colour. A white wire on a white plate is otherwise invisible; this gives it
+  an edge without touching it.
+- **Labels are pushed toward the ink until they can be read**, keeping their
+  hue. A label is a readout *about* the shape rather than the shape, so it may
+  be adjusted where the shape may not. That is why a component's fill and
+  border look identical between themes while its name does not.
+
 ### Aligning bosses
 
 Dragging a boss snaps it onto the centre line of another boss **holding the same

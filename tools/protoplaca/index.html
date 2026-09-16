@@ -142,6 +142,9 @@
         <button type="button" class="tool" id="crosshairBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5v5M10 12.5v5M2.5 10h5M12.5 10h5"/><circle cx="10" cy="10" r="2.4"/></svg>
         </button>
+        <button type="button" class="tool" id="themeBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6.6"/><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none"/></svg>
+        </button>
         <button type="button" class="tool" id="dimsBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="12" height="7"/><path d="M4 14.5h12M4 13v3M16 13v3"/></svg>
         </button>
@@ -604,6 +607,7 @@ var STRINGS = {
     measure: 'Measure',
     crosshair: 'Crosshair',
     dimensions: 'Dimensions',
+    theme: 'Light or dark',
     align: 'Align bosses',
     clearGuides: 'Clear guides',
     zoom: 'Zoom',
@@ -743,6 +747,7 @@ var STRINGS = {
     measure: 'Medir',
     crosshair: 'Mira',
     dimensions: 'Dimens\u00f5es',
+    theme: 'Claro ou escuro',
     align: 'Alinhar bossas',
     clearGuides: 'Limpar guias',
     zoom: 'Ampliação',
@@ -1246,6 +1251,30 @@ function redo() { restore(redoStack, undoStack); }
    -------------------------------------------------------------------------- */
 var HANDLE = 7;           // px, square side
 
+/* A colour to write a LABEL in.
+
+   Shapes keep exactly the colour they were given -- that is the user's choice
+   and it means something. A label is a readout about the shape, not the shape,
+   so it may be pushed toward the ink until it can be read: a near-white wire
+   name is invisible on a pale plate, and a near-black one would be on a dark
+   plate. The hue is kept, so the label still reads as belonging to its wire.
+
+   This is why a component's fill and border look untouched between themes
+   while its name does not. */
+function labelInk(hex) {
+  var n = parseInt(hex.slice(1), 16);
+  var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  var lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+  var mix = 0, toward = 0;
+  if (themeName === 'light' && lum > 0.55) { mix = (lum - 0.55) / 0.45 * 0.75; toward = 0; }
+  else if (themeName === 'dark' && lum < 0.30) { mix = (0.30 - lum) / 0.30 * 0.7; toward = 255; }
+  if (!mix) return hex;
+
+  function f(v) { return Math.round(v + (toward - v) * mix); }
+  return 'rgb(' + f(r) + ',' + f(g) + ',' + f(b) + ')';
+}
+
 function withAlpha(hex, alpha) {
   var n = parseInt(hex.slice(1), 16);
   return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
@@ -1372,8 +1401,18 @@ function drawComponents() {
     for (var k = 0; k < lines.length; k++) {
       ctx.font = (k === 0 && c.name ? '11px' : '10px')
         + ' ui-monospace, Menlo, Consolas, monospace';
-      ctx.fillStyle = (k === 0 && c.name) ? c.colour : withAlpha(c.colour, 0.75);
-      ctx.fillText(fitLabel(lines[k], r.w - 8), cx, top + k * lineH);
+      var shown = fitLabel(lines[k], r.w - 8);
+      // Over its own translucent fill, a label in the same colour has almost
+      // nothing to read against. The halo gives it a background of its own.
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = COL.halo;
+      ctx.strokeText(shown, cx, top + k * lineH);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = labelInk(c.colour);
+      ctx.globalAlpha = (k === 0 && c.name) ? 1 : 0.75;
+      ctx.fillText(shown, cx, top + k * lineH);
+      ctx.globalAlpha = 1;
     }
   }
 }
@@ -1403,7 +1442,7 @@ function drawBosses() {
     ctx.arc(cx, cy, outer, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = COL.bg;
+    ctx.fillStyle = COL.hole;
     ctx.beginPath();
     ctx.arc(cx, cy, hole, 0, Math.PI * 2);
     ctx.fill();
@@ -1453,15 +1492,26 @@ function drawWires() {
     var pts = wirePoints(w);
     var live = (wireDraw && wireDraw.id === w.id) ? wireDraw.live : null;
 
-    ctx.strokeStyle = w.colour;
-    ctx.lineWidth = Math.max(1.5, w.od * view.scale);
+    var lw = Math.max(1.5, w.od * view.scale);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.85;
 
     ctx.beginPath();
     ctx.moveTo(sx(pts[0][0]), sy(pts[0][1]));
     for (var k = 1; k < pts.length; k++) ctx.lineTo(sx(pts[k][0]), sy(pts[k][1]));
+
+    /* A casing under the wire, in the theme's ink rather than the wire's own
+       colour. A white wire on a white plate is otherwise invisible, and the
+       alternative -- quietly darkening a colour someone picked to mean
+       something -- would be worse. This adds an edge without touching it. */
+    ctx.strokeStyle = COL.casing;
+    ctx.lineWidth = lw + 2.5;
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+
+    ctx.strokeStyle = w.colour;
+    ctx.lineWidth = lw;
+    ctx.globalAlpha = 0.85;
     ctx.stroke();
 
     if (live) {
@@ -1515,10 +1565,10 @@ function drawWires() {
       // A halo, so the name reads over its own wire, a component, or the grid.
       ctx.lineJoin = 'round';
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(13,13,18,0.9)';
+      ctx.strokeStyle = COL.halo;
       ctx.strokeText(w.name, tx, ty);
       ctx.lineWidth = 1;
-      ctx.fillStyle = w.colour;
+      ctx.fillStyle = labelInk(w.colour);
       ctx.fillText(w.name, tx, ty);
     }
   }
@@ -1675,27 +1725,88 @@ window.addEventListener('resize', draw);
 /* --------------------------------------------------------------------------
    Drawing
    -------------------------------------------------------------------------- */
-var COL = {
-  bg: '#14141a',
-  plate: '#1e1e28',
-  gridDim: 'rgba(255,255,255,0.045)',
-  gridDimMajor: 'rgba(255,255,255,0.085)',
-  grid: 'rgba(255,255,255,0.075)',
-  gridMajor: 'rgba(255,255,255,0.16)',
-  plateEdge: '#6f6f80',
-  axis: '#4dd8ff',
-  ruler: '#101016',
-  rulerEdge: '#2b2b36',
-  tick: '#4a4a58',
-  label: '#8a8a96',
-  guide: '#ffb648',
-  measure: '#4dd8ff',
-  select: '#f4f4f2',
-  align: '#5ee88f',
-  boss: '#c8c6c9',
-  text: '#e8e6e3',
-  crosshair: 'rgba(244,244,242,0.30)'
+/* --------------------------------------------------------------------------
+   Two palettes for the drawing
+   --------------------------------------------------------------------------
+   The panels stay dark, as the rest of the tools in this repo are. The drawing
+   is the part you stare at, and a plate is a white thing in real life, so it
+   gets a choice.
+
+   Everything the canvas paints reads its colour from here, including the two
+   that used to be written into the drawing code -- the plaque backing and the
+   halo behind a wire's name -- because a dark backing on a pale plate is a
+   black box sitting in the middle of the drawing.
+
+   Component, wire and text colours are NOT themed. They are the user's, and
+   silently altering a colour someone chose to mean something would be worse
+   than letting a pale wire look pale on pale.
+   -------------------------------------------------------------------------- */
+var THEMES = {
+  dark: {
+    bg: '#14141a',
+    plate: '#1e1e28',
+    hole: '#0d0d12',
+    gridDim: 'rgba(255,255,255,0.045)',
+    gridDimMajor: 'rgba(255,255,255,0.085)',
+    grid: 'rgba(255,255,255,0.075)',
+    gridMajor: 'rgba(255,255,255,0.16)',
+    plateEdge: '#6f6f80',
+    axis: '#4dd8ff',
+    ruler: '#101016',
+    rulerEdge: '#2b2b36',
+    tick: '#4a4a58',
+    label: '#8a8a96',
+    guide: '#ffb648',
+    measure: '#4dd8ff',
+    select: '#f4f4f2',
+    boss: '#c8c6c9',
+    text: '#e8e6e3',
+    align: '#5ee88f',
+    crosshair: 'rgba(244,244,242,0.30)',
+    plaqueBg: 'rgba(13,13,18,0.88)',
+    plaqueInk: '#f4f4f2',
+    halo: 'rgba(13,13,18,0.9)',
+    // Ink, not background: this goes UNDER a wire to give it an edge.
+    casing: 'rgba(6,6,10,0.7)'
+  },
+  light: {
+    bg: '#e6e6e3',
+    plate: '#ffffff',
+    hole: '#cfcfcc',
+    gridDim: 'rgba(0,0,0,0.05)',
+    gridDimMajor: 'rgba(0,0,0,0.10)',
+    grid: 'rgba(0,0,0,0.07)',
+    gridMajor: 'rgba(0,0,0,0.17)',
+    plateEdge: '#7b7b86',
+    axis: '#0b86c6',
+    ruler: '#d6d6d2',
+    rulerEdge: '#b4b4b0',
+    tick: '#8e8e94',
+    label: '#4a4a52',
+    guide: '#b26a00',
+    measure: '#0b86c6',
+    select: '#1a1a20',
+    boss: '#6c6c74',
+    text: '#2e2e36',
+    align: '#1a8f4c',
+    crosshair: 'rgba(0,0,0,0.32)',
+    plaqueBg: 'rgba(255,255,255,0.92)',
+    plaqueInk: '#1a1a20',
+    halo: 'rgba(255,255,255,0.9)',
+    casing: 'rgba(42,42,52,0.6)'
+  }
 };
+
+var COL = THEMES.dark;
+var themeName = 'dark';
+
+function setCanvasTheme(name) {
+  themeName = THEMES[name] ? name : 'dark';
+  COL = THEMES[themeName];
+  document.getElementById('stage').style.background = COL.bg;
+  themeBtn.classList.toggle('active', themeName === 'light');
+}
+
 
 /* A "nice" step is one a person reads without counting: 1, 2, 5 and their
    decades. Pick the smallest one that leaves at least minPx between lines. */
@@ -1919,7 +2030,7 @@ function plaque(lines, x, y, colour, swatch) {
   x = Math.min(Math.max(x, plot.x0 + 2), plot.x1 - boxW - 2);
   y = Math.min(Math.max(y, plot.y0 + 2), plot.y1 - boxH - 2);
 
-  ctx.fillStyle = 'rgba(13,13,18,0.88)';
+  ctx.fillStyle = COL.plaqueBg;
   ctx.fillRect(x, y, boxW, boxH);
   ctx.strokeStyle = colour || COL.measure;
   ctx.lineWidth = 1;
@@ -1937,7 +2048,7 @@ function plaque(lines, x, y, colour, swatch) {
       ctx.fill();
       tx += dot;
     }
-    ctx.fillStyle = '#f4f4f2';
+    ctx.fillStyle = COL.plaqueInk;
     ctx.fillText(lines[i], tx, ty);
   }
 }
@@ -2777,6 +2888,13 @@ document.getElementById('fitBtn').onclick = function () {
 var measureBtn = document.getElementById('measureBtn');
 measureBtn.onclick = function () { setTool('measure'); };
 wireBtn.onclick = function () { setTool('wire'); };
+
+var themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick = function () {
+  setCanvasTheme(themeName === 'light' ? 'dark' : 'light');
+  store.set('canvasTheme', themeName);
+  draw();
+};
 
 var dimsBtn = document.getElementById('dimsBtn');
 dimsBtn.onclick = function () {
@@ -4403,6 +4521,7 @@ function applyLang() {
   tip('fitBtn', t('fit'));
   tip('crosshairBtn', t('crosshair'));
   tip('dimsBtn', t('dimensions'));
+  tip('themeBtn', t('theme'));
   tip('alignBtn', t('align'));
   tip('measureBtn', t('measure'));
   tip('clearGuidesBtn', t('clearGuides'));
@@ -4432,6 +4551,8 @@ crosshairBtn.classList.toggle('active', crosshair);
 
 showDims = store.get('showDims') === true;
 dimsBtn.classList.toggle('active', showDims);
+
+setCanvasTheme(store.get('canvasTheme') === 'light' ? 'light' : 'dark');
 
 alignSnap = store.get('alignSnap') !== false;   // on unless turned off
 alignBtn.classList.toggle('active', alignSnap);
