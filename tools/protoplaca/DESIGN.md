@@ -59,8 +59,8 @@ screw the ESP32 down" without any wire handling at all.
 **Phase 3** — retainers: tunnels, clips, automatic placement and crossings.
 (built)
 **Phase 4** — the 3D tab: the mesh plus coloured wires and components, collision
-checks.
-**Phase 5** — ribs, recessed text.
+checks. (built)
+**Phase 5** — ribs.
 
 ---
 
@@ -923,6 +923,137 @@ is not chosen yet.
 
 ---
 
+## The 3D tab
+
+The diagram says where things go. The 3D tab says whether they fit — which is a
+different question, and the one a breadboard answers for free by letting you
+pick the thing up.
+
+Three layers, each switchable. **The print** is exactly what `buildMesh`
+returns, so what you turn over is the STL and not a second model that could
+drift away from it. **The components** are the boxes their three heights
+describe, drawn translucent so the bosses and wires underneath stay visible —
+the gap under a board is where the mistakes live, and a solid board hides
+precisely that. **The wires** are tubes at their real outside diameter, lying on
+the plate, climbing into a header at an anchored end and over anything a raised
+retainer lifts them across.
+
+Only the first layer is geometry the printer will ever see. The other two are
+the things that arrive in envelopes.
+
+### No three.js
+
+The model viewer next door loads three.js from a CDN. That is the right trade
+there and the wrong one here, because Protoplaca claims to work offline, and a
+page that quietly needs the network to draw half of itself is not offline.
+Vendoring the library would fix that and cost about six hundred kilobytes of
+somebody else's code in a repository of hand-written single-file tools.
+
+So the renderer is written against WebGL directly. It fits in a few hundred
+lines because it only has one job — flat-shaded triangles under an orbit camera
+— and because everything it draws is already a triangle list, which is the
+shape the STL writer wanted anyway. If the 3D tab ever needs shadows or
+outlines or a ground plane, that judgement should be made again rather than
+defended.
+
+Face normals rather than smoothed ones: every surface here is flat, and
+averaging normals at a box corner paints a gradient that reads as curvature
+which is not there. The light rides with the camera, because a light fixed in
+world space leaves you rotating the model into its own shadow. Colours are
+pushed towards linear before the shading multiplies them, or every mid tone
+comes out washed.
+
+Translucency is sorted per part, back to front, on the distance from the eye —
+coarse, and enough, because the only translucent things are component boxes and
+those are not supposed to interpenetrate. Where they do, the clash list says so.
+
+### Does it fit
+
+Everything standing on this plate is a box or is safely described by one, so
+every check is the same check: do two boxes overlap, and by how much. That is
+crude next to real interference detection, and it is the right crudeness. It
+never reports a clash that is not there, it reports the overlap as a number you
+can act on, and it runs in single-digit milliseconds so it can run on every
+edit.
+
+Five rules:
+
+1. **The space under a board belongs to that board's own bosses.** A boss the
+   component is supposed to land on is not a clash; the same boss under the
+   neighbouring component is. Anything else under a footprint — a tunnel, a
+   clip, a raised letter — is measured against the standoff and reported by how
+   much it is too tall.
+2. **Two component bodies in the same space**, footprint and height both.
+3. **A component hanging off the plate.**
+4. **Two things on the plate in the same place.** With one exception, below.
+5. **A wire with nowhere to go under a board**, tested against the height the
+   wire is actually drawn at rather than against its diameter, because a wire
+   lifted over a crossing needs the room it was lifted to.
+
+Touching is not colliding. A boss top at exactly the standoff it was built for
+would otherwise report on every plate ever drawn, which is the fastest way to
+teach somebody to ignore a warning list. Two hundredths of a millimetre of
+tolerance.
+
+The exception in rule 4 is that **two retainers on the same wire are allowed to
+merge**. They are threading one wire, the slicer unions them into a longer
+tunnel and the bore stays a bore. Two retainers on *different* wires merging is
+a real fault — the bores open into each other and a wire can leave its own
+channel — so that pair is still checked. The first version did not make this
+distinction and reported the auto-placer's own spacing as a collision. A warning
+list that flags the tool's own correct output is a warning list nobody reads.
+
+### Boxes that do not fit their contents
+
+A retainer is a rectangle turned to whatever angle its wire runs at. The first
+version took the square that would contain it at *any* angle, which is simple
+and conservative and produced five false reports on a plate with two wires on
+it. It now takes the exact axis-aligned box of the turned rectangle, which is
+still conservative on a diagonal, but by a fraction of a millimetre rather than
+by half the diagonal.
+
+Retainers are numbered within their wire for the same reason: two unnumbered
+tunnels on one wire produce two warnings that read identically, and nothing
+tells you which of the six the second one is.
+
+### The marker is the intersection
+
+A clash is drawn as a red box at exactly the overlap, which is the most useful
+place for it and the worst place to render it: every face is coplanar with a
+face that is already there, which is the one situation a depth buffer cannot
+resolve. It is grown by two tenths of a millimetre so it sits outside both, and
+it ignores the translucency sort and draws last — a warning has to be visible
+through the very board that is causing it.
+
+### What the 3D tab paid back
+
+The wire length readout carried a note saying retainer climbs were not counted
+yet. They are now, and not because anything was added to count them: the climbs
+are measured off the same three-dimensional route the tab draws. The old number
+was a sum of the standoffs at the two ends, which missed every crossing. Taking
+it from the drawn path means the readout and the picture cannot disagree, and a
+crossing added after the wire was measured changes the number the moment it
+appears.
+
+## The palette
+
+Fifteen colours, the same fifteen the model viewer offers, **copied rather than
+shared**. The model viewer reads them from a `manifest.json` generated by the
+Fantoma case scripts, and Protoplaca is not allowed to depend on Fantoma.
+Copying means the two can drift apart; sharing would mean this tool stops
+working the moment somebody moves a Python file in another project. Drift is the
+cheaper failure.
+
+Why a palette at all, when the colour picker can produce sixteen million:
+picking from fifteen is a decision, picking from a gradient is a chore. The
+custom picker stays beside it for the case where the real part is a colour
+nothing here matches.
+
+New wires cycle through a different order from new components — red and black
+first, because the first two wires anybody draws are power and ground. The
+palette has no brown and no violet, which a real ribbon does. Said here rather
+than quietly solved by inventing two colours the other tool does not have.
+
 ## Deferred, deliberately
 
 - **Non-rectangular plate outlines.** Rectangle in phase 1; arbitrary polygons once
@@ -933,3 +1064,9 @@ is not chosen yet.
 - **Junctions.** Wires run point to point. Where three wires must meet, that is a
   component — a terminal block — not a wire feature.
 - **Lightening and ventilation holes** in the plate.
+- **Engraved text.** Raised text is legible now that the pen follows the cap
+  height, so the reason for engraving it — that raised text was hard to read —
+  has gone. The triangulator could cut it if a plate ever needs something
+  underneath a part that would rub raised letters away.
+- **Per-triangle sorting in the 3D tab.** Per part is enough while the only
+  translucent things are component boxes.

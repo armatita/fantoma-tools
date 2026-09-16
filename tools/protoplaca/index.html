@@ -43,6 +43,22 @@
     background: #14141a; touch-action: none; user-select: none;
   }
   #stage canvas { display: block; width: 100%; height: 100%; }
+  #stage3d {
+    position: relative; width: 100%; height: 62vh; min-height: 380px;
+    border: 1px solid #2b2b36; border-radius: 8px; overflow: hidden;
+    background: #14141a; touch-action: none; user-select: none; cursor: grab;
+  }
+  #stage3d.dragging { cursor: grabbing; }
+  #stage3d canvas { display: block; width: 100%; height: 100%; }
+  #glFail {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; padding: 30px; text-align: center;
+    color: #9a9aa4; font-size: 13px; line-height: 1.6;
+  }
+  .clash { margin-top: 8px; font-size: 12px; line-height: 1.5; }
+  .clash div { padding: 4px 0; border-top: 1px solid #22222b; color: #9a9aa4; }
+  .clash div:first-child { border-top: none; }
+  .clash b { color: #ffb648; font-weight: 400; }
 
   .statusbar {
     display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
@@ -53,6 +69,7 @@
   .statusbar .hint { color: #6b6b76; }
 
   .panel { border: 1px solid #2b2b36; border-radius: 8px; padding: 12px; margin-top: 14px; }
+  [hidden] { display: none !important; }
   @media (min-width: 880px) { .panel:first-child { margin-top: 0; } }
   .panel h2 {
     font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
@@ -83,6 +100,12 @@
   /* A field whose value is derived from somewhere else should look as though
      it cannot be typed in, not merely refuse to be typed in. */
   .field input:disabled { opacity: 0.45; cursor: not-allowed; }
+  .sws { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; margin-top: 6px; }
+  .sws button {
+    height: 16px; padding: 0; border: 1px solid #3a3a44; border-radius: 3px;
+    cursor: pointer; min-width: 0;
+  }
+  .sws button.on { box-shadow: 0 0 0 2px #0e0e12, 0 0 0 3px #8ab4ff; }
   .field.narrow input[type=number] { width: 70px; }
 
   .row { display: flex; gap: 6px; margin-top: 10px; }
@@ -96,6 +119,12 @@
 
   /* The things you reach for while drawing live above the drawing, where
      taking one does not cost you sight of it. */
+  .tabs { display: flex; gap: 4px; margin-bottom: 8px; border-bottom: 1px solid #2b2b36; }
+  .tabs button {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: #9a9aa4; padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .tabs button.on { color: #f4f4f2; border-bottom-color: #4dd8ff; }
   .toolbar { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
   .toolbar .tool {
     flex: 0 0 auto; width: 32px; height: 32px; padding: 0;
@@ -133,6 +162,11 @@
   </div>
   <div class="sub" id="subtitle"></div>
 
+  <div class="tabs" id="tabs">
+    <button type="button" id="tabDiagram" class="on"></button>
+    <button type="button" id="tab3d"></button>
+  </div>
+
   <div class="cols">
     <div>
       <div class="toolbar" id="toolbar">
@@ -163,13 +197,20 @@
         </button>
       </div>
       <div id="stage"><canvas id="cv"></canvas></div>
-      <div class="statusbar">
+      <div class="statusbar" id="statusbar2d">
         <span>X <b id="curX">—</b></span>
         <span>Y <b id="curY">—</b></span>
         <span class="sep">|</span>
         <span id="zoomLabel"></span>
         <span class="sep">|</span>
         <span class="hint" id="hint"></span>
+      </div>
+
+      <div id="stage3d" hidden><canvas id="gl"></canvas></div>
+      <div class="statusbar" id="statusbar3d" hidden>
+        <span><b id="tri3d">—</b></span>
+        <span class="sep">|</span>
+        <span class="hint" id="hint3d"></span>
       </div>
     </div>
 
@@ -263,6 +304,7 @@
             <label for="compColour" id="lbColour"></label>
             <input type="color" id="compColour">
           </div>
+          <div class="sws" id="compSws"></div>
           <div class="row">
             <button type="button" id="dupCompBtn"></button>
             <button type="button" id="delCompBtn"></button>
@@ -340,6 +382,7 @@
             <label for="wireColour" id="lbWireColour"></label>
             <input type="color" id="wireColour">
           </div>
+          <div class="sws" id="wireSws"></div>
           <div class="note" id="lengthBreakdown"></div>
           <div class="row">
             <button type="button" id="delWireBtn"></button>
@@ -502,6 +545,36 @@
         <div class="note" id="profileNote"></div>
       </section>
 
+      <section class="panel" id="view3dPanel" hidden>
+        <h2><span id="ttView3d"></span></h2>
+        <div class="field">
+          <label for="showPrint" id="lbShowPrint"></label>
+          <input type="checkbox" id="showPrint" checked>
+        </div>
+        <div class="field">
+          <label for="showComps" id="lbShowComps"></label>
+          <input type="checkbox" id="showComps" checked>
+        </div>
+        <div class="field">
+          <label for="showWires3d" id="lbShowWires3d"></label>
+          <input type="checkbox" id="showWires3d" checked>
+        </div>
+        <div class="field">
+          <label for="filamentColour" id="lbFilament"></label>
+          <input type="color" id="filamentColour" value="#e8e6e7">
+        </div>
+        <div class="row">
+          <button type="button" id="view3dReset"></button>
+        </div>
+        <div class="note" id="view3dNote"></div>
+      </section>
+
+      <section class="panel" id="clashPanel" hidden>
+        <h2><span id="ttClashes"></span></h2>
+        <div class="clash" id="clashList"></div>
+        <div class="note" id="clashNote"></div>
+      </section>
+
       <section class="panel" id="exportPanel">
         <h2><span id="ttExport"></span></h2>
         <div class="field">
@@ -562,7 +635,7 @@
    -------------------------------------------------------------------------- */
 var STRINGS = {
   en: {
-    subtitle: 'step 2 — components and the project file',
+    subtitle: 'draw the plate, print the plate, see whether it fits',
     project: 'Project',
     docName: 'Name',
     untitled: 'untitled',
@@ -626,11 +699,41 @@ var STRINGS = {
     hintWire: 'click to place a point \u00b7 double-click to finish \u00b7 Esc to abandon',
     hintWireSel: 'drag a square to move it \u00b7 Delete removes the wire',
     lenFlat: 'flat run',
-    lenClimb: 'standoff climbs',
+    lenClimb: 'climbs',
     lenSlack: 'slack',
     lenTotal: 'at least',
-    lenPending: 'Retainer climbs are not in this yet \u2014 they arrive with phase 3, '
-      + 'and they can only make it longer.',
+    lenPending: 'The climbs are measured off the route the 3D tab draws \u2014 up '
+      + 'into a header, and over anything the wire has to cross.',
+    tabDiagram: 'Diagram',
+    tab3d: '3D',
+    noWebgl: 'This browser will not give the page a 3D context, so the 3D tab '
+      + 'cannot draw. Everything else, including the STL, still works.',
+    view3dTitle: 'What to show',
+    showPrint: 'The print',
+    showComps: 'Components',
+    showWires3d: 'Wires',
+    filament: 'Filament',
+    reset3d: 'Reset the view',
+    view3dNote: 'Drag to turn, shift-drag to slide, wheel to zoom. Only \u201cthe '
+      + 'print\u201d is geometry the printer sees \u2014 the rest is what you are '
+      + 'going to put on it.',
+    hint3d: 'drag to turn \u00b7 shift-drag to slide \u00b7 wheel to zoom',
+    trianglesWord: 'triangles printed',
+    clashTitle: 'Does it fit',
+    clashesNone: 'Nothing is in anything else\u2019s way.',
+    clashesFound: '{n} to look at. Each one is drawn in red where the two '
+      + 'things actually meet.',
+    clashUnder: '{a} has {b} under it, {n} mm too tall for the standoff.',
+    clashBodies: '{a} and {b} occupy the same space, by {n} mm.',
+    clashOffPlate: '{a} hangs off the plate.',
+    clashPlate: '{a} and {b} are both on the plate in the same place, '
+      + 'overlapping by {n} mm.',
+    clashWire: '{a} runs under {b} and needs {n} mm more standoff than it has.',
+    unnamedComp: 'an unnamed component',
+    unnamedWire: 'an unnamed wire',
+    bossWord: 'a boss',
+    tunnelWord: 'a tunnel',
+    clipWord: 'a clip',
     exportTitle: 'Print',
     triangles: 'Triangles',
     downloadStl: 'Download STL',
@@ -737,7 +840,7 @@ var STRINGS = {
     dist: 'distance'
   },
   pt: {
-    subtitle: 'passo 2 — componentes e o ficheiro do projeto',
+    subtitle: 'desenhar a placa, imprimir a placa, ver se cabe tudo',
     project: 'Projeto',
     docName: 'Nome',
     untitled: 'sem título',
@@ -803,11 +906,42 @@ var STRINGS = {
     hintWire: 'clique para colocar um ponto \u00b7 duplo clique para terminar \u00b7 Esc abandona',
     hintWireSel: 'arraste um quadrado para o mover \u00b7 Delete apaga o fio',
     lenFlat: 'percurso plano',
-    lenClimb: 'subidas do espa\u00e7ador',
+    lenClimb: 'subidas',
     lenSlack: 'folga',
     lenTotal: 'pelo menos',
-    lenPending: 'As subidas pelos retentores ainda n\u00e3o entram nesta conta \u2014 '
-      + 'chegam na fase 3, e s\u00f3 a podem tornar maior.',
+    lenPending: 'As subidas s\u00e3o medidas no percurso que o separador 3D desenha '
+      + '\u2014 at\u00e9 ao conector, e por cima do que o fio tenha de atravessar.',
+    tabDiagram: 'Diagrama',
+    tab3d: '3D',
+    noWebgl: 'Este navegador n\u00e3o d\u00e1 um contexto 3D \u00e0 p\u00e1gina, por isso o '
+      + 'separador 3D n\u00e3o consegue desenhar. O resto, incluindo o STL, '
+      + 'continua a funcionar.',
+    view3dTitle: 'O que mostrar',
+    showPrint: 'A pe\u00e7a impressa',
+    showComps: 'Componentes',
+    showWires3d: 'Fios',
+    filament: 'Filamento',
+    reset3d: 'Repor a vista',
+    view3dNote: 'Arraste para rodar, shift+arrastar para deslocar, roda para '
+      + 'aproximar. S\u00f3 \u201ca pe\u00e7a impressa\u201d \u00e9 geometria que a impressora v\u00ea '
+      + '\u2014 o resto \u00e9 o que lhe vai p\u00f4r em cima.',
+    hint3d: 'arrastar para rodar \u00b7 shift+arrastar para deslocar \u00b7 roda para aproximar',
+    trianglesWord: 'tri\u00e2ngulos impressos',
+    clashTitle: 'Cabe tudo',
+    clashesNone: 'Nada est\u00e1 no caminho de nada.',
+    clashesFound: '{n} para ver. Cada um est\u00e1 desenhado a vermelho onde as '
+      + 'duas coisas se encontram.',
+    clashUnder: '{a} tem {b} por baixo, {n} mm mais alto do que o espa\u00e7ador.',
+    clashBodies: '{a} e {b} ocupam o mesmo espa\u00e7o, em {n} mm.',
+    clashOffPlate: '{a} sai fora da placa.',
+    clashPlate: '{a} e {b} est\u00e3o ambos na placa no mesmo s\u00edtio, a sobrepor-se '
+      + 'em {n} mm.',
+    clashWire: '{a} passa por baixo de {b} e precisa de mais {n} mm de espa\u00e7ador.',
+    unnamedComp: 'um componente sem nome',
+    unnamedWire: 'um fio sem nome',
+    bossWord: 'uma bossa',
+    tunnelWord: 'um t\u00fanel',
+    clipWord: 'uma mola',
     exportTitle: 'Imprimir',
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
@@ -1234,7 +1368,7 @@ function normComponent(raw, taken) {
   c.name = typeof c.name === 'string' ? c.name.slice(0, 40) : '';
   c.at = pairOr(c.at, [0, 0]);
   c.size = pairOr(c.size, [20, 20], MIN_COMP);
-  c.colour = colourOr(c.colour, '#4dd8ff');
+  c.colour = colourOr(c.colour, PALETTE[0]);
   c.standoff = numOr(c.standoff, 6, 0, 200);    // clear space under the board
   c.board = numOr(c.board, 1.6, 0, 50);         // the PCB itself
   c.body = numOr(c.body, 10, 0, 300);           // whatever stands on top of it
@@ -1324,7 +1458,32 @@ function normProfile(raw) {
    -------------------------------------------------------------------------- */
 var AWGS = [30, 28, 26, 24, 22, 20, 18];
 var AWG_OD = { 30: 0.8, 28: 0.9, 26: 1.1, 24: 1.4, 22: 1.7, 20: 2.1, 18: 2.4 };
-var WIRE_PALETTE = ['#e0534f', '#4dd8ff', '#5ee88f', '#ffb648', '#f4f4f2', '#b45cff'];
+/* The same fifteen colours the model viewer offers, copied rather than
+   fetched from its manifest.json: that file is generated by the Fantoma case
+   scripts, and Protoplaca is not allowed to depend on Fantoma. Copying means
+   the two can drift; sharing would mean this tool stops working the moment
+   somebody moves a Python script in another project. Drift is the cheaper
+   failure.
+
+   Why a palette at all when the picker can produce sixteen million colours:
+   picking from six is a decision, picking from a gradient is a chore. The
+   custom picker stays beside it for the case where the real part is a colour
+   nothing here matches. */
+var PALETTE = [
+  '#b74858', '#993233', '#e9ca00', '#d8a309', '#c7711e',
+  '#428d38', '#94b91e', '#6cbfaf', '#017eaa', '#3e51ad',
+  '#2c2a2b', '#787677', '#a2a2a4', '#c8c6c9', '#e8e6e7'
+];
+
+/* New wires cycle through this rather than through PALETTE in its printed
+   order, because wire colour carries meaning on a bench -- red and black first
+   because the first two wires drawn are nearly always power and ground. The
+   palette has no brown and no violet, which a real ribbon does; say so rather
+   than quietly inventing two colours the other tool does not have. */
+var WIRE_PALETTE = [
+  '#b74858', '#2c2a2b', '#e9ca00', '#017eaa',
+  '#428d38', '#e8e6e7', '#c7711e', '#6cbfaf'
+];
 
 function odForAwg(awg) { return AWG_OD[awg] || 1.4; }
 
@@ -2064,6 +2223,10 @@ var W = 0, H = 0;         // CSS pixels
 var pending = false;
 
 function draw() {
+  /* Both views hang off this one call, so an edit cannot refresh one and
+     forget the other. The 3D side does the work only when it is on screen --
+     see touch3d -- so the diagram is no slower for having a 3D tab. */
+  touch3d();
   if (pending) return;
   pending = true;
   requestAnimationFrame(function () { pending = false; render(); });
@@ -2185,6 +2348,8 @@ function setCanvasTheme(name) {
   themeName = THEMES[name] ? name : 'dark';
   COL = THEMES[themeName];
   document.getElementById('stage').style.background = COL.bg;
+  document.getElementById('stage3d').style.background = COL.bg;
+  draw3d();
   themeBtn.classList.toggle('active', themeName === 'light');
 }
 
@@ -3354,6 +3519,37 @@ var F = {
   colour: document.getElementById('compColour')
 };
 
+/* A row of palette swatches wired to a colour input. Clicking one writes the
+   input and fires the same `input` event a typed colour would, so there is
+   exactly one path from a colour to the document however it was chosen. */
+function swatchRow(hostId, input) {
+  var host = document.getElementById(hostId);
+  for (var i = 0; i < PALETTE.length; i++) {
+    (function (hex) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.style.background = hex;
+      b.title = hex;
+      b.onclick = function () {
+        snapshot();
+        input.value = hex;
+        input.dispatchEvent(new Event('input'));
+        markSwatches(hostId, hex);
+      };
+      host.appendChild(b);
+    }(PALETTE[i]));
+  }
+}
+
+function markSwatches(hostId, hex) {
+  var host = document.getElementById(hostId);
+  var want = String(hex || '').toLowerCase();
+  for (var i = 0; i < host.children.length; i++) {
+    var b = host.children[i];
+    b.classList.toggle('on', b.title.toLowerCase() === want);
+  }
+}
+
 /* Push the document into the controls. Called after anything that changes the
    document from outside the panel -- a drag, an undo, opening a file -- so the
    numbers you read are always the numbers the drawing is using. */
@@ -3383,6 +3579,7 @@ function syncControls() {
     F.board.value = c.board;
     F.body.value = c.body;
     F.colour.value = c.colour;
+    markSwatches('compSws', c.colour);
   }
 
   syncing = false;
@@ -3406,6 +3603,7 @@ function onCompField() {
   c.board = Math.max(0, num(F.board, c.board));
   c.body = Math.max(0, num(F.body, c.body));
   c.colour = colourOr(F.colour.value, c.colour);
+  markSwatches('compSws', c.colour);
   syncBossHeights();
   scheduleSave();
   draw();
@@ -3416,6 +3614,9 @@ for (var fieldKey in F) {
     F[fieldKey].addEventListener('input', onCompField);
   }
 }
+
+swatchRow('compSws', F.colour);
+F.colour.addEventListener('input', function () { markSwatches('compSws', F.colour.value); });
 
 // Typing in a box is one undoable act, not one per keystroke.
 for (var focusKey in F) {
@@ -3434,7 +3635,6 @@ docName.addEventListener('focus', snapshot);
 /* A new component lands in the middle of what you are looking at, at a size
    you will immediately retype anyway -- the point is to give the calipers
    somewhere to go. */
-var PALETTE = ['#4dd8ff', '#5ee88f', '#ffb648', '#ff5cd6', '#b45cff', '#ff4d5e'];
 
 function occupied(at) {
   for (var i = 0; i < doc.components.length; i++) {
@@ -5095,6 +5295,9 @@ var WF = {
   colour: document.getElementById('wireColour')
 };
 
+swatchRow('wireSws', WF.colour);
+WF.colour.addEventListener('input', function () { markSwatches('wireSws', WF.colour.value); });
+
 /* --------------------------------------------------------------------------
    How long a wire actually needs to be
    --------------------------------------------------------------------------
@@ -5118,12 +5321,22 @@ function wireLength(w) {
     flat += Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]));
   }
 
-  var climb = 0;
-  for (i = 0; i < w.path.length; i++) {
-    if (!w.path[i].of) continue;
-    var c = findIn(doc.components, w.path[i].of);
-    if (c) climb += c.standoff;
+  /* Everything the wire does that is not flat, measured off the same
+     three-dimensional route the 3D tab draws rather than estimated from the
+     standoffs. It was an estimate until phase 4 built that route: a sum of the
+     standoffs at the two ends, which missed every climb over a raised
+     retainer. Taking it from the drawn path means the readout and the picture
+     cannot disagree, and a crossing added after the wire was measured changes
+     the number the moment it appears. */
+  var solid = 0;
+  var pts = wirePath3d(w);
+  for (i = 1; i < pts.length; i++) {
+    var dx = pts[i][0] - pts[i - 1][0];
+    var dy = pts[i][1] - pts[i - 1][1];
+    var dz = pts[i][2] - pts[i - 1][2];
+    solid += Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
+  var climb = Math.max(0, solid - flat);
 
   return { flat: flat, climb: climb, slack: w.slack, total: flat + climb + w.slack };
 }
@@ -5140,6 +5353,7 @@ function syncWireControls() {
   WF.od.value = round2(w.od);
   WF.slack.value = w.slack;
   WF.colour.value = w.colour;
+  markSwatches('wireSws', w.colour);
 
   var L = wireLength(w);
   document.getElementById('lengthBreakdown').innerHTML =
@@ -5718,6 +5932,17 @@ function applyLang() {
   document.getElementById('lbWall').textContent = t('wall');
   document.getElementById('lbHoleDia').textContent = t('holeDia');
   document.getElementById('lbMinHole').textContent = t('minHole');
+  document.getElementById('tabDiagram').textContent = t('tabDiagram');
+  document.getElementById('tab3d').textContent = t('tab3d');
+  document.getElementById('hint3d').textContent = t('hint3d');
+  document.getElementById('ttView3d').textContent = t('view3dTitle');
+  document.getElementById('lbShowPrint').textContent = t('showPrint');
+  document.getElementById('lbShowComps').textContent = t('showComps');
+  document.getElementById('lbShowWires3d').textContent = t('showWires3d');
+  document.getElementById('lbFilament').textContent = t('filament');
+  document.getElementById('view3dReset').textContent = t('reset3d');
+  document.getElementById('view3dNote').textContent = t('view3dNote');
+  document.getElementById('ttClashes').textContent = t('clashTitle');
   document.getElementById('lbAllow').textContent = t('allow');
   document.getElementById('lbDrawn').textContent = t('drawnAs');
   document.getElementById('lbMinPen').textContent = t('minPen');
@@ -5792,6 +6017,969 @@ applyLang();
 syncControls();
 render();     // synchronous, so the first paint is already the right size
 
+
+/* --------------------------------------------------------------------------
+   The 3D tab
+   --------------------------------------------------------------------------
+   The diagram says where things go. The 3D tab says whether they fit.
+
+   Three layers, each switchable: the PRINT, which is exactly the mesh the STL
+   would carry; the COMPONENTS, as the boxes their three heights describe; and
+   the WIRES, as tubes at their real diameter. Only the first is geometry the
+   printer will ever see -- the other two are the things that arrive in
+   envelopes, drawn so the clash list has something to point at.
+
+   Written against WebGL directly rather than against a library. The model
+   viewer next door loads three.js from a CDN, which is the right trade there
+   and the wrong one here: this tool declares itself offline, and a page that
+   quietly needs the network to show half of itself is not offline. The whole
+   renderer below fits in a few hundred lines because it only has to do one
+   thing -- flat-shaded triangles under an orbit camera -- and everything it
+   draws is already a triangle list, which is the shape the STL writer wanted
+   anyway.
+   -------------------------------------------------------------------------- */
+
+/* ---- matrices, column-major because that is what WebGL reads ---- */
+
+function m4mul(a, b) {
+  var o = new Float32Array(16), c, r, k, v;
+  for (c = 0; c < 4; c++) {
+    for (r = 0; r < 4; r++) {
+      v = 0;
+      for (k = 0; k < 4; k++) v += a[k * 4 + r] * b[c * 4 + k];
+      o[c * 4 + r] = v;
+    }
+  }
+  return o;
+}
+
+function m4perspective(fovy, aspect, near, far) {
+  var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  var o = new Float32Array(16);
+  o[0] = f / aspect;
+  o[5] = f;
+  o[10] = (far + near) * nf;
+  o[11] = -1;
+  o[14] = 2 * far * near * nf;
+  return o;
+}
+
+function m4lookAt(eye, at, up) {
+  var zx = eye[0] - at[0], zy = eye[1] - at[1], zz = eye[2] - at[2];
+  var zl = Math.sqrt(zx * zx + zy * zy + zz * zz) || 1;
+  zx /= zl; zy /= zl; zz /= zl;
+
+  var xx = up[1] * zz - up[2] * zy;
+  var xy = up[2] * zx - up[0] * zz;
+  var xz = up[0] * zy - up[1] * zx;
+  var xl = Math.sqrt(xx * xx + xy * xy + xz * xz) || 1;
+  xx /= xl; xy /= xl; xz /= xl;
+
+  var yx = zy * xz - zz * xy;
+  var yy = zz * xx - zx * xz;
+  var yz = zx * xy - zy * xx;
+
+  return new Float32Array([
+    xx, yx, zx, 0,
+    xy, yy, zy, 0,
+    xz, yz, zz, 0,
+    -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+    -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
+    -(zx * eye[0] + zy * eye[1] + zz * eye[2]), 1
+  ]);
+}
+
+/* ---- the context ---- */
+
+var VERT = [
+  'attribute vec3 aPos;',
+  'attribute vec3 aNrm;',
+  'uniform mat4 uMVP;',
+  'varying vec3 vN;',
+  'void main() {',
+  '  vN = aNrm;',
+  '  gl_Position = uMVP * vec4(aPos, 1.0);',
+  '}'
+].join('\n');
+
+/* One directional key light plus a hemisphere term, so a face turned away
+   from the light is dim rather than black. On a white filament every surface
+   is the same colour and shape is all there is to read, so the shading has to
+   carry more than it usually would. */
+var FRAG = [
+  'precision mediump float;',
+  'uniform vec3 uColour;',
+  'uniform float uAlpha;',
+  'uniform vec3 uLight;',
+  'varying vec3 vN;',
+  'void main() {',
+  '  vec3 n = normalize(vN);',
+  '  float key = max(dot(n, uLight), 0.0);',
+  '  float sky = 0.5 + 0.5 * n.z;',
+  '  vec3 c = uColour * (0.24 + 0.22 * sky + 0.60 * key);',
+  '  gl_FragColor = vec4(c, uAlpha);',
+  '}'
+].join('\n');
+
+var gl = null, glProg = null, glLoc = null, glBroken = false;
+var glCanvas = document.getElementById('gl');
+var stage3d = document.getElementById('stage3d');
+
+function compileShader(type, src) {
+  var sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    console.warn('[protoplaca] shader', gl.getShaderInfoLog(sh));
+    return null;
+  }
+  return sh;
+}
+
+function glFail() {
+  glBroken = true;
+  gl = null;
+  if (document.getElementById('glFail')) return;
+  var d = document.createElement('div');
+  d.id = 'glFail';
+  d.textContent = t('noWebgl');
+  stage3d.appendChild(d);
+}
+
+function initGL() {
+  if (gl) return true;
+  if (glBroken) return false;
+  try {
+    gl = glCanvas.getContext('webgl', { antialias: true, alpha: false, depth: true })
+      || glCanvas.getContext('experimental-webgl');
+  } catch (e) { gl = null; }
+  if (!gl) { glFail(); return false; }
+
+  var vs = compileShader(gl.VERTEX_SHADER, VERT);
+  var fs = compileShader(gl.FRAGMENT_SHADER, FRAG);
+  if (!vs || !fs) { glFail(); return false; }
+
+  glProg = gl.createProgram();
+  gl.attachShader(glProg, vs);
+  gl.attachShader(glProg, fs);
+  gl.linkProgram(glProg);
+  if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) {
+    console.warn('[protoplaca] link', gl.getProgramInfoLog(glProg));
+    glFail();
+    return false;
+  }
+
+  glLoc = {
+    pos: gl.getAttribLocation(glProg, 'aPos'),
+    nrm: gl.getAttribLocation(glProg, 'aNrm'),
+    mvp: gl.getUniformLocation(glProg, 'uMVP'),
+    colour: gl.getUniformLocation(glProg, 'uColour'),
+    alpha: gl.getUniformLocation(glProg, 'uAlpha'),
+    light: gl.getUniformLocation(glProg, 'uLight')
+  };
+
+  /* No back-face culling. The plate is a solid and the inside of a face is
+     never meant to be seen -- except through a translucent component, where
+     seeing the far wall of a boss is exactly the point. The shading lights a
+     back face by its own normal rather than leaving it black. */
+  gl.enable(gl.DEPTH_TEST);
+  return true;
+}
+
+/* ---- parts ---- */
+
+function rgbOf(hex) {
+  var h = String(hex || '#888888').replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  var n = parseInt(h, 16);
+  if (!isFinite(n)) n = 0x888888;
+  /* sRGB towards linear. Without it the lighting multiplies an already
+     gamma-encoded value and every mid tone comes out washed. */
+  return [
+    Math.pow(((n >> 16) & 255) / 255, 2.2),
+    Math.pow(((n >> 8) & 255) / 255, 2.2),
+    Math.pow((n & 255) / 255, 2.2)
+  ];
+}
+
+/* A triangle list becomes one buffer of position and face normal. FACE
+   normals, not smoothed ones: every surface here is flat, and averaging
+   normals at a box corner paints a gradient that reads as curvature which is
+   not there. */
+function uploadPart(part) {
+  var tris = part.tris, n = tris.length;
+  var data = new Float32Array(n * 18);
+  var o = 0, i, k, T;
+  var cx = 0, cy = 0, cz = 0;
+
+  for (i = 0; i < n; i++) {
+    T = tris[i];
+    var ux = T[3] - T[0], uy = T[4] - T[1], uz = T[5] - T[2];
+    var vx = T[6] - T[0], vy = T[7] - T[1], vz = T[8] - T[2];
+    var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    var l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+    nx /= l; ny /= l; nz /= l;
+    for (k = 0; k < 3; k++) {
+      data[o++] = T[k * 3];
+      data[o++] = T[k * 3 + 1];
+      data[o++] = T[k * 3 + 2];
+      data[o++] = nx; data[o++] = ny; data[o++] = nz;
+      cx += T[k * 3]; cy += T[k * 3 + 1]; cz += T[k * 3 + 2];
+    }
+  }
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+
+  var m = n * 3 || 1;
+  return {
+    buf: buf,
+    count: n * 3,
+    colour: rgbOf(part.colour),
+    alpha: part.alpha === undefined ? 1 : part.alpha,
+    last: !!part.last,
+    centre: [cx / m, cy / m, cz / m]
+  };
+}
+
+var scene = [];
+
+function clearScene() {
+  if (gl) for (var i = 0; i < scene.length; i++) gl.deleteBuffer(scene[i].buf);
+  scene = [];
+}
+
+/* ---- the camera ---- */
+
+var cam = { yaw: -1.05, pitch: 0.62, dist: 200, target: [0, 0, 0] };
+
+function camEye() {
+  var cp = Math.cos(cam.pitch);
+  return [
+    cam.target[0] + cam.dist * cp * Math.cos(cam.yaw),
+    cam.target[1] + cam.dist * cp * Math.sin(cam.yaw),
+    cam.target[2] + cam.dist * Math.sin(cam.pitch)
+  ];
+}
+
+function frame3d() {
+  var w = doc.plate.w, h = doc.plate.h;
+  cam.target = [w / 2, h / 2, doc.plate.thickness];
+  cam.dist = Math.max(40, Math.sqrt(w * w + h * h) * 1.35);
+  cam.yaw = -1.05;
+  cam.pitch = 0.62;
+}
+
+/* ---- drawing ---- */
+
+function sizeGL() {
+  /* The canvas's own rect, every frame, for the same reason the 2D canvas
+     reads its own: a collapsing panel changes the layout without telling
+     anybody, and a stale size shows up as a stretched picture. */
+  var r = glCanvas.getBoundingClientRect();
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var w = Math.max(1, Math.round(r.width * dpr));
+  var h = Math.max(1, Math.round(r.height * dpr));
+  if (glCanvas.width !== w || glCanvas.height !== h) {
+    glCanvas.width = w;
+    glCanvas.height = h;
+  }
+  gl.viewport(0, 0, w, h);
+  return w / h;
+}
+
+function dist2(a, b) {
+  var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+  return dx * dx + dy * dy + dz * dz;
+}
+
+function drawPart(p) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, p.buf);
+  gl.enableVertexAttribArray(glLoc.pos);
+  gl.vertexAttribPointer(glLoc.pos, 3, gl.FLOAT, false, 24, 0);
+  gl.enableVertexAttribArray(glLoc.nrm);
+  gl.vertexAttribPointer(glLoc.nrm, 3, gl.FLOAT, false, 24, 12);
+  gl.uniform3fv(glLoc.colour, p.colour);
+  gl.uniform1f(glLoc.alpha, p.alpha);
+  gl.drawArrays(gl.TRIANGLES, 0, p.count);
+}
+
+function render3d() {
+  if (!initGL()) return;
+  var aspect = sizeGL();
+  var eye = camEye();
+
+  var bg = themeName === 'light' ? [0.94, 0.94, 0.95] : [0.078, 0.078, 0.102];
+  gl.clearColor(bg[0], bg[1], bg[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  var proj = m4perspective(36 * Math.PI / 180, aspect,
+                           Math.max(0.5, cam.dist / 200), cam.dist * 8);
+  var mvp = m4mul(proj, m4lookAt(eye, cam.target, [0, 0, 1]));
+
+  gl.useProgram(glProg);
+  gl.uniformMatrix4fv(glLoc.mvp, false, mvp);
+
+  /* The light rides with the camera, over the left shoulder. A light fixed in
+     world space leaves you rotating the model into its own shadow. */
+  var lx = -0.45 * Math.cos(cam.yaw) - 0.55 * Math.sin(cam.yaw);
+  var ly = -0.45 * Math.sin(cam.yaw) + 0.55 * Math.cos(cam.yaw);
+  var ll = Math.sqrt(lx * lx + ly * ly + 0.64) || 1;
+  gl.uniform3f(glLoc.light, lx / ll, ly / ll, 0.8 / ll);
+
+  var i, solid = [], ghost = [];
+  for (i = 0; i < scene.length; i++) (scene[i].alpha >= 1 ? solid : ghost).push(scene[i]);
+
+  gl.disable(gl.BLEND);
+  gl.depthMask(true);
+  for (i = 0; i < solid.length; i++) drawPart(solid[i]);
+
+  /* Translucency has nothing to sort it, so sort by hand, back to front, on
+     the distance from the eye to the part's centre. Per part rather than per
+     triangle, which is coarse and is enough: the only translucent things are
+     component boxes and they are not supposed to interpenetrate. Depth writes
+     off, so a near ghost does not erase what stands behind it. */
+  ghost.sort(function (a, b) {
+    /* A clash marker ignores the sort and goes last. It is a warning, not a
+       thing on the plate: it has to be visible through the translucent board
+       that is causing the clash, which is exactly the board that would be
+       drawn over it. */
+    if (a.last !== b.last) return a.last ? 1 : -1;
+    return dist2(b.centre, eye) - dist2(a.centre, eye);
+  });
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.depthMask(false);
+  for (i = 0; i < ghost.length; i++) drawPart(ghost[i]);
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+}
+
+/* --------------------------------------------------------------------------
+   What the 3D tab is made of
+   --------------------------------------------------------------------------
+   The print comes straight from buildMesh, so what you orbit is the STL and
+   not a second model that could drift away from it. Everything else is drawn
+   only here: a component is the box its three heights describe, and a wire is
+   a tube of its own outside diameter lying on the plate.
+   -------------------------------------------------------------------------- */
+
+var TUBE_SIDES = 8;
+
+function cross3(a, b) {
+  return [a[1] * b[2] - a[2] * b[1],
+          a[2] * b[0] - a[0] * b[2],
+          a[0] * b[1] - a[1] * b[0]];
+}
+
+function norm3(v) {
+  var l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
+
+/* One length of tube between two points, capped at both ends. Capping every
+   segment and dropping a ball at each joint is wasteful next to a properly
+   mitred sweep, and it is immune to the case that breaks mitring: a wire that
+   doubles back on itself, where the mitre plane goes to infinity. Nothing
+   here is exported, so a few hundred spare triangles cost nothing. */
+function segTube(out, a, b, r) {
+  var d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  var L = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+  if (L < 1e-6) return;
+  d = [d[0] / L, d[1] / L, d[2] / L];
+
+  var seed = Math.abs(d[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+  var u = norm3(cross3(seed, d));
+  var v = cross3(d, u);
+
+  var i, ring = [];
+  for (i = 0; i < TUBE_SIDES; i++) {
+    var th = (i / TUBE_SIDES) * Math.PI * 2;
+    var c = Math.cos(th) * r, s = Math.sin(th) * r;
+    ring.push([u[0] * c + v[0] * s, u[1] * c + v[1] * s, u[2] * c + v[2] * s]);
+  }
+
+  for (i = 0; i < TUBE_SIDES; i++) {
+    var o1 = ring[i], o2 = ring[(i + 1) % TUBE_SIDES];
+    var a1 = [a[0] + o1[0], a[1] + o1[1], a[2] + o1[2]];
+    var a2 = [a[0] + o2[0], a[1] + o2[1], a[2] + o2[2]];
+    var b1 = [b[0] + o1[0], b[1] + o1[1], b[2] + o1[2]];
+    var b2 = [b[0] + o2[0], b[1] + o2[1], b[2] + o2[2]];
+    quad(out, a1, b1, b2, a2);
+    tri(out, a[0], a[1], a[2], a2[0], a2[1], a2[2], a1[0], a1[1], a1[2]);
+    tri(out, b[0], b[1], b[2], b1[0], b1[1], b1[2], b2[0], b2[1], b2[2]);
+  }
+}
+
+/* A low ball at a bend, so the corner is round rather than notched. */
+function ballMesh(out, c, r) {
+  var rows = 4, cols = TUBE_SIDES, i, j;
+  function at(i, j) {
+    var ph = (i / rows) * Math.PI;
+    var th = (j / cols) * Math.PI * 2;
+    return [c[0] + r * Math.sin(ph) * Math.cos(th),
+            c[1] + r * Math.sin(ph) * Math.sin(th),
+            c[2] + r * Math.cos(ph)];
+  }
+  for (i = 0; i < rows; i++) {
+    for (j = 0; j < cols; j++) {
+      var p00 = at(i, j), p01 = at(i, j + 1), p10 = at(i + 1, j), p11 = at(i + 1, j + 1);
+      if (i === 0) tri(out, p00[0], p00[1], p00[2], p11[0], p11[1], p11[2], p10[0], p10[1], p10[2]);
+      else if (i === rows - 1) tri(out, p00[0], p00[1], p00[2], p01[0], p01[1], p01[2], p10[0], p10[1], p10[2]);
+      else quad(out, p00, p01, p11, p10);
+    }
+  }
+}
+
+/* The height a wire runs at, as a list of arclength stations.
+
+   Flat on the plate for most of its run. It climbs at an end that plugs into
+   a component, because that is where the header is, and it climbs over a
+   raised retainer, because that is the whole point of a raised retainer. The
+   climbs are drawn as ramps rather than steps, which is both what a wire does
+   and what keeps the tube from folding through itself at the corner. */
+function wireStations(w) {
+  var th = doc.plate.thickness;
+  var r = w.od / 2;
+  var clear = numOr(doc.profile.wireClear, 0.4);
+  var wall = numOr(doc.profile.retWall, 1.2);
+  var total = pathLength(w);
+  if (total <= 0) return [];
+
+  var flat = th + r;
+  var st = [];
+  var i;
+
+  for (i = 0; i < w.path.length; i++) {
+    var run = 0;
+    for (var k = 1; k <= i; k++) {
+      run += Math.hypot(w.path[k].at[0] - w.path[k - 1].at[0],
+                        w.path[k].at[1] - w.path[k - 1].at[1]);
+    }
+    st.push({ s: run, z: flat });
+  }
+
+  function endClimb(idx, s0, towards) {
+    var p = w.path[idx];
+    if (!p.of) return;
+    var c = findIn(doc.components, p.of);
+    if (!c) return;
+    var up = th + c.standoff + c.board + r;
+    var ramp = Math.min(Math.max(c.standoff, 3), total * 0.4);
+    st.push({ s: s0, z: up });
+    st.push({ s: s0 + towards * ramp, z: flat });
+  }
+  endClimb(0, 0, 1);
+  endClimb(w.path.length - 1, total, -1);
+
+  for (i = 0; i < doc.retainers.length; i++) {
+    var ret = doc.retainers[i];
+    if (ret.wire !== w.id || ret.origin === 'auto-suppressed' || !ret.level) continue;
+    var floor = ret.level * (w.od + clear + wall);
+    var up2 = th + floor + clear + r;
+    var half = Math.min(numOr(doc.profile.retLen, 6), total) / 2;
+    var sr = ret.t * total;
+    st.push({ s: Math.max(0, sr - half - 4), z: flat });
+    st.push({ s: Math.max(0, sr - half), z: up2 });
+    st.push({ s: Math.min(total, sr + half), z: up2 });
+    st.push({ s: Math.min(total, sr + half + 4), z: flat });
+  }
+
+  /* Sorted, and the highest z wins where two stations land on the same spot:
+     a wire that has to be up is never allowed to be drawn down. */
+  st.sort(function (a, b) { return a.s - b.s || b.z - a.z; });
+  var out = [];
+  for (i = 0; i < st.length; i++) {
+    if (out.length && Math.abs(out[out.length - 1].s - st[i].s) < 1e-6) continue;
+    out.push(st[i]);
+  }
+  return out;
+}
+
+function wirePath3d(w) {
+  var st = wireStations(w);
+  var pts = [];
+  for (var i = 0; i < st.length; i++) {
+    var xy = pointAtLength(w, st[i].s);
+    pts.push([xy[0], xy[1], st[i].z]);
+  }
+  return pts;
+}
+
+function wirePart(w) {
+  var pts = wirePath3d(w);
+  if (pts.length < 2) return null;
+  var out = [], r = w.od / 2;
+  for (var i = 1; i < pts.length; i++) {
+    segTube(out, pts[i - 1], pts[i], r);
+    if (i < pts.length - 1) ballMesh(out, pts[i], r);
+  }
+  return out.length ? { tris: out, colour: w.colour, alpha: 1 } : null;
+}
+
+/* ---- building the scene ---- */
+
+var view3d = {
+  print: true,
+  comps: true,
+  wires: true,
+  filament: '#e8e6e7'
+};
+
+function build3d() {
+  clearScene();
+  if (!initGL()) return;
+
+  var th = doc.plate.thickness;
+  var parts = [], i, printed = 0;
+
+  if (view3d.print) {
+    var m = buildMesh();
+    if (m) {
+      printed = m.length;
+      parts.push({ tris: m, colour: view3d.filament, alpha: 1 });
+    }
+  }
+
+  if (view3d.comps) {
+    for (i = 0; i < doc.components.length; i++) {
+      var c = doc.components[i];
+      var x1 = c.at[0] + c.size[0], y1 = c.at[1] + c.size[1];
+      var z0 = th + c.standoff;
+
+      /* The board and whatever stands on it are two boxes, not one, because
+         they are two different measurements and the thing that goes wrong is
+         nearly always the gap underneath the board rather than the height of
+         the lump on top of it. Both are ghosts: the point of the layer is to
+         see the bosses and the wires it is sitting over. */
+      if (c.board > 0) {
+        var bd = [];
+        boxMesh(bd, c.at[0], c.at[1], z0, x1, y1, z0 + c.board);
+        parts.push({ tris: bd, colour: c.colour, alpha: 0.85 });
+      }
+      if (c.body > 0) {
+        var by = [];
+        boxMesh(by, c.at[0], c.at[1], z0 + c.board, x1, y1, z0 + c.board + c.body);
+        parts.push({ tris: by, colour: c.colour, alpha: 0.4 });
+      }
+    }
+  }
+
+  if (view3d.wires) {
+    for (i = 0; i < doc.wires.length; i++) {
+      var wp = wirePart(doc.wires[i]);
+      if (wp) parts.push(wp);
+    }
+  }
+
+  /* The interferences.
+
+     Grown by a sliver, because the marker IS the intersection of the two
+     things it is about, so at its true size it is buried inside both of them
+     and every face is coplanar with a face that is already there -- which is
+     the one situation a depth buffer cannot resolve. A fifth of a millimetre
+     puts it outside both and stops the flickering. */
+  var bad = findClashes();
+  for (i = 0; i < bad.length; i++) {
+    if (!bad[i].box) continue;
+    var bx = [], B = bad[i].box, g = 0.2;
+    boxMesh(bx, B[0] - g, B[1] - g, B[2] - g, B[3] + g, B[4] + g, B[5] + g);
+    parts.push({ tris: bx, colour: '#ff3b30', alpha: 0.9, last: true });
+  }
+
+  for (i = 0; i < parts.length; i++) scene.push(uploadPart(parts[i]));
+
+  document.getElementById('tri3d').textContent =
+    mm(printed, 0) + ' ' + t('trianglesWord');
+  showClashes(bad);
+}
+
+/* --------------------------------------------------------------------------
+   Does it fit
+   --------------------------------------------------------------------------
+   Everything on this plate is a box or is safely described by one, so every
+   check below is the same check: do two boxes overlap, and by how much. That
+   is crude next to real interference detection and it is the right crudeness
+   -- it never reports a clash that is not there, it reports the overlap as a
+   number you can act on, and it runs fast enough to do on every edit.
+
+   The one rule that is not box-against-box is the one that matters most: the
+   space under a component's board belongs to that component's own bosses and
+   to nothing else. A boss the board is supposed to land on is not a clash; the
+   same boss under the neighbouring board is.
+   -------------------------------------------------------------------------- */
+
+function boxOverlap(a, b) {
+  var ox = Math.min(a[3], b[3]) - Math.max(a[0], b[0]);
+  var oy = Math.min(a[4], b[4]) - Math.max(a[1], b[1]);
+  var oz = Math.min(a[5], b[5]) - Math.max(a[2], b[2]);
+  if (ox <= CLASH_EPS || oy <= CLASH_EPS || oz <= CLASH_EPS) return null;
+  return {
+    box: [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2]),
+          Math.min(a[3], b[3]), Math.min(a[4], b[4]), Math.min(a[5], b[5])],
+    depth: Math.min(ox, Math.min(oy, oz))
+  };
+}
+
+/* Two surfaces that touch are not two surfaces that collide. A boss top at
+   exactly the standoff it was built for would otherwise report as a clash on
+   every single plate, which is the fastest way to teach somebody to ignore a
+   warning list. */
+var CLASH_EPS = 0.02;
+
+function compLabel(c) { return c.name || t('unnamedComp'); }
+function wireLabel(w) { return w.name || t('unnamedWire'); }
+
+/* Everything standing on the plate, as a box with a name and an owner. */
+function obstacles() {
+  var t0 = doc.plate.thickness, out = [], i;
+
+  for (i = 0; i < doc.bosses.length; i++) {
+    var b = doc.bosses[i];
+    var r = bossOuterDia(b) / 2;
+    out.push({
+      kind: 'boss',
+      label: t('bossWord') + ' ' + sizeLabel(b.size),
+      owner: b.of,
+      box: [b.at[0] - r, b.at[1] - r, t0, b.at[0] + r, b.at[1] + r, t0 + bossHeightOf(b)]
+    });
+  }
+
+  var clear = numOr(doc.profile.wireClear, 0.4);
+  var wall = numOr(doc.profile.retWall, 1.2);
+  var seen = {};
+  for (i = 0; i < doc.retainers.length; i++) {
+    var ret = doc.retainers[i];
+    if (ret.origin === 'auto-suppressed') continue;
+    var pose = retainerPose(ret);
+    if (!pose) continue;
+    var od = pose.wire.od;
+    var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
+    var across = od + clear * 2 + wall * 2;
+    /* The sweep is a rectangle turned to whatever angle the wire runs at, so
+       take the exact box that contains the turned rectangle, rather than the
+       square that would contain it at any angle. The square was the first
+       version, and it reported the auto-placer's own spacing as a collision --
+       which is the fastest way to make a warning list worth ignoring. */
+    var ex = Math.abs(pose.dir[0]) * len / 2 + Math.abs(pose.dir[1]) * across / 2;
+    var ey = Math.abs(pose.dir[1]) * len / 2 + Math.abs(pose.dir[0]) * across / 2;
+
+    var floor = ret.level * (od + clear + wall);
+    seen[pose.wire.id] = (seen[pose.wire.id] || 0) + 1;
+    out.push({
+      kind: 'retainer',
+      wire: pose.wire.id,
+      /* Numbered within its wire. Two unnumbered tunnels on one wire produce
+         two warnings that read identically, and nothing tells you which of the
+         six the second one is. */
+      label: t(ret.kind === 'clip' ? 'clipWord' : 'tunnelWord') + ' #' + seen[pose.wire.id]
+             + ' · ' + wireLabel(pose.wire),
+      owner: null,
+      box: [pose.at[0] - ex, pose.at[1] - ey, t0,
+            pose.at[0] + ex, pose.at[1] + ey, t0 + floor + od + clear * 2 + wall]
+    });
+  }
+
+  var relief = numOr(doc.profile.markHeight, 0.4);
+  for (i = 0; i < doc.texts.length; i++) {
+    var bx = textBox(doc.texts[i]);
+    out.push({
+      kind: 'text',
+      label: '“' + doc.texts[i].text + '”',
+      owner: null,
+      box: [bx.x, bx.y, t0, bx.x + bx.w, bx.y + bx.h, t0 + relief]
+    });
+  }
+
+  return out;
+}
+
+function findClashes() {
+  var t0 = doc.plate.thickness;
+  var out = [], i, j, hit;
+  var obs = obstacles();
+
+  for (i = 0; i < doc.components.length; i++) {
+    var c = doc.components[i];
+    var foot = [c.at[0], c.at[1], t0, c.at[0] + c.size[0], c.at[1] + c.size[1], t0 + c.standoff];
+
+    /* 1. the space under the board */
+    for (j = 0; j < obs.length; j++) {
+      if (obs[j].kind === 'boss' && obs[j].owner === c.id) continue;
+      hit = boxOverlap(foot, obs[j].box);
+      if (!hit) continue;
+      out.push({
+        box: hit.box,
+        text: t('clashUnder')
+          .replace('{a}', compLabel(c))
+          .replace('{b}', obs[j].label)
+          .replace('{n}', mm(hit.box[5] - foot[5] > 0 ? hit.box[5] - foot[5] : hit.depth, 2))
+      });
+    }
+
+    /* 2. one component standing in another */
+    var solidC = [c.at[0], c.at[1], t0 + c.standoff,
+                  c.at[0] + c.size[0], c.at[1] + c.size[1],
+                  t0 + c.standoff + c.board + c.body];
+    for (j = i + 1; j < doc.components.length; j++) {
+      var d = doc.components[j];
+      var solidD = [d.at[0], d.at[1], t0 + d.standoff,
+                    d.at[0] + d.size[0], d.at[1] + d.size[1],
+                    t0 + d.standoff + d.board + d.body];
+      hit = boxOverlap(solidC, solidD);
+      if (!hit) continue;
+      out.push({
+        box: hit.box,
+        text: t('clashBodies')
+          .replace('{a}', compLabel(c))
+          .replace('{b}', compLabel(d))
+          .replace('{n}', mm(hit.depth, 2))
+      });
+    }
+
+    /* 3. off the edge */
+    if (c.at[0] < -CLASH_EPS || c.at[1] < -CLASH_EPS ||
+        c.at[0] + c.size[0] > doc.plate.w + CLASH_EPS ||
+        c.at[1] + c.size[1] > doc.plate.h + CLASH_EPS) {
+      out.push({ box: null, text: t('clashOffPlate').replace('{a}', compLabel(c)) });
+    }
+  }
+
+  /* 4. two things on the plate in the same place */
+  for (i = 0; i < obs.length; i++) {
+    for (j = i + 1; j < obs.length; j++) {
+      if (obs[i].kind === 'text' || obs[j].kind === 'text') continue;
+
+      /* Two retainers on the SAME wire are allowed to merge. They are threading
+         the one wire, the slicer unions them into a longer tunnel, and the
+         bore stays a bore. Two retainers on DIFFERENT wires merging is a real
+         fault -- the two bores open into each other and a wire can leave its
+         own channel -- so that pair is still checked. */
+      if (obs[i].kind === 'retainer' && obs[j].kind === 'retainer' &&
+          obs[i].wire === obs[j].wire) continue;
+
+      hit = boxOverlap(obs[i].box, obs[j].box);
+      if (!hit) continue;
+      out.push({
+        box: hit.box,
+        text: t('clashPlate')
+          .replace('{a}', obs[i].label)
+          .replace('{b}', obs[j].label)
+          .replace('{n}', mm(hit.depth, 2))
+      });
+    }
+  }
+
+  /* 5. a wire with nowhere to go under a board.
+
+     Tested against the wire's own drawn height rather than against its
+     diameter alone, because a wire that has been lifted over a crossing needs
+     the room it was lifted to, not the room it started with. */
+  for (i = 0; i < doc.wires.length; i++) {
+    var w = doc.wires[i];
+    var pts = wirePath3d(w);
+    for (j = 0; j < doc.components.length; j++) {
+      var e = doc.components[j];
+      var need = 0, anchored = false, k;
+      for (k = 0; k < w.path.length; k++) if (w.path[k].of === e.id) anchored = true;
+      if (anchored) continue;
+      for (k = 0; k < pts.length; k++) {
+        if (pts[k][0] < e.at[0] || pts[k][0] > e.at[0] + e.size[0]) continue;
+        if (pts[k][1] < e.at[1] || pts[k][1] > e.at[1] + e.size[1]) continue;
+        need = Math.max(need, pts[k][2] + w.od / 2 - doc.plate.thickness);
+      }
+      if (need > e.standoff + CLASH_EPS) {
+        out.push({
+          box: null,
+          text: t('clashWire')
+            .replace('{a}', wireLabel(w))
+            .replace('{b}', compLabel(e))
+            .replace('{n}', mm(need - e.standoff, 2))
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+function showClashes(list) {
+  var host = document.getElementById('clashList');
+  host.innerHTML = '';
+  document.getElementById('clashNote').textContent =
+    list.length ? t('clashesFound').replace('{n}', list.length) : t('clashesNone');
+
+  for (var i = 0; i < list.length && i < 40; i++) {
+    var d = document.createElement('div');
+    d.textContent = list[i].text;
+    host.appendChild(d);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Switching tabs, and orbiting
+   --------------------------------------------------------------------------
+   The 3D tab rebuilds from the document rather than keeping its own copy of
+   anything, so there is no way for the two views to disagree. Rebuilding runs
+   buildMesh, which is the expensive call in this page, so it happens once per
+   frame at most and only while the 3D tab is the one you are looking at.
+   -------------------------------------------------------------------------- */
+
+var tab = 'diagram';
+var dirty3d = true;
+var pending3d = false;
+
+function setTab(next) {
+  tab = next === '3d' ? '3d' : 'diagram';
+  var is3d = tab === '3d';
+
+  document.getElementById('tabDiagram').classList.toggle('on', !is3d);
+  document.getElementById('tab3d').classList.toggle('on', is3d);
+
+  document.getElementById('toolbar').hidden = is3d;
+  document.getElementById('stage').hidden = is3d;
+  document.getElementById('statusbar2d').hidden = is3d;
+  document.getElementById('stage3d').hidden = !is3d;
+  document.getElementById('statusbar3d').hidden = !is3d;
+
+  /* The panels that edit the drawing have nothing to do in a view you cannot
+     draw in, and the two that belong to the 3D tab have nothing to say in the
+     diagram. Hiding rather than disabling: a greyed-out column of twenty
+     fields is just noise with a lower contrast. */
+  var only2d = ['compPanel', 'bossPanel', 'wirePanel', 'retPanel', 'textPanel'];
+  for (var i = 0; i < only2d.length; i++) {
+    document.getElementById(only2d[i]).hidden = is3d;
+  }
+  document.getElementById('view3dPanel').hidden = !is3d;
+  document.getElementById('clashPanel').hidden = !is3d;
+
+  store.set('tab', tab);
+  if (is3d) {
+    if (first3d) { frame3d(); first3d = false; }
+    dirty3d = true;
+    draw3d();
+  } else {
+    draw();
+  }
+}
+
+var first3d = true;
+
+/* Marked dirty by every edit; acted on only when the 3D tab is showing. */
+function touch3d() {
+  dirty3d = true;
+  if (tab === '3d') draw3d();
+}
+
+function draw3d() {
+  /* The boot block sets the theme, which asks for a redraw, before this
+     module's own variables have been assigned. Hoisting makes the call legal
+     and this makes it harmless. */
+  if (!glCanvas) return;
+  if (pending3d) return;
+  pending3d = true;
+  requestAnimationFrame(function () {
+    pending3d = false;
+    if (!initGL()) return;
+    if (dirty3d) { build3d(); dirty3d = false; }
+    render3d();
+  });
+}
+
+document.getElementById('tabDiagram').onclick = function () { setTab('diagram'); };
+document.getElementById('tab3d').onclick = function () { setTab('3d'); };
+
+/* ---- orbit, pan, zoom ---- */
+
+var orbit = null;
+
+stage3d.addEventListener('pointerdown', function (e) {
+  if (e.button !== 0 && e.button !== 1) return;
+  e.preventDefault();
+  orbit = {
+    x: e.clientX,
+    y: e.clientY,
+    pan: e.shiftKey || e.button === 1,
+    id: e.pointerId
+  };
+  try { stage3d.setPointerCapture(e.pointerId); } catch (err) { /* see endPointer */ }
+  stage3d.classList.add('dragging');
+});
+
+stage3d.addEventListener('pointermove', function (e) {
+  if (!orbit) return;
+  var dx = e.clientX - orbit.x, dy = e.clientY - orbit.y;
+  orbit.x = e.clientX;
+  orbit.y = e.clientY;
+
+  if (orbit.pan) {
+    /* Pan in the plane the camera is looking along, scaled so a pixel of
+       mouse moves about a pixel of model at the target's depth. */
+    var r = stage3d.getBoundingClientRect();
+    var perPx = 2 * cam.dist * Math.tan(18 * Math.PI / 180) / Math.max(1, r.height);
+    var rx = [-Math.sin(cam.yaw), Math.cos(cam.yaw), 0];
+    var sp = Math.sin(cam.pitch), cp = Math.cos(cam.pitch);
+    var ux = [-sp * Math.cos(cam.yaw), -sp * Math.sin(cam.yaw), cp];
+    for (var k = 0; k < 3; k++) {
+      cam.target[k] -= rx[k] * dx * perPx;
+      cam.target[k] += ux[k] * dy * perPx;
+    }
+  } else {
+    cam.yaw -= dx * 0.008;
+    /* Stopped just short of straight up. At the pole the up vector and the
+       view direction are parallel and lookAt has no cross product to work
+       with, which shows up as the model flipping over. */
+    cam.pitch = Math.max(-1.45, Math.min(1.45, cam.pitch + dy * 0.008));
+  }
+  draw3d();
+});
+
+function endOrbit(e) {
+  if (!orbit) return;
+  try { stage3d.releasePointerCapture(orbit.id); } catch (err) { /* already gone */ }
+  orbit = null;
+  stage3d.classList.remove('dragging');
+}
+stage3d.addEventListener('pointerup', endOrbit);
+stage3d.addEventListener('pointercancel', endOrbit);
+
+stage3d.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  var f = Math.exp(e.deltaY * 0.0012);
+  cam.dist = Math.max(10, Math.min(4000, cam.dist * f));
+  draw3d();
+}, { passive: false });
+
+/* ---- the panel ---- */
+
+document.getElementById('showPrint').onchange = function () {
+  view3d.print = this.checked; touch3d();
+};
+document.getElementById('showComps').onchange = function () {
+  view3d.comps = this.checked; touch3d();
+};
+document.getElementById('showWires3d').onchange = function () {
+  view3d.wires = this.checked; touch3d();
+};
+document.getElementById('filamentColour').oninput = function () {
+  view3d.filament = colourOr(this.value, view3d.filament);
+  store.set('filament', view3d.filament);
+  touch3d();
+};
+document.getElementById('view3dReset').onclick = function () {
+  frame3d();
+  draw3d();
+};
+
+window.addEventListener('resize', function () { if (tab === '3d') draw3d(); });
+
+/* ---- what this browser remembered ---- */
+
+view3d.filament = colourOr(store.get('filament'), view3d.filament);
+document.getElementById('filamentColour').value = view3d.filament;
+setTab(store.get('tab') === '3d' ? '3d' : 'diagram');
+
 /* --------------------------------------------------------------------------
    Collapsible panels
    --------------------------------------------------------------------------
@@ -5859,6 +7047,8 @@ makeCollapsible('retPanel', true);
 makeCollapsible('textPanel', true);
 makeCollapsible('profilePanel', false);
 makeCollapsible('exportPanel', true);
+makeCollapsible('view3dPanel', true);
+makeCollapsible('clashPanel', true);
 makeCollapsible('viewPanel', false);
 
 FantomaApp.init({
