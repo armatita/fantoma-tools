@@ -320,6 +320,14 @@ straight into the reading. Inside caliper jaws are poor at these sizes; a drill
 shank that slides in and the next one that does not brackets a small hole
 better than the jaws do.
 
+**The one outlier was left alone.** The M2 self-tap hole read 1.72 against a
+drawn 1.60 -- the only hole on the plate wider than it was asked to be, while
+its neighbours on both sides came out narrower. It was read once, and its screw
+went in like all the others. Backing that screw out to re-measure would leave a
+tapped thread behind and a reading of the thread rather than of the print, so
+the hole is not worth re-measuring: it would answer a different question. Judged
+a measurement error, and it stays in the average that produced the allowance.
+
 **Every self-tap size took its screw**, including M1.4 and M1.7, so that whole
 column is now measured rather than standard. Reported as slightly tight, which
 matches holes arriving 0.14 under the tapping size, and is what the allowance
