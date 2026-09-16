@@ -211,47 +211,79 @@ thickness, both from the print profile. A boss that carried its own outer size
 could disagree with the profile, and then the drawing and the mesh would be
 describing different objects.
 
-### The numbers in the profile are placeholders, and the panel says so
+### Every number says where it came from
 
-Self-tap and clearance diameters are the conventional tapping and clearance
-sizes — inference from a standard, not a measurement. Insert diameters are
-worse: they vary by brand and by length, and the only way to know yours is to
-push one in. They are in the tool because it needs *a* number to draw, not
-because they are right.
+Each hole diameter carries one of three states, and **the tool never promotes
+between them on its own**:
 
-Sizes run M1.4, M1.7, M2, M2.5, M3, M4. The two smallest are there because
-they turn up in small modules and consumer teardowns, and they are the least
-trustworthy rows in the table. **M1.7 is not an ISO metric size at all**, so its
-figures are interpolated from its neighbours rather than read from a standard.
-And heat-set inserts that small may simply not exist — those two numbers are
-extrapolation from the ratio of the larger sizes, which is a polite word for
-invention. Treat them as fiction until an insert is actually in your hand.
+| | |
+|---|---|
+| **measured** | confirmed on a real print, on the machine named in the profile |
+| **standard** | an ISO tapping or clearance size — a table, not a measurement |
+| **assumed** | extrapolated or invented, because nothing better was to hand |
 
-There is a printing limit underneath this too: a 1.1 mm hole extruded through a
-0.4 mm nozzle comes out undersized and rough, whatever the table says. At these
-sizes a clearance hole with a nut underneath is often the better fixing, and the
-profile note says so.
+This follows the convention already used in `print_tests/TESTS.md` and
+`case_params.py`, and for the same stated reason: *a guess is never promoted to
+a measurement without measuring.* So **editing a hole does not mark it
+measured** — you might be trying a value rather than reporting one. Promotion
+is a separate, deliberate button. Unmarking returns a number to whatever the
+shipped default said it was, rather than to a fourth state meaning "was
+measured once".
 
-This is the same discipline as everything else here: a label or a datasheet
-that disagrees with reality is the normal case, so the tool states which of its
-numbers were measured and which were assumed. The calibration coupon exists to
-replace every one of them.
+**What is measured, and by whom.** M2 self-tap at 1.6 mm and M3 at 2.5 mm come
+from T2 in `print_tests`: a five-value sweep either side of each, every one of
+which took its screw without stripping or splitting at 2–3 mm of engagement.
+Everything else ships as standard or assumed.
 
-Editing a hole diameter edits the profile, not the boss. Every M3 self-tapped
-hole in a project is the same hole; they are all wrong together until the
-coupon says otherwise, and fixing them one at a time would guarantee an
-inconsistent plate.
+**The profile names the machine it describes**, because these numbers are not
+properties of the design. T2 makes that unarguable: the same 1.6 mm pilot in
+the same drawing measured **0.925 mm** under one slicer profile and **1.580 mm**
+under another — 71 % wider, from settings alone, with roundness improving by an
+order of magnitude alongside it. A hole diameter without the profile that
+produced it is not a measurement, it is an anecdote.
 
-### Undo
+### The smallest hole that prints round
 
-Ctrl+Z and Ctrl+Y, as whole-document snapshots — the document is small enough
-that a snapshot is just its JSON, so this needs no inverse operations and has
-no bugs of its own.
+`minHole`, default **1.5 mm**, measured. Below it a hole stops being round
+rather than merely being small: at 1.0 mm nominal the measured result was
+0.18 mm out of round — 18 % of nominal — against 0.01–0.07 mm everywhere from
+1.5 to 4.0 mm.
 
-It is here because the tool saves as you work. Without autosave, a mistake
-costs nothing: you close without saving. With it, the previous state is already
-overwritten by the time you notice, so undo is not a convenience, it is the
-only way back. Autosave and undo arrived in the same step for that reason.
+Two of the shipped self-tap defaults fall under it: **M1.4 at 1.1 mm and M1.7
+at 1.35 mm**. The tool says so on the boss and again before export, rather than
+letting a number that cannot be printed sit in a table looking like the others.
+Below the floor the advice is to model generously and drill, or to use a
+clearance hole and a nut.
+
+### Shrinkage is not uniform, and that matters later
+
+Through-holes in a 3 mm plate lost **0.168 mm ± 0.020** — essentially constant
+regardless of diameter, so the error is absolute rather than proportional,
+which is why it costs an M2 far more of its thread engagement than an M3.
+
+But a blind pilot inside a boss lost only **0.02 mm**. Same plate, same hour,
+same profile. The shrinkage is therefore not a global property of the machine,
+which is exactly why `xy_hole_compensation` is left at 0 there — a global
+correction would take the boss pilots to 1.75 and 1.89 and make loose screws of
+the one feature that works.
+
+**Every hole Protoplaca currently makes is blind**, so the table values are
+right as drawn. The moment clearance holes go through the plate they will need
+drawing oversize by roughly the through-hole shortfall. That is a measured
+design input already waiting for the triangulator.
+
+### Other findings carried in from the same tests
+
+- **Boss outer diameter = pilot + 4 mm**, which is the 2 mm wall default. T2
+  printed its bosses to that rule and none split.
+- **Boss height has no measurable effect** on how a boss behaves, so the height
+  field needs no printing constraint.
+- **Maximum unsupported bridge: 20 mm**, and 20 is the edge rather than a
+  comfortable limit. That is the design rule for a square tunnel roof in phase 3.
+- **Minimum structural rib: 1.0 mm**, design at 1.2. What failed below that was
+  not the rib printing but the rib staying attached to the plate. Phase 5.
+- **Minimum engraved groove: 0.4 mm**, the smallest tested. Phase 5, recessed
+  text.
 
 ### The print profile
 

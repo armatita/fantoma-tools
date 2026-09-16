@@ -287,6 +287,11 @@ Holes are blind, which is right for self-tapping screws and heat-set inserts.
 Clearance bosses are **not** drilled through the plate yet — that needs the same
 triangulation as recessed text and waits for it. The export panel says so.
 
+The print profile carries the hole sizes, and each one says where it came from
+— measured on a real print, a standard table size, or assumed. The M2 and M3
+self-tap pilots are measured, from the sweeps in `print_tests/`. Nothing is
+promoted to measured without you measuring it.
+
 Wires are phase 2.
 
 ---

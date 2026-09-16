@@ -111,6 +111,11 @@
   .note { font-size: 11px; color: #6b6b76; line-height: 1.55; margin-top: 10px; }
   /* A note explains; a warning says the output is not what you asked for.
      They should not look the same. */
+  .src { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .src.measured { color: #5ee88f; }
+  .src.standard { color: #9a9aa4; }
+  .src.assumed  { color: #ffb648; }
+
   .note.warn {
     color: #ffb648; border-left: 2px solid #ffb648; padding-left: 8px;
   }
@@ -308,10 +313,27 @@
           <span class="unit">mm</span>
         </div>
         <div class="field narrow">
+          <label for="profMinHole" id="lbMinHole"></label>
+          <input type="number" id="profMinHole" inputmode="decimal" step="0.1" min="0.1">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field narrow">
           <label for="profHole" id="lbHoleDia"></label>
           <input type="number" id="profHole" inputmode="decimal" step="0.1" min="0.2">
           <span class="unit">mm</span>
         </div>
+        <div class="field">
+          <label id="lbSource"></label>
+          <span class="src" id="holeSrc">—</span>
+        </div>
+        <div class="row">
+          <button type="button" id="promoteBtn"></button>
+        </div>
+        <div class="note warn" id="holeSmallWarn" hidden></div>
+        <div class="field">
+          <label for="profSource" id="lbProfSource"></label>
+        </div>
+        <input type="text" id="profSource" maxlength="80" style="width:100%">
         <div class="note" id="profileNote"></div>
       </section>
 
@@ -325,6 +347,7 @@
           <button type="button" id="stlBtn"></button>
         </div>
         <div class="note warn" id="clearanceWarn" hidden></div>
+        <div class="note warn" id="smallHoleWarn" hidden></div>
         <div class="note" id="exportNote"></div>
       </section>
 
@@ -416,13 +439,25 @@ var STRINGS = {
     hintBoss: 'drag to move \u00b7 Delete removes it',
     profile: 'Print profile',
     wall: 'Wall',
+    minHole: 'Smallest hole',
+    holeFrom: 'This hole is',
+    srcMeasured: 'measured',
+    srcStandard: 'standard size',
+    srcAssumed: 'assumed',
+    promote: 'Mark as measured',
+    demote: 'Unmark',
+    profSource: 'Measured on',
+    holeSmallWarn: 'This hole is under the smallest that prints round. Below the '
+      + 'floor a hole comes out oval and undersized \u2014 model it generously and '
+      + 'drill, or use a clearance hole and a nut.',
+    smallHoleWarn: 'Some bosses have holes under the smallest that prints round. '
+      + 'They will come out oval and undersized.',
     holeDia: 'Hole',
-    profileNote: 'The hole shown is for the selected boss. Every number here is '
-      + 'a placeholder: the self-tap and clearance figures are standard sizes '
-      + 'rather than measurements, and insert sizes vary by brand. At M1.4 and '
-      + 'M1.7 the insert figures are guesses at parts that may not exist, and '
-      + 'a hole that small prints undersized on a 0.4 mm nozzle. Print the '
-      + 'calibration coupon and replace them with what actually fits.',
+    profileNote: 'These numbers belong to one printer, one filament and one '
+      + 'slicer profile — change any of those and they need checking again. '
+      + 'Each hole says where it came from, and nothing is promoted to measured '
+      + 'without you measuring it. Print the calibration coupon and promote the '
+      + 'ones you check.',
     addComp: 'Add component',
     duplicate: 'Duplicate',
     remove: 'Delete',
@@ -510,14 +545,25 @@ var STRINGS = {
     hintBoss: 'arraste para mover \u00b7 Delete apaga',
     profile: 'Perfil de impress\u00e3o',
     wall: 'Parede',
+    minHole: 'Furo m\u00ednimo',
+    holeFrom: 'Este furo \u00e9',
+    srcMeasured: 'medido',
+    srcStandard: 'medida padr\u00e3o',
+    srcAssumed: 'presumido',
+    promote: 'Marcar como medido',
+    demote: 'Desmarcar',
+    profSource: 'Medido em',
+    holeSmallWarn: 'Este furo \u00e9 menor do que o m\u00ednimo que sai redondo. '
+      + 'Abaixo desse limite o furo sai oval e subdimensionado \u2014 desenhe-o com '
+      + 'folga e fure depois, ou use furo passante e porca.',
+    smallHoleWarn: 'H\u00e1 bossas com furos menores do que o m\u00ednimo que sai '
+      + 'redondo. V\u00e3o sair ovais e subdimensionados.',
     holeDia: 'Furo',
-    profileNote: 'O furo mostrado \u00e9 o da bossa selecionada. Todos estes '
-      + 'n\u00fameros s\u00e3o provis\u00f3rios: os valores de autoroscante e de furo '
-      + 'passante s\u00e3o medidas padr\u00e3o e n\u00e3o medi\u00e7\u00f5es, e os '
-      + 'insertos variam com a marca. Em M1.4 e M1.7 os valores de inserto '
-      + 'são palpites sobre peças que podem nem existir, e um furo tão '
-      + 'pequeno sai subdimensionado com um bico de 0,4 mm. Imprima o cup\u00e3o de calibra\u00e7\u00e3o e '
-      + 'substitua-os pelo que realmente encaixa.',
+    profileNote: 'Estes números pertencem a uma impressora, um filamento e '
+      + 'um perfil de fatiamento — mude qualquer um deles e voltam a precisar '
+      + 'de verificação. Cada furo diz de onde veio, e nada passa a '
+      + 'medido sem que o meça. Imprima o cupão de calibração e '
+      + 'promova os que verificar.',
     addComp: 'Adicionar componente',
     duplicate: 'Duplicar',
     remove: 'Apagar',
@@ -619,6 +665,11 @@ function blankDoc() {
    -------------------------------------------------------------------------- */
 function defaultProfile() {
   return {
+    // Whose printer these numbers describe. Results mean nothing without it:
+    // the same 1.6 mm pilot measured 0.925 mm under one slicer profile and
+    // 1.580 mm under another, from settings alone.
+    source: 'Elegoo Centauri Carbon \u00b7 PLA \u00b7 FINISH profile',
+    minHole: 1.5,         // below this a round hole stops being round
     wall: 2,              // mm of material around the hole
     holes: {
       // size:   [ self-tap, heat-set insert, clearance ]
@@ -628,8 +679,51 @@ function defaultProfile() {
       M2_5:{ selftap: 2.1, insert: 3.6, clearance: 2.9 },
       M3:  { selftap: 2.5, insert: 4.0, clearance: 3.4 },
       M4:  { selftap: 3.3, insert: 5.6, clearance: 4.5 }
-    }
+    },
+    holeSource: defaultHoleSource()
   };
+}
+
+/* --------------------------------------------------------------------------
+   Where each number came from
+   --------------------------------------------------------------------------
+   Three states, and the tool never promotes between them on its own:
+
+     measured  - confirmed on a real print, on the machine named in `source`
+     standard  - an ISO tapping or clearance size; a table, not a measurement
+     assumed   - extrapolated or invented, because nothing better was to hand
+
+   `measured` beats the other two by a margin worth showing. On the real
+   control panel a 1.6 mm pilot came out 0.925 mm -- 42 % undersize -- and on
+   the test coupon, same drawing, it came out 1.580 mm. Nothing in a table
+   predicts that; only a print does.
+
+   Promotion is deliberate and manual. Editing a number does NOT mark it
+   measured, because you might be trying a value rather than reporting one,
+   and a guess must never be promoted to a measurement without measuring.
+   -------------------------------------------------------------------------- */
+var SOURCES = ['measured', 'standard', 'assumed'];
+
+function defaultHoleSource() {
+  return {
+    // M2 and M3 self-tap pilots: swept on T2 and both took their screws
+    // without splitting or stripping at 2-3 mm of engagement.
+    M1_4: { selftap: 'standard', insert: 'assumed',  clearance: 'standard' },
+    M1_7: { selftap: 'assumed',  insert: 'assumed',  clearance: 'assumed'  },
+    M2:   { selftap: 'measured', insert: 'assumed',  clearance: 'standard' },
+    M2_5: { selftap: 'standard', insert: 'assumed',  clearance: 'standard' },
+    M3:   { selftap: 'measured', insert: 'assumed',  clearance: 'standard' },
+    M4:   { selftap: 'standard', insert: 'assumed',  clearance: 'standard' }
+  };
+}
+
+function holeSourceOf(b) {
+  var row = doc.profile.holeSource[b.size];
+  return (row && row[b.fixing]) || 'assumed';
+}
+
+function holeTooSmall(b) {
+  return b.fixing !== 'insert' && holeDia(b) < numOr(doc.profile.minHole, 1.5);
 }
 
 /* M1.7 is not an ISO metric size, but it turns up constantly in small modules
@@ -797,6 +891,8 @@ function normProfile(raw) {
   var d = defaultProfile();
   var out = copyInto({}, raw && typeof raw === 'object' ? raw : {});
   out.wall = numOr(out.wall, d.wall, 0.4, 20);
+  out.minHole = numOr(out.minHole, d.minHole, 0.1, 20);
+  out.source = typeof out.source === 'string' ? out.source.slice(0, 80) : d.source;
   var holes = copyInto({}, (raw && raw.holes) || {});
   for (var i = 0; i < SIZES.length; i++) {
     var key = SIZES[i];
@@ -807,6 +903,18 @@ function normProfile(raw) {
     holes[key] = row;
   }
   out.holes = holes;
+
+  var src = copyInto({}, (raw && raw.holeSource) || {});
+  for (var a = 0; a < SIZES.length; a++) {
+    var sk = SIZES[a];
+    var srow = copyInto({}, src[sk] || {});
+    for (var b2 = 0; b2 < FIXINGS.length; b2++) {
+      var fk = FIXINGS[b2];
+      if (SOURCES.indexOf(srow[fk]) < 0) srow[fk] = d.holeSource[sk][fk];
+    }
+    src[sk] = srow;
+  }
+  out.holeSource = src;
   return out;
 }
 
@@ -2216,6 +2324,11 @@ var B = {
 };
 var profWall = document.getElementById('profWall');
 var profHole = document.getElementById('profHole');
+var profMinHole = document.getElementById('profMinHole');
+var profSource = document.getElementById('profSource');
+var holeSrc = document.getElementById('holeSrc');
+var promoteBtn = document.getElementById('promoteBtn');
+var holeSmallWarn = document.getElementById('holeSmallWarn');
 
 function fillSelect(el, values, labelFor, current) {
   el.innerHTML = '';
@@ -2255,11 +2368,25 @@ function syncBossControls() {
     document.getElementById('bossDerived').textContent = b.of ? t('bossDerived') : '';
     profHole.value = round2(holeDia(b));
     profHole.disabled = false;
+
+    var src = holeSourceOf(b);
+    holeSrc.textContent = t('src' + src.charAt(0).toUpperCase() + src.slice(1));
+    holeSrc.className = 'src ' + src;
+    promoteBtn.textContent = src === 'measured' ? t('demote') : t('promote');
+    promoteBtn.disabled = false;
+    holeSmallWarn.hidden = !holeTooSmall(b);
   } else {
     profHole.value = '';
     profHole.disabled = true;
+    holeSrc.textContent = '\u2014';
+    holeSrc.className = 'src';
+    promoteBtn.textContent = t('promote');
+    promoteBtn.disabled = true;
+    holeSmallWarn.hidden = true;
   }
   profWall.value = doc.profile.wall;
+  profMinHole.value = doc.profile.minHole;
+  profSource.value = doc.profile.source;
 }
 
 function onBossField() {
@@ -2292,6 +2419,41 @@ profWall.addEventListener('input', function () {
   scheduleSave();
   draw();
 });
+
+profMinHole.addEventListener('focus', snapshot);
+profMinHole.addEventListener('input', function () {
+  if (syncing) return;
+  doc.profile.minHole = Math.max(0.1, num(profMinHole, doc.profile.minHole));
+  syncControls();
+  scheduleSave();
+  draw();
+});
+
+profSource.addEventListener('focus', snapshot);
+profSource.addEventListener('input', function () {
+  if (syncing) return;
+  doc.profile.source = profSource.value.slice(0, 80);
+  scheduleSave();
+});
+
+/* The one place a number changes what it claims about itself.
+
+   Deliberately a separate act from editing the value, because you might be
+   trying a number rather than reporting one -- and a guess must never be
+   promoted to a measurement without measuring. Unmarking returns it to
+   whatever the shipped default said it was, rather than to a fourth state
+   meaning "was measured once". */
+promoteBtn.onclick = function () {
+  var b = selectedBoss();
+  if (!b) return;
+  snapshot();
+  var defaults = defaultHoleSource();
+  var now = holeSourceOf(b);
+  doc.profile.holeSource[b.size][b.fixing] =
+    (now === 'measured') ? defaults[b.size][b.fixing] : 'measured';
+  syncControls();
+  scheduleSave();
+};
 
 profHole.addEventListener('focus', snapshot);
 profHole.addEventListener('input', function () {
@@ -2656,6 +2818,13 @@ function hasClearance() {
   return false;
 }
 
+function anyHoleTooSmall() {
+  for (var i = 0; i < doc.bosses.length; i++) {
+    if (holeTooSmall(doc.bosses[i])) return true;
+  }
+  return false;
+}
+
 function syncExport() {
   var tris = buildMesh().length;
   // 50 bytes a triangle plus an 84-byte header, so the size is exact rather
@@ -2663,6 +2832,7 @@ function syncExport() {
   var kb = Math.round((84 + tris * 50) / 1024);
   triCount.textContent = tris + '  (' + kb + ' kB)';
   clearanceWarn.hidden = !hasClearance();
+  document.getElementById('smallHoleWarn').hidden = !anyHoleTooSmall();
 }
 
 document.getElementById('stlBtn').onclick = function () {
@@ -2779,6 +2949,11 @@ function applyLang() {
   document.getElementById('ttProfile').textContent = t('profile');
   document.getElementById('lbWall').textContent = t('wall');
   document.getElementById('lbHoleDia').textContent = t('holeDia');
+  document.getElementById('lbMinHole').textContent = t('minHole');
+  document.getElementById('lbSource').textContent = t('holeFrom');
+  document.getElementById('lbProfSource').textContent = t('profSource');
+  document.getElementById('holeSmallWarn').textContent = t('holeSmallWarn');
+  document.getElementById('smallHoleWarn').textContent = t('smallHoleWarn');
   document.getElementById('profileNote').textContent = t('profileNote');
 
   document.getElementById('ttPlate').textContent = t('plate');
