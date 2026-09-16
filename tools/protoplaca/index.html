@@ -94,6 +94,17 @@
   button:active { transform: translateY(1px); }
   button.active { background: #4dd8ff; color: #0d0d12; border-color: #4dd8ff; }
 
+  /* The things you reach for while drawing live above the drawing, where
+     taking one does not cost you sight of it. */
+  .toolbar { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+  .toolbar .tool {
+    flex: 0 0 auto; width: 32px; height: 32px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .toolbar .tool svg { width: 18px; height: 18px; display: block; }
+  .toolbar .tool.active { background: #4dd8ff; color: #0d0d12; border-color: #4dd8ff; }
+  .toolbar .gap { width: 1px; height: 20px; background: #2b2b36; margin: 0 5px; }
+
   .langswitch { display: flex; gap: 4px; }
   .langswitch button { padding: 4px 8px; font-size: 10px; flex: 0 0 auto; letter-spacing: 0.1em; }
 
@@ -119,6 +130,24 @@
 
   <div class="cols">
     <div>
+      <div class="toolbar" id="toolbar">
+        <button type="button" class="tool" id="fitBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V3h4M17 7V3h-4M3 13v4h4M17 13v4h-4"/><rect x="7" y="7" width="6" height="6"/></svg>
+        </button>
+        <button type="button" class="tool" id="crosshairBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5v5M10 12.5v5M2.5 10h5M12.5 10h5"/><circle cx="10" cy="10" r="2.4"/></svg>
+        </button>
+        <button type="button" class="tool" id="dimsBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="12" height="7"/><path d="M4 14.5h12M4 13v3M16 13v3"/></svg>
+        </button>
+        <span class="gap"></span>
+        <button type="button" class="tool" id="measureBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14.5L14.5 5.5"/><circle cx="5" cy="15" r="1.7"/><circle cx="15" cy="5" r="1.7"/></svg>
+        </button>
+        <button type="button" class="tool" id="clearGuidesBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5h14M7.5 3v14" stroke-dasharray="2.5 2"/><path d="M12.5 12.5l4.5 4.5M17 12.5l-4.5 4.5"/></svg>
+        </button>
+      </div>
       <div id="stage"><canvas id="cv"></canvas></div>
       <div class="statusbar">
         <span>X <b id="curX">—</b></span>
@@ -307,14 +336,6 @@
             <option value="0" id="optNoGrid"></option>
           </select>
         </div>
-        <div class="row">
-          <button type="button" id="fitBtn"></button>
-          <button type="button" id="measureBtn"></button>
-        </div>
-        <div class="row">
-          <button type="button" id="crosshairBtn"></button>
-          <button type="button" id="clearGuidesBtn"></button>
-        </div>
         <div class="note" id="viewNote"></div>
       </section>
     </div>
@@ -429,6 +450,7 @@ var STRINGS = {
     fit: 'Fit',
     measure: 'Measure',
     crosshair: 'Crosshair',
+    dimensions: 'Dimensions',
     clearGuides: 'Clear guides',
     zoom: 'Zoom',
     hintIdle: 'drag to pan · wheel to zoom · drag off a ruler for a guide',
@@ -522,6 +544,7 @@ var STRINGS = {
     fit: 'Ajustar',
     measure: 'Medir',
     crosshair: 'Mira',
+    dimensions: 'Dimens\u00f5es',
     clearGuides: 'Limpar guias',
     zoom: 'Ampliação',
     hintIdle: 'arraste para deslocar · roda para ampliar · arraste de uma régua para uma guia',
@@ -930,8 +953,16 @@ function componentAt(p) {
   return null;
 }
 
+/* Trim a label until it fits the box it is sitting in. Better a shortened
+   name than one that spills over its own component and onto its neighbour. */
+function fitLabel(text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  var out = text;
+  while (out.length > 1 && ctx.measureText(out).width > maxWidth) out = out.slice(0, -1);
+  return out;
+}
+
 function drawComponents() {
-  ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -945,13 +976,27 @@ function drawComponents() {
     ctx.lineWidth = 1;
     ctx.strokeRect(crisp(r.x), crisp(r.y), Math.round(r.w), Math.round(r.h));
 
-    if (c.name && r.w > 34 && r.h > 14) {
-      ctx.fillStyle = c.colour;
-      var label = c.name;
-      while (label.length > 1 && ctx.measureText(label).width > r.w - 8) {
-        label = label.slice(0, -1);
-      }
-      ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
+    // The name, and under it the two numbers you would otherwise go to the
+    // panel to read -- but only where there is honestly room for them. A label
+    // that overflows its component is worse than no label.
+    var lines = [];
+    if (c.name) lines.push(c.name);
+    if (showDims) {
+      lines.push(round2(c.size[0]) + ' \u00d7 ' + round2(c.size[1]));
+      lines.push('(' + round2(c.at[0]) + ', ' + round2(c.at[1]) + ')');
+    }
+    if (!lines.length) continue;
+
+    var lineH = 12;
+    if (r.w < 36 || r.h < lines.length * lineH + 4) continue;
+
+    var cx = r.x + r.w / 2;
+    var top = r.y + r.h / 2 - (lines.length - 1) * lineH / 2;
+    for (var k = 0; k < lines.length; k++) {
+      ctx.font = (k === 0 && c.name ? '11px' : '10px')
+        + ' ui-monospace, Menlo, Consolas, monospace';
+      ctx.fillStyle = (k === 0 && c.name) ? c.colour : withAlpha(c.colour, 0.75);
+      ctx.fillText(fitLabel(lines[k], r.w - 8), cx, top + k * lineH);
     }
   }
 }
@@ -990,6 +1035,21 @@ function drawBosses() {
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, outer, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, hole, 0, Math.PI * 2); ctx.stroke();
+
+    // With dimensions on, a boss says what it is. This is what makes the
+    // calibration coupon readable on screen: eighteen identical-looking rings
+    // become a labelled grid, and the editor becomes the coupon's legend.
+    if (showDims && outer > 11) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
+      ctx.fillStyle = COL.boss;
+      ctx.fillText(sizeLabel(b.size), cx, cy + outer + 3);
+      if (outer > 16) {
+        ctx.fillStyle = withAlpha(COL.boss, 0.7);
+        ctx.fillText(t(b.fixing), cx, cy + outer + 13);
+      }
+    }
 
     // A heat-set insert is a different operation with a different failure
     // mode, so it should not look like a drilled hole. Ticks mark it.
@@ -1350,6 +1410,7 @@ function plaque(lines, x, y) {
    component library the coordinate readout is how parts get placed, so it is
    the number read most often and it belongs under the eye. */
 var crosshair = true;
+var showDims = false;   // off by default: it is a lot of ink on a busy plate
 
 function drawCursor() {
   if (!crosshair || !cursor) return;
@@ -1839,6 +1900,14 @@ measureBtn.onclick = function () {
   measure.a = measure.b = measure.live = null;
   if (measure.on) { deselect(); syncControls(); }
   measureBtn.classList.toggle('active', measure.on);
+  draw();
+};
+
+var dimsBtn = document.getElementById('dimsBtn');
+dimsBtn.onclick = function () {
+  showDims = !showDims;
+  dimsBtn.classList.toggle('active', showDims);
+  store.set('showDims', showDims);
   draw();
 };
 
@@ -2552,6 +2621,12 @@ document.getElementById('couponBtn').onclick = function () {
    -------------------------------------------------------------------------- */
 var store = Fantoma.store('protoplaca');
 
+function tip(id, label) {
+  var el = document.getElementById(id);
+  el.title = label;
+  el.setAttribute('aria-label', label);
+}
+
 function applyLang() {
   document.documentElement.lang = (lang === 'pt' ? 'pt-PT' : 'en');
   document.getElementById('subtitle').textContent = t('subtitle');
@@ -2608,10 +2683,14 @@ function applyLang() {
   document.getElementById('ttView').textContent = t('view');
   document.getElementById('lbGrid').textContent = t('grid');
   document.getElementById('optNoGrid').textContent = t('noGrid');
-  document.getElementById('fitBtn').textContent = t('fit');
-  document.getElementById('measureBtn').textContent = t('measure');
-  document.getElementById('crosshairBtn').textContent = t('crosshair');
-  document.getElementById('clearGuidesBtn').textContent = t('clearGuides');
+  // Toolbar buttons hold an SVG, so their label is the tooltip. Writing
+  // textContent here would throw the icon away -- the same trap the panel
+  // headings hit with their chevron.
+  tip('fitBtn', t('fit'));
+  tip('crosshairBtn', t('crosshair'));
+  tip('dimsBtn', t('dimensions'));
+  tip('measureBtn', t('measure'));
+  tip('clearGuidesBtn', t('clearGuides'));
   document.getElementById('viewNote').textContent = t('viewNote');
   document.getElementById('langEn').classList.toggle('active', lang === 'en');
   document.getElementById('langPt').classList.toggle('active', lang === 'pt');
@@ -2635,6 +2714,9 @@ gridSel.value = String(gridPitch);
 
 crosshair = store.get('crosshair') !== false;   // on unless turned off
 crosshairBtn.classList.toggle('active', crosshair);
+
+showDims = store.get('showDims') === true;
+dimsBtn.classList.toggle('active', showDims);
 
 /* What this browser remembered goes through the same door as an opened file.
    If it is corrupt or from a version that never existed, we start clean rather

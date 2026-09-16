@@ -485,7 +485,7 @@ Portuguese here means European Portuguese, not Brazilian.
 
 ---
 
-## Interface, planned but not built
+## Interface
 
 Raised while using the first working build, and worth having. None of it
 changes the document or the geometry — it is all about getting at the tool,
@@ -493,14 +493,20 @@ and none of it is load-bearing: the canvas measures its own box every frame, so
 a toolbar can be dropped in above it without the drawing code noticing, and the
 buttons bind by id so moving them is moving markup.
 
-**A toolbar above the drawing, icons with tooltips.** The panels beside the
-canvas are for typing numbers; the things you reach for while drawing belong
-above the drawing, where taking them does not cost you sight of it.
+**A toolbar above the drawing, icons with tooltips** — **built**. The panels
+beside the canvas are for typing numbers; the things you reach for while drawing
+belong above the drawing, where taking them does not cost you sight of it.
 
-What goes on it:
+On it: Fit, Cursor readout, Dimensions, Measure, Clear guides. The View panel
+keeps only the grid pitch, which is a choice rather than an action.
 
-- **Measure**, as a toggle — moved off the View panel.
-- **Clear guides**, as a push button — likewise.
+Its buttons hold an SVG, so their label is the tooltip — `applyLang` sets
+`title` rather than `textContent`, because writing text into them would throw
+the icon away. That is the second time this trap has been hit here; the panel
+headings hit it with their chevron.
+
+- **Measure**, as a toggle — moved off the View panel. Built.
+- **Clear guides**, as a push button — likewise. Built.
 - **Cursor readout** — **built**, though it lives on the View panel until
   there is a toolbar to move it to. Dashed crosshair, a mark on each ruler, and
   the coordinate beside the pointer. It was pulled forward because it is not
@@ -509,8 +515,15 @@ What goes on it:
   component library the coordinate readout is how parts get placed, so it is
   the number read most often. On by default; the status bar keeps its copy,
   which is always visible and does not need the pointer to be over the drawing.
-- **Component dimensions**, as a toggle. Each component's size and origin shown
-  under its name, when there is room for them.
+- **Component dimensions**, as a toggle — **built**. Each component's size and
+  origin under its name, and each boss's screw size and fixing under the ring,
+  when there is honestly room: a label that overflows its own component onto its
+  neighbour is worse than no label, so they are dropped rather than crammed.
+
+  Extending it to bosses was not in the original suggestion, and it turned out
+  to be the bigger win. **It is what makes the calibration coupon readable.**
+  Eighteen near-identical rings become a labelled grid, which is what lets the
+  coupon work before there is any way to emboss text on a plate.
 
 **A default colour palette for components**, with a custom colour still
 available. Picking from a handful is less work than deciding a hex value, and
