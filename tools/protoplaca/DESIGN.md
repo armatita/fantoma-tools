@@ -60,7 +60,7 @@ screw the ESP32 down" without any wire handling at all.
 (built)
 **Phase 4** — the 3D tab: the mesh plus coloured wires and components, collision
 checks. (built)
-**Phase 5** — ribs.
+**Phase 5** — ribs. (built)
 
 ---
 
@@ -333,6 +333,12 @@ column is now measured rather than standard. Reported as slightly tight, which
 matches holes arriving 0.14 under the tapping size, and is what the allowance
 now corrects. The insert column stays assumed: their holes were measured but no
 insert has been pushed into one, and a diameter is not a fit.
+
+**There are no inserts to push.** None on hand, and they have to be ordered, so
+that column is going to stay `assumed` for a while. Worth stating plainly rather
+than leaving as an open task that looks a week away: the allowance for inserts
+is deliberately 0, the sizes are ISO table values, and the first person to press
+one in should expect to correct both.
 
 ### An allowance, rather than eighteen corrected sizes
 
@@ -1035,6 +1041,92 @@ it from the drawn path means the readout and the picture cannot disagree, and a
 crossing added after the wire was measured changes the number the moment it
 appears.
 
+## Ribs
+
+A plate with four screws pulled tight bows in the middle. A rib across it stops
+that for a few grams and some floor space, which is the whole of phase 5.
+
+**It stands up.** That is the structurally worse of the two choices and the only
+printable one: the plate lies face up on the bed, so a rib underneath prints in
+mid-air. Everything in this tool grows up from the plate top for the same
+reason, and this is the case where it costs something — a rib on the underside
+would be out of the way, and it is not available.
+
+**It is a polyline**, drawn with the wire tool's gesture: click to place,
+double-click to finish, Escape to abandon, square and 45 degrees snapped.
+Deliberately the same gesture, because it is the same gesture. What differs is
+that a rib anchors to nothing — it is part of the plate, not something laid on
+it.
+
+### The floor is not a printing limit
+
+T3 swept seven fins from 0.4 to 2.0 mm. The result that matters is not which
+ones printed — they all did, and Arachne filled every one of them solid, with no
+void down the middle. It is **where they failed**: 0.4, 0.6 and 0.8 came away at
+the joint to the base plate. A thin rib here is not unprintable, it is
+**unattached**, which is worse, because it looks perfect and does nothing.
+
+So `minRib` is 1.0 and the default is 1.2, one step up for margin. Under the
+floor the panel says what will actually happen rather than "too thin".
+
+### A rib crossing a wire
+
+Unavoidable: a stiffener wants to run where there is space, and so does a wire.
+Three things could happen, and the tool does the first that fits.
+
+**It arches over.** The rib's cross-section is taken in (along, up) and swept
+across its own width, so an opening is a shape cut out of the bottom edge of
+that section — and the triangulator that cuts the plate's clearance holes cuts
+this too. The arch is the tunnel's arch, for the tunnel's reason: it never
+exceeds 45 degrees of overhang, so nothing is bridged and nothing sags into the
+clearance the wire needs.
+
+**It stops either side.** When the rib is too short to carry a roof over the
+wire, the rib breaks rather than sitting on it. A break is a worse stiffener
+than an arch and a far better one than a rib resting on a wire, and the clash
+list says how tall the rib would have to be to arch instead.
+
+**It is reported and nothing is cut.** Two cases. A wire meeting a rib at a
+shallow angle needs an opening that grows as 1/sin — at ten degrees it is six
+times the wire — and past about twenty degrees the wire is not crossing the rib,
+it is running along it, and the answer is to move one of them. And a crossing
+that lands on one of the rib's own corners falls between two sweeps and belongs
+to neither.
+
+A wire through a rib's corner crosses **both** of the segments that meet there,
+and came back as two crossings a hair apart: one hole to cut and one thing to
+say, so the duplicate is dropped.
+
+### Corners
+
+Each straight run is its own sweep, so a corner is a wedge of missing material
+on the outside of the turn. It is filled with a round post of the rib's own
+width. Round rather than mitred: a mitre needs the angle bisector and runs to
+infinity as a rib doubles back on itself, and a rounded corner on a stiffener is
+not a compromise — it is where the fillet would go anyway.
+
+### What the clash list does and does not say about a rib
+
+A rib running into a **boss** is not a fault, it is the point: they union into
+one braced structure, and a rib that ends at a boss is stiffer than one that
+stops beside it. Two ribs crossing are a grid, which is better than either one
+alone. Both are excluded.
+
+A rib through a **retainer** is still a fault — that one has a wire in it. A rib
+under a **board** is measured against the standoff like anything else standing
+on the plate, and it is boxed per straight run rather than as one rectangle,
+because an L-shaped rib boxed as a rectangle claims the empty corner it wraps
+around, which is exactly where somebody has put a component.
+
+### On the drawing
+
+A rib is grey with a dashed centre line, not a palette colour: it is plate, not
+something laid on the plate, and the first version in a palette green was
+indistinguishable from a yellow wire beside it. It draws **under** the wires,
+because that is where it is. A ring marks every crossing the rib arches over and
+a red cross marks every one it could not — from above those two look identical,
+and they are opposites.
+
 ## The palette
 
 Fifteen colours, the same fifteen the model viewer offers, **copied rather than
@@ -1064,6 +1156,8 @@ than quietly solved by inventing two colours the other tool does not have.
 - **Junctions.** Wires run point to point. Where three wires must meet, that is a
   component — a terminal block — not a wire feature.
 - **Lightening and ventilation holes** in the plate.
+- **Ribs on the underside**, which would be out of the way and would need
+  either supports or a second print orientation.
 - **Engraved text.** Raised text is legible now that the pen follows the cap
   height, so the reason for engraving it — that raised text was hard to read —
   has gone. The triangulator could cut it if a plate ever needs something

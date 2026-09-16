@@ -100,7 +100,9 @@
   /* A field whose value is derived from somewhere else should look as though
      it cannot be typed in, not merely refuse to be typed in. */
   .field input:disabled { opacity: 0.45; cursor: not-allowed; }
-  .sws { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; margin-top: 6px; }
+  /* Nine to a row: seventeen across one row of a 290px panel leaves swatches
+     too small to aim at. */
+  .sws { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; margin-top: 6px; }
   .sws button {
     height: 16px; padding: 0; border: 1px solid #3a3a44; border-radius: 3px;
     cursor: pointer; min-width: 0;
@@ -188,6 +190,9 @@
         <span class="gap"></span>
         <button type="button" class="tool" id="wireBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15h4l3-10h4l3 5"/><circle cx="3" cy="15" r="1.6"/><circle cx="17" cy="10" r="1.6"/></svg>
+        </button>
+        <button type="button" class="tool" id="ribBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 14.5h15"/><path d="M5 14.5V6M9 14.5V4M13 14.5V6M17 14.5V8.5"/></svg>
         </button>
         <button type="button" class="tool" id="measureBtn">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14.5L14.5 5.5"/><circle cx="5" cy="15" r="1.7"/><circle cx="15" cy="5" r="1.7"/></svg>
@@ -421,6 +426,32 @@
           </div>
         </div>
         <div class="note" id="retNote"></div>
+      </section>
+
+      <section class="panel" id="ribPanel">
+        <h2><span id="ttRibs"></span></h2>
+        <div class="note" id="ribEmpty"></div>
+        <div id="ribFields" hidden>
+          <div class="field">
+            <label for="ribName" id="lbRibName"></label>
+            <input type="text" id="ribName" maxlength="40">
+          </div>
+          <div class="field narrow">
+            <label for="ribWidth" id="lbRibWidth"></label>
+            <input type="number" id="ribWidth" inputmode="decimal" step="0.2" min="0.2">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="ribHeight" id="lbRibHeight"></label>
+            <input type="number" id="ribHeight" inputmode="decimal" step="0.5" min="0.4">
+            <span class="unit">mm</span>
+          </div>
+          <div class="note warn" id="ribWarn" hidden></div>
+          <div class="row">
+            <button type="button" id="delRibBtn"></button>
+          </div>
+        </div>
+        <div class="note" id="ribNote"></div>
       </section>
 
       <section class="panel" id="textPanel">
@@ -731,9 +762,28 @@ var STRINGS = {
     clashWire: '{a} runs under {b} and needs {n} mm more standoff than it has.',
     unnamedComp: 'an unnamed component',
     unnamedWire: 'an unnamed wire',
+    unnamedRib: 'an unnamed rib',
     bossWord: 'a boss',
     tunnelWord: 'a tunnel',
     clipWord: 'a clip',
+    ribs: 'Ribs',
+    ribName: 'Name',
+    ribWidth: 'Width',
+    ribHeight: 'Height',
+    noRib: 'Pick the rib tool and click along where the plate needs stiffening. '
+      + 'Double-click to finish.',
+    ribNote: 'A rib stands on the plate, because that is the side the printer '
+      + 'can build on. Where a wire crosses one, the rib arches over it.',
+    ribTooThin: 'Under {n} mm a rib prints, and then comes away at the joint to '
+      + 'the plate. It looks right and holds nothing.',
+    hintRib: 'click to place \u00b7 double-click to finish \u00b7 Esc to abandon',
+    hintRibSel: 'Delete removes the rib',
+    clashRibShallow: '{a} runs along {b} rather than across it, so there is no '
+      + 'opening to make. Move one of them.',
+    clashRibShort: '{a} is too short to arch over {b}, so it stops either side '
+      + 'of it. {n} mm tall would carry a roof.',
+    clashRibCorner: '{a} crosses {b} at a corner of the rib, where an opening '
+      + 'cannot be cut. Move the crossing off the corner.',
     exportTitle: 'Print',
     triangles: 'Triangles',
     downloadStl: 'Download STL',
@@ -931,17 +981,38 @@ var STRINGS = {
     clashesNone: 'Nada est\u00e1 no caminho de nada.',
     clashesFound: '{n} para ver. Cada um est\u00e1 desenhado a vermelho onde as '
       + 'duas coisas se encontram.',
-    clashUnder: '{a} tem {b} por baixo, {n} mm mais alto do que o espa\u00e7ador.',
+    clashUnder: '{a} tem {b} por baixo, com mais {n} mm do que o '
+      + 'espa\u00e7ador permite.',
     clashBodies: '{a} e {b} ocupam o mesmo espa\u00e7o, em {n} mm.',
     clashOffPlate: '{a} sai fora da placa.',
-    clashPlate: '{a} e {b} est\u00e3o ambos na placa no mesmo s\u00edtio, a sobrepor-se '
+    clashPlate: '{a} e {b} ocupam o mesmo s\u00edtio na placa, a sobrepor-se '
       + 'em {n} mm.',
     clashWire: '{a} passa por baixo de {b} e precisa de mais {n} mm de espa\u00e7ador.',
     unnamedComp: 'um componente sem nome',
     unnamedWire: 'um fio sem nome',
+    unnamedRib: 'uma nervura sem nome',
     bossWord: 'uma bossa',
     tunnelWord: 'um t\u00fanel',
     clipWord: 'uma mola',
+    ribs: 'Nervuras',
+    ribName: 'Nome',
+    ribWidth: 'Largura',
+    ribHeight: 'Altura',
+    noRib: 'Escolha a ferramenta de nervura e clique ao longo do s\u00edtio onde a '
+      + 'placa precisa de refor\u00e7o. Duplo clique para terminar.',
+    ribNote: 'A nervura fica em cima da placa, porque \u00e9 desse lado que a '
+      + 'impressora consegue construir. Onde um fio a atravessa, a nervura '
+      + 'faz um arco por cima.',
+    ribTooThin: 'Abaixo de {n} mm a nervura imprime, e depois solta-se da '
+      + 'liga\u00e7\u00e3o \u00e0 placa. Parece bem e n\u00e3o segura nada.',
+    hintRib: 'clicar para marcar \u00b7 duplo clique para terminar \u00b7 Esc para desistir',
+    hintRibSel: 'Delete remove a nervura',
+    clashRibShallow: '{a} e {b} seguem lado a lado em vez de se cruzarem, '
+      + 'por isso n\u00e3o h\u00e1 abertura a abrir. Afaste um do outro.',
+    clashRibShort: '{a} n\u00e3o tem altura para fazer um arco sobre {b}, por '
+      + 'isso p\u00e1ra de cada lado. Com {n} mm j\u00e1 levava um tecto por cima.',
+    clashRibCorner: '{a} atravessa {b} num canto da nervura, onde n\u00e3o se pode '
+      + 'abrir passagem. Afaste o cruzamento do canto.',
     exportTitle: 'Imprimir',
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
@@ -1084,6 +1155,7 @@ function blankDoc() {
     wires: [],            // see normWire
     texts: [],            // see normText
     retainers: [],        // see normRetainer
+    ribs: [],             // see normRib
     guides: []            // { axis: 'x' | 'y', v: mm }
   };
 }
@@ -1136,6 +1208,14 @@ function defaultProfile() {
     allow: { selftap: 0.15, insert: 0, clearance: 0 },
 
     minPen: 0.5,          // the thinnest raised line worth drawing
+
+    /* MEASURED, T3. Seven fins swept from 0.4 to 2.0 mm: 0.4, 0.6 and 0.8 all
+       printed and all came away at the joint to the base plate; 1.0 held. The
+       failure below this is not a printing failure, it is an ATTACHMENT
+       failure, which is worse -- a 0.6 mm rib looks perfect and is doing
+       nothing. Arachne filled every fin solid, so there is no hidden void to
+       account for either way. */
+    minRib: 1.0,
     wall: 2,              // mm of material around the hole
 
     // Retainers: the tunnels and clips that hold a wire on its path.
@@ -1285,7 +1365,7 @@ function selectedRetainer() {
    care -- delete, and the "is anything selected" hint. */
 function selectedAny() {
   return selectedComponent() || selectedBoss() || selectedWire()
-      || selectedText() || selectedRetainer();
+      || selectedText() || selectedRetainer() || selectedRib();
 }
 
 
@@ -1399,6 +1479,7 @@ function normProfile(raw) {
   out.wall = numOr(out.wall, d.wall, 0.4, 20);
   out.minHole = numOr(out.minHole, d.minHole, 0.1, 20);
   out.minPen = numOr(out.minPen, d.minPen, 0.2, 5);
+  out.minRib = numOr(out.minRib, d.minRib, 0.2, 20);
   var al = copyInto({}, out.allow || {});
   for (var f2 = 0; f2 < FIXINGS.length; f2++) {
     al[FIXINGS[f2]] = numOr(al[FIXINGS[f2]], d.allow[FIXINGS[f2]], -2, 5);
@@ -1466,23 +1547,28 @@ var AWG_OD = { 30: 0.8, 28: 0.9, 26: 1.1, 24: 1.4, 22: 1.7, 20: 2.1, 18: 2.4 };
    failure.
 
    Why a palette at all when the picker can produce sixteen million colours:
-   picking from six is a decision, picking from a gradient is a chore. The
-   custom picker stays beside it for the case where the real part is a colour
-   nothing here matches. */
+   picking from seventeen is a decision, picking from a gradient is a chore.
+   The custom picker stays beside it for the case where the real part is a
+   colour nothing here matches.
+
+   Seventeen, not fifteen: BROWN and VIOLET are added here and are not in the
+   model viewer. A ribbon has them and a case does not, which is the whole
+   difference between the two tools. They are mixed to sit in the same tonal
+   range as the rest rather than picked off a colour wheel, so a plate does not
+   end up with fifteen muted colours and two shouting ones. */
 var PALETTE = [
-  '#b74858', '#993233', '#e9ca00', '#d8a309', '#c7711e',
-  '#428d38', '#94b91e', '#6cbfaf', '#017eaa', '#3e51ad',
+  '#b74858', '#993233', '#e9ca00', '#d8a309', '#c7711e', '#7a4a2a',
+  '#428d38', '#94b91e', '#6cbfaf', '#017eaa', '#3e51ad', '#7a4bb0',
   '#2c2a2b', '#787677', '#a2a2a4', '#c8c6c9', '#e8e6e7'
 ];
 
 /* New wires cycle through this rather than through PALETTE in its printed
-   order, because wire colour carries meaning on a bench -- red and black first
-   because the first two wires drawn are nearly always power and ground. The
-   palette has no brown and no violet, which a real ribbon does; say so rather
-   than quietly inventing two colours the other tool does not have. */
+   order, because wire colour carries meaning on a bench: red and black first,
+   since the first two wires anybody draws are power and ground, then the order
+   a ribbon runs in. */
 var WIRE_PALETTE = [
-  '#b74858', '#2c2a2b', '#e9ca00', '#017eaa',
-  '#428d38', '#e8e6e7', '#c7711e', '#6cbfaf'
+  '#b74858', '#2c2a2b', '#e9ca00', '#017eaa', '#428d38',
+  '#e8e6e7', '#c7711e', '#7a4a2a', '#7a4bb0', '#6cbfaf'
 ];
 
 function odForAwg(awg) { return AWG_OD[awg] || 1.4; }
@@ -1677,6 +1763,10 @@ function normDoc(raw) {
   var rl = (raw.retainers && raw.retainers.length) ? raw.retainers : [];
   out.retainers = [];
   for (var u = 0; u < rl.length; u++) out.retainers.push(normRetainer(rl[u], taken, wireIds));
+
+  var fl = (raw.ribs && raw.ribs.length) ? raw.ribs : [];
+  out.ribs = [];
+  for (var y2 = 0; y2 < fl.length; y2++) out.ribs.push(normRib(fl[y2], taken));
 
   var gs = (raw.guides && raw.guides.length) ? raw.guides : [];
   out.guides = [];
@@ -2310,6 +2400,7 @@ var THEMES = {
     plaqueBg: 'rgba(13,13,18,0.88)',
     plaqueInk: '#f4f4f2',
     halo: 'rgba(13,13,18,0.9)',
+    rib: '#8f96a2',
     // Ink, not background: this goes UNDER a wire to give it an edge.
     casing: 'rgba(6,6,10,0.7)'
   },
@@ -2337,6 +2428,7 @@ var THEMES = {
     plaqueBg: 'rgba(255,255,255,0.92)',
     plaqueInk: '#1a1a20',
     halo: 'rgba(255,255,255,0.9)',
+    rib: '#666d79',
     casing: 'rgba(42,42,52,0.6)'
   }
 };
@@ -2613,6 +2705,11 @@ function hoverTarget(p) {
   if (w) return { text: w.name || t('wires'), colour: w.colour };
   var rt = retainerAt(p);
   if (rt) return { text: t(rt.kind), colour: COL.boss };
+  var fb = ribAt(p);
+  if (fb) {
+    return { text: ribLabel(fb) + ' \u00b7 ' + mm(fb.width, 1) + ' \u00d7 ' + mm(fb.height, 1),
+             colour: COL.rib };
+  }
   var xt = textAt(p);
   if (xt) return { text: xt.text, colour: COL.text };
   var c = componentAt(p);
@@ -2727,7 +2824,9 @@ function render() {
   drawGrid();
   drawComponents();
   drawBosses();
+  drawRibs();
   drawWires();
+  drawRibMarks();
   drawRetainers();
   drawTexts();
   drawGuides();
@@ -2758,9 +2857,11 @@ function setTool(next) {
   tool = (tool === next) ? 'select' : next;
   measure.a = measure.b = measure.live = null;
   if (tool !== 'wire') cancelWire();
+  if (tool !== 'rib') cancelRib();
   if (tool !== 'select') deselect();
   measureBtn.classList.toggle('active', tool === 'measure');
   wireBtn.classList.toggle('active', tool === 'wire');
+  ribBtn.classList.toggle('active', tool === 'rib');
   syncControls();
   draw();
 }
@@ -2780,6 +2881,10 @@ function updateStatus() {
     hint.textContent = t('hintGuide');
   } else if (tool === 'wire') {
     hint.textContent = t('hintWire');
+  } else if (tool === 'rib') {
+    hint.textContent = t('hintRib');
+  } else if (sel.kind === 'rib') {
+    hint.textContent = t('hintRibSel');
   } else if (sel.kind === 'retainer') {
     hint.textContent = t('hintRet');
   } else if (sel.kind === 'text') {
@@ -2883,6 +2988,15 @@ cv.addEventListener('pointerdown', function (e) {
     if (tool === 'wire') {
       if (!wireDraw) startWire(wx(p.x), wy(p.y));
       else addWirePoint(wx(p.x), wy(p.y));
+      syncControls();
+      scheduleSave();
+      draw();
+      return;
+    }
+
+    if (tool === 'rib') {
+      if (!ribDraw) startRib(wx(p.x), wy(p.y));
+      else addRibPoint(wx(p.x), wy(p.y));
       syncControls();
       scheduleSave();
       draw();
@@ -3073,6 +3187,11 @@ cv.addEventListener('pointermove', function (e) {
     if (dw && dw.path.length) {
       wireDraw.live = snapAngle(dw.path[dw.path.length - 1].at, wx(p.x), wy(p.y));
     }
+  } else if (ribDraw) {
+    var df = drawingRib();
+    if (df && df.path.length) {
+      ribDraw.live = snapAngle(df.path[df.path.length - 1].at, wx(p.x), wy(p.y));
+    }
   } else if (tool === 'measure' && measure.a && !measure.b) {
     measure.live = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
   } else {
@@ -3111,6 +3230,18 @@ cv.addEventListener('pointerleave', function () {
 });
 
 cv.addEventListener('dblclick', function (e) {
+  if (ribDraw) {
+    var f = drawingRib();
+    // Same as a wire: the second click of the double already put a point on
+    // top of the first one's, so drop it.
+    if (f && f.path.length > 2) {
+      var fa = f.path[f.path.length - 1].at, fb = f.path[f.path.length - 2].at;
+      if (Math.abs(fa[0] - fb[0]) < 1e-9 && Math.abs(fa[1] - fb[1]) < 1e-9) f.path.pop();
+    }
+    finishRib();
+    draw();
+    return;
+  }
   if (wireDraw) {
     var w = drawingWire();
     // The second click of the double already placed a point on top of the
@@ -3457,6 +3588,7 @@ document.getElementById('fitBtn').onclick = function () {
   draw();
 };
 
+var ribBtn = document.getElementById('ribBtn');
 var measureBtn = document.getElementById('measureBtn');
 measureBtn.onclick = function () { setTool('measure'); };
 wireBtn.onclick = function () { setTool('wire'); };
@@ -3569,6 +3701,7 @@ function syncControls() {
   syncWireControls();
   syncTextControls();
   syncRetainerControls();
+  syncRibControls();
   if (c) {
     F.name.value = c.name;
     F.x.value = round2(c.at[0]);
@@ -3693,6 +3826,7 @@ function deleteSelected() {
   if (sel.kind === 'wire') { deleteWire(); return; }
   if (sel.kind === 'text') { deleteText(); return; }
   if (sel.kind === 'retainer') { deleteRetainer(); return; }
+  if (sel.kind === 'rib') { deleteRib(); return; }
   var c = selectedComponent();
   if (!c) return;
   snapshot();
@@ -3937,6 +4071,18 @@ document.getElementById('addBossBtn').onclick = function () {
   scheduleSave();
   draw();
 };
+
+/* Every id in the document, for handing to a normaliser that has to mint a
+   new one. Ids are unique across kinds, not per list, so that a selection can
+   be one id and a kind and nothing has to be checked twice. */
+function allIds() {
+  var out = {}, i;
+  var lists = [doc.components, doc.bosses, doc.wires, doc.texts, doc.retainers, doc.ribs];
+  for (i = 0; i < lists.length; i++) {
+    for (var k = 0; k < (lists[i] || []).length; k++) out[lists[i][k].id] = true;
+  }
+  return out;
+}
 
 function makeIdSet(list) {
   var out = {};
@@ -4386,6 +4532,321 @@ function plateMesh(out) {
   return true;
 }
 
+
+/* --------------------------------------------------------------------------
+   Ribs
+   --------------------------------------------------------------------------
+   A stiffening wall standing on the plate. A 3 mm plate with four screws in it
+   bows when you tighten them; a rib across the middle stops that, for the cost
+   of a few grams and some floor space.
+
+   It stands UP, which is the structurally worse of the two choices and the only
+   printable one: the plate lies face up on the bed, so a rib underneath would
+   print in mid-air. Everything in this tool grows up from the plate top for the
+   same reason.
+
+   Drawn as a polyline, like a wire, because a stiffener nearly always has to
+   get around something, and because the drawing interaction already exists.
+
+   T3 measured the floor: fins at 0.4, 0.6 and 0.8 mm printed but came away at
+   the joint to the base plate, and 1.0 mm held. Thin ribs here are not
+   unprintable, they are UNATTACHED -- which is worse, because they look right
+   until the moment they matter. So 1.0 is the hard floor and 1.2 is the
+   default, one step up for margin.
+   -------------------------------------------------------------------------- */
+
+function normRib(raw, taken) {
+  var f = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  f.id = (typeof f.id === 'string' && f.id && !taken[f.id]) ? f.id : nextId(taken, 'f');
+  taken[f.id] = true;
+  f.name = typeof f.name === 'string' ? f.name.slice(0, 40) : '';
+  f.width = numOr(f.width, 1.2, 0.2, 20);
+  f.height = numOr(f.height, 5, 0.4, 100);
+
+  /* The same { at: [x, y] } shape a wire path uses, and not because a rib has
+     anything to anchor to -- it does not. It means pathLength and
+     pointAtLength work on a rib unchanged, and those two are the only reason
+     any of the arclength arithmetic below is short. */
+  var src = (raw && raw.path && raw.path.length) ? raw.path : [];
+  f.path = [];
+  for (var i = 0; i < src.length; i++) f.path.push({ at: pairOr(src[i] && src[i].at, [0, 0]) });
+  return f;
+}
+
+function ribPoints(f) {
+  var out = [];
+  for (var i = 0; i < f.path.length; i++) out.push(f.path[i].at);
+  return out;
+}
+
+/* Where wires cross this rib, and what each crossing would need.
+
+   A wire meeting a rib at a shallow angle needs an opening far wider along the
+   rib than the wire is thick -- the width goes as 1/sin, so at ten degrees it
+   is six times the wire. Past about twenty degrees the wire is not crossing
+   the rib, it is running along it, and the answer is to move one of them
+   rather than to cut a slot half the length of the rib. */
+var RIB_MIN_SIN = 0.34;              // about 20 degrees
+
+function ribCrossings(f) {
+  var out = [];
+  var clear = numOr(doc.profile.wireClear, 0.4);
+  var roof = Math.max(1, numOr(doc.profile.minRib, 1));
+  var run = 0, i, j, k;
+
+  for (i = 1; i < f.path.length; i++) {
+    var a = f.path[i - 1].at, b = f.path[i].at;
+    var len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < 1e-9) continue;
+    var d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+
+    for (j = 0; j < doc.wires.length; j++) {
+      var w = doc.wires[j];
+      for (k = 1; k < w.path.length; k++) {
+        var p = w.path[k - 1].at, q = w.path[k].at;
+        var hit = segmentCross(a, b, p, q);
+        if (!hit) continue;
+
+        var wl = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+        var e = [(q[0] - p[0]) / wl, (q[1] - p[1]) / wl];
+        var sinT = Math.abs(d[0] * e[1] - d[1] * e[0]);
+        var oh = w.od + clear * 2;
+
+        out.push({
+          wire: w,
+          s: run + len * hit.ta,
+          at: hit.at,
+          oh: oh,
+          hw: (w.od / 2 + clear) / Math.max(sinT, RIB_MIN_SIN),
+          shallow: sinT < RIB_MIN_SIN,
+          tooShort: oh + roof > f.height
+        });
+      }
+    }
+    run += len;
+  }
+
+  out.sort(function (x, y) { return x.s - y.s; });
+
+  /* A wire passing exactly through one of the rib's own corners crosses BOTH
+     segments that meet there, and comes back as two crossings a hair apart.
+     That is one hole to cut and one thing to tell somebody about, so the
+     second copy goes. */
+  var once = [];
+  for (i = 0; i < out.length; i++) {
+    var dup = false;
+    for (j = 0; j < once.length; j++) {
+      if (once[j].wire === out[i].wire && Math.abs(once[j].s - out[i].s) < 0.05) dup = true;
+    }
+    if (!dup) once.push(out[i]);
+  }
+  return once;
+}
+
+/* What to build, and what could not be built.
+
+   A crossing the rib can arch over becomes an arch. One it cannot -- because
+   the rib is too short to carry a roof over the wire -- becomes a BREAK: the
+   rib simply stops either side of the wire. A break is a worse stiffener than
+   an arch and a far better one than a rib sitting on top of a wire, and it is
+   reported either way.
+
+   The pieces come out already split at the rib's own corners, because a sweep
+   is straight and a corner is where one sweep ends and the next begins. An
+   arch that straddles a corner belongs to neither and is reported rather than
+   quietly dropped. */
+function ribPlan(f) {
+  var total = pathLength(f);
+  var plan = { pieces: [], blocked: [], total: total };
+  if (f.path.length < 2 || total <= 0) return plan;
+
+  var i, k;
+  var cross = ribCrossings(f);
+  var breaks = [], arches = [];
+
+  for (i = 0; i < cross.length; i++) {
+    var c = cross[i];
+    if (c.shallow) { plan.blocked.push({ crossing: c, why: 'shallow' }); continue; }
+    if (c.tooShort) {
+      breaks.push([c.s - c.hw - f.width / 2, c.s + c.hw + f.width / 2]);
+      plan.blocked.push({ crossing: c, why: 'short' });
+      continue;
+    }
+    arches.push(c);
+  }
+
+  breaks.sort(function (x, y) { return x[0] - y[0]; });
+
+  /* The rib's own corners, as arclengths, so a piece never spans one. */
+  var stops = [0, total], run = 0;
+  for (i = 1; i < f.path.length - 1; i++) {
+    run += Math.hypot(f.path[i].at[0] - f.path[i - 1].at[0],
+                      f.path[i].at[1] - f.path[i - 1].at[1]);
+    stops.push(run);
+  }
+  for (i = 0; i < breaks.length; i++) {
+    stops.push(Math.max(0, breaks[i][0]));
+    stops.push(Math.min(total, breaks[i][1]));
+  }
+  stops.sort(function (x, y) { return x - y; });
+
+  function inBreak(s) {
+    for (var m = 0; m < breaks.length; m++) {
+      if (s > breaks[m][0] && s < breaks[m][1]) return true;
+    }
+    return false;
+  }
+
+  for (i = 1; i < stops.length; i++) {
+    var s0 = stops[i - 1], s1 = stops[i];
+    if (s1 - s0 < 0.2) continue;
+    if (inBreak((s0 + s1) / 2)) continue;
+    plan.pieces.push({
+      s0: s0, s1: s1,
+      a: pointAtLength(f, s0),
+      b: pointAtLength(f, s1),
+      arches: []
+    });
+  }
+
+  /* Each arch goes to the one piece that can hold the whole of it, with the
+     rib's own thickness to spare either side so the opening never breaks out
+     through the end face of a sweep. */
+  for (i = 0; i < arches.length; i++) {
+    var placed = false;
+    for (k = 0; k < plan.pieces.length; k++) {
+      var pc = plan.pieces[k];
+      if (arches[i].s - arches[i].hw < pc.s0 + f.width / 2) continue;
+      if (arches[i].s + arches[i].hw > pc.s1 - f.width / 2) continue;
+      pc.arches.push(arches[i]);
+      placed = true;
+      break;
+    }
+    if (!placed) plan.blocked.push({ crossing: arches[i], why: 'corner' });
+  }
+
+  return plan;
+}
+
+/* One straight run of rib, drawn in (u, v): u along the run with zero at its
+   middle, v up from the plate. A rectangle, with a pointed arch cut out of its
+   bottom edge wherever a wire goes through.
+
+   The arch is the tunnel's arch, for the tunnel's reason: it never exceeds
+   45 degrees of overhang, so nothing is bridged and nothing sags into the
+   clearance the wire needs. */
+function ribSection(len, height, arches) {
+  var half = len / 2;
+  var ring = [[-half, 0]];
+  var i, j, n = 8;
+
+  var list = arches.slice().sort(function (x, y) { return x.u - y.u; });
+  for (i = 0; i < list.length; i++) {
+    var g = list[i];
+    var spring = Math.max(0.05, g.oh - g.hw * 0.7);
+    ring.push([g.u - g.hw, 0]);
+    for (j = 0; j <= n; j++) {
+      var fa = j / n;
+      ring.push([g.u - g.hw * (1 - fa),
+                 spring + (g.oh - spring) * Math.sin(fa * Math.PI / 2)]);
+    }
+    for (j = n - 1; j >= 0; j--) {
+      var fb = j / n;
+      ring.push([g.u + g.hw * (1 - fb),
+                 spring + (g.oh - spring) * Math.sin(fb * Math.PI / 2)]);
+    }
+    ring.push([g.u + g.hw, 0]);
+  }
+
+  ring.push([half, 0]);
+  ring.push([half, height]);
+  ring.push([-half, height]);
+  return ring;
+}
+
+/* A solid post, which is what fills the wedge on the outside of a corner.
+
+   Round rather than mitred: a mitre needs the angle bisector and goes to
+   infinity as a rib doubles back on itself, and a rounded corner on a
+   stiffener is not a compromise -- it is where you would put the fillet
+   anyway. */
+function postMesh(out, cx, cy, r, z0, z1) {
+  var n = segmentsFor(r);
+  var ring = circleRing(cx, cy, r, n);
+  for (var i = 0; i < n; i++) {
+    var p1 = ring[i], p2 = ring[(i + 1) % n];
+    quad(out, [p1[0], p1[1], z0], [p2[0], p2[1], z0],
+              [p2[0], p2[1], z1], [p1[0], p1[1], z1]);
+    tri(out, cx, cy, z1, p1[0], p1[1], z1, p2[0], p2[1], z1);
+    tri(out, cx, cy, z0, p2[0], p2[1], z0, p1[0], p1[1], z0);
+  }
+}
+
+function ribMesh(out, f) {
+  if (!f.path || f.path.length < 2) return true;
+  var plan = ribPlan(f);
+  if (!plan.pieces.length) return true;
+
+  var z0 = doc.plate.thickness - WELD;
+  var z1 = doc.plate.thickness + f.height;
+  var width = Math.max(0.2, f.width);
+  var i, k;
+
+  for (i = 0; i < plan.pieces.length; i++) {
+    var pc = plan.pieces[i];
+    var L = pc.s1 - pc.s0;
+    var dx = pc.b[0] - pc.a[0], dy = pc.b[1] - pc.a[1];
+    var dl = Math.hypot(dx, dy);
+    if (dl < 1e-9) continue;
+    var d = [dx / dl, dy / dl];
+
+    var local = [];
+    for (k = 0; k < pc.arches.length; k++) {
+      local.push({
+        u: pc.arches[k].s - (pc.s0 + L / 2),
+        hw: pc.arches[k].hw,
+        oh: pc.arches[k].oh
+      });
+    }
+
+    /* The sweep runs ACROSS the rib, for the rib's width, and the section's u
+       axis runs along it. sweepSection puts u on the axis perpendicular to the
+       direction it is given, so it is handed the perpendicular. */
+    var mid = [(pc.a[0] + pc.b[0]) / 2, (pc.a[1] + pc.b[1]) / 2];
+    if (!sweepSection(out, ribSection(L, f.height, local), mid, [d[1], -d[0]], width, z0)) {
+      return false;
+    }
+  }
+
+  /* A post at every corner that both of its pieces actually reached. */
+  var run = 0;
+  for (i = 1; i < f.path.length - 1; i++) {
+    run += Math.hypot(f.path[i].at[0] - f.path[i - 1].at[0],
+                      f.path[i].at[1] - f.path[i - 1].at[1]);
+    var before = false, after = false;
+    for (k = 0; k < plan.pieces.length; k++) {
+      if (Math.abs(plan.pieces[k].s1 - run) < 1e-6) before = true;
+      if (Math.abs(plan.pieces[k].s0 - run) < 1e-6) after = true;
+    }
+    if (before && after) {
+      postMesh(out, f.path[i].at[0], f.path[i].at[1], width / 2, z0, z1);
+    }
+  }
+  return true;
+}
+
+/* Crossings the rib could not open for, for the clash list. */
+function ribBlocks() {
+  var out = [];
+  for (var i = 0; i < doc.ribs.length; i++) {
+    var plan = ribPlan(doc.ribs[i]);
+    for (var k = 0; k < plan.blocked.length; k++) {
+      out.push({ rib: doc.ribs[i], blocked: plan.blocked[k] });
+    }
+  }
+  return out;
+}
+
 function buildMesh() {
   var out = [];
   var t = doc.plate.thickness;
@@ -4398,6 +4859,10 @@ function buildMesh() {
 
   for (var rr = 0; rr < doc.retainers.length; rr++) {
     if (!retainerMesh(out, doc.retainers[rr])) return null;
+  }
+
+  for (var fb = 0; fb < doc.ribs.length; fb++) {
+    if (!ribMesh(out, doc.ribs[fb])) return null;
   }
 
   for (var i = 0; i < doc.bosses.length; i++) {
@@ -5898,6 +6363,13 @@ function applyLang() {
   document.getElementById('lbWireColour').textContent = t('colour');
   document.getElementById('delWireBtn').textContent = t('remove');
   document.getElementById('wireNote').textContent = t('wireNote');
+  document.getElementById('ttRibs').textContent = t('ribs');
+  document.getElementById('ribEmpty').textContent = t('noRib');
+  document.getElementById('lbRibName').textContent = t('ribName');
+  document.getElementById('lbRibWidth').textContent = t('ribWidth');
+  document.getElementById('lbRibHeight').textContent = t('ribHeight');
+  document.getElementById('delRibBtn').textContent = t('remove');
+  document.getElementById('ribNote').textContent = t('ribNote');
   tip('wireBtn', t('wires'));
 
   document.getElementById('ttRetainers').textContent = t('retainers');
@@ -5967,6 +6439,7 @@ function applyLang() {
   tip('dimsBtn', t('dimensions'));
   tip('themeBtn', t('theme'));
   tip('alignBtn', t('align'));
+  tip('ribBtn', t('ribs'));
   tip('measureBtn', t('measure'));
   tip('clearGuidesBtn', t('clearGuides'));
   document.getElementById('viewNote').textContent = t('viewNote');
@@ -6012,6 +6485,243 @@ if (remembered) {
     console.warn('[protoplaca] ignoring unreadable saved project', e);
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   Drawing a rib
+   --------------------------------------------------------------------------
+   The same interaction as a wire: click to place a point, double-click to
+   finish, Escape to abandon, square and 45 degrees snapped. Deliberately the
+   same, because it is the same gesture and there is no reason to learn it
+   twice. What differs is that a rib does not anchor to anything -- it is part
+   of the plate, not something laid on it.
+   -------------------------------------------------------------------------- */
+
+var ribDraw = null;
+
+function selectedRib() {
+  return sel.kind === 'rib' ? findIn(doc.ribs, sel.id) : null;
+}
+
+function drawingRib() {
+  return ribDraw ? findIn(doc.ribs, ribDraw.id) : null;
+}
+
+function startRib(x, y) {
+  snapshot();
+  var f = normRib({}, allIds());
+  f.path = [{ at: [snap(x), snap(y)] }];
+  doc.ribs.push(f);
+  ribDraw = { id: f.id, live: f.path[0].at.slice() };
+  select('rib', f.id);
+}
+
+function addRibPoint(x, y) {
+  var f = drawingRib();
+  if (!f) return;
+  var last = f.path[f.path.length - 1].at;
+  var pt = snapAngle(last, x, y);
+  if (Math.abs(pt[0] - last[0]) < 1e-9 && Math.abs(pt[1] - last[1]) < 1e-9) return;
+  f.path.push({ at: pt });
+}
+
+function finishRib() {
+  var f = drawingRib();
+  ribDraw = null;
+  if (!f) return;
+  if (f.path.length < 2) {
+    doc.ribs.splice(doc.ribs.indexOf(f), 1);
+    deselect();
+  }
+  syncControls();
+  scheduleSave();
+}
+
+function cancelRib() {
+  var f = drawingRib();
+  ribDraw = null;
+  if (f) {
+    doc.ribs.splice(doc.ribs.indexOf(f), 1);
+    deselect();
+  }
+}
+
+function ribAt(p) {
+  for (var i = doc.ribs.length - 1; i >= 0; i--) {
+    var f = doc.ribs[i];
+    var tol = Math.max(4, f.width * view.scale / 2 + 2);
+    for (var k = 1; k < f.path.length; k++) {
+      var a = f.path[k - 1].at, b = f.path[k].at;
+      if (distToSegment(p.x, p.y, sx(a[0]), sy(a[1]), sx(b[0]), sy(b[1])) <= tol) return f;
+    }
+  }
+  return null;
+}
+
+/* Drawn at its real width, like a wire, so a rib that is about to sit on a
+   component is visible as such before the 3D tab has to say so. Hatched,
+   because at 1.2 mm a solid line is indistinguishable from a wire. */
+function drawRibs() {
+  for (var i = 0; i < doc.ribs.length; i++) {
+    var f = doc.ribs[i];
+    if (f.path.length < 1) continue;
+    var pts = ribPoints(f);
+    var live = (ribDraw && ribDraw.id === f.id) ? ribDraw.live : null;
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx(pts[0][0]), sy(pts[0][1]));
+    for (var k = 1; k < pts.length; k++) ctx.lineTo(sx(pts[k][0]), sy(pts[k][1]));
+
+    ctx.strokeStyle = COL.rib;
+    ctx.lineWidth = Math.max(2, f.width * view.scale);
+    ctx.globalAlpha = 0.9;
+    ctx.stroke();
+
+    ctx.strokeStyle = COL.casing;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.6;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (live) {
+      ctx.strokeStyle = COL.rib;
+      ctx.lineWidth = Math.max(2, f.width * view.scale);
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sx(pts[pts.length - 1][0]), sy(pts[pts.length - 1][1]));
+      ctx.lineTo(sx(live[0]), sy(live[1]));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+
+    if (showDims && f.name && pts.length > 1) {
+      var bestLen = -1, bi = 1;
+      for (var q = 1; q < pts.length; q++) {
+        var seg = Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]);
+        if (seg > bestLen) { bestLen = seg; bi = q; }
+      }
+      plaque([f.name, mm(f.width, 1) + ' × ' + mm(f.height, 1) + ' mm'],
+             sx((pts[bi][0] + pts[bi - 1][0]) / 2),
+             sy((pts[bi][1] + pts[bi - 1][1]) / 2) - 6,
+             COL.rib, COL.rib);
+    }
+  }
+}
+
+/* Where wires pass through ribs, drawn ON TOP of the wires so the mark is not
+   buried under the thing it is about.
+
+   An arch is invisible from above -- the rib looks continuous and so does the
+   wire -- and it is the single most useful thing to know about a rib. A
+   crossing the rib could NOT be opened for gets a red cross, because from above
+   that looks exactly the same and is the opposite situation. */
+function drawRibMarks() {
+  for (var i = 0; i < doc.ribs.length; i++) {
+    var f = doc.ribs[i];
+    if (f.path.length < 2) continue;
+    var plan = ribPlan(f);
+    var m, n;
+
+    for (m = 0; m < plan.pieces.length; m++) {
+      for (n = 0; n < plan.pieces[m].arches.length; n++) {
+        var g = plan.pieces[m].arches[n];
+        var r = Math.max(3.5, g.hw * view.scale);
+        ctx.strokeStyle = COL.casing;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(sx(g.at[0]), sy(g.at[1]), r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = COL.rib;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(sx(g.at[0]), sy(g.at[1]), r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    for (m = 0; m < plan.blocked.length; m++) {
+      var c = plan.blocked[m].crossing;
+      var px = sx(c.at[0]), py = sy(c.at[1]), k = 5;
+      ctx.strokeStyle = COL.casing;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(px - k, py - k); ctx.lineTo(px + k, py + k);
+      ctx.moveTo(px + k, py - k); ctx.lineTo(px - k, py + k);
+      ctx.stroke();
+      ctx.strokeStyle = '#ff3b30';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px - k, py - k); ctx.lineTo(px + k, py + k);
+      ctx.moveTo(px + k, py - k); ctx.lineTo(px - k, py + k);
+      ctx.stroke();
+    }
+  }
+  ctx.lineWidth = 1;
+}
+
+/* ---- the panel ---- */
+
+var RF = {
+  name: document.getElementById('ribName'),
+  width: document.getElementById('ribWidth'),
+  height: document.getElementById('ribHeight')
+};
+var ribFields = document.getElementById('ribFields');
+var ribEmpty = document.getElementById('ribEmpty');
+
+function syncRibControls() {
+  var f = selectedRib();
+  ribFields.hidden = !f;
+  ribEmpty.hidden = !!f;
+  if (!f) return;
+  RF.name.value = f.name;
+  RF.width.value = round2(f.width);
+  RF.height.value = round2(f.height);
+
+  var floor = numOr(doc.profile.minRib, 1);
+  var note = document.getElementById('ribWarn');
+  var thin = f.width < floor - 1e-9;
+  note.hidden = !thin;
+  if (thin) note.textContent = t('ribTooThin').replace('{n}', mm(floor, 1));
+}
+
+function onRibField() {
+  if (syncing) return;
+  var f = selectedRib();
+  if (!f) return;
+  f.name = RF.name.value.slice(0, 40);
+  f.width = Math.max(0.2, num(RF.width, f.width));
+  f.height = Math.max(0.4, num(RF.height, f.height));
+  syncRibControls();
+  scheduleSave();
+  draw();
+}
+
+for (var ribKey in RF) {
+  if (Object.prototype.hasOwnProperty.call(RF, ribKey)) {
+    RF[ribKey].addEventListener('input', onRibField);
+    RF[ribKey].addEventListener('focus', snapshot);
+  }
+}
+
+function deleteRib() {
+  var f = selectedRib();
+  if (!f) return;
+  snapshot();
+  doc.ribs.splice(doc.ribs.indexOf(f), 1);
+  deselect();
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+document.getElementById('delRibBtn').onclick = deleteRib;
+ribBtn.onclick = function () { setTool('rib'); };
 
 applyLang();
 syncControls();
@@ -6630,6 +7340,7 @@ var CLASH_EPS = 0.02;
 
 function compLabel(c) { return c.name || t('unnamedComp'); }
 function wireLabel(w) { return w.name || t('unnamedWire'); }
+function ribLabel(f) { return f.name || t('unnamedRib'); }
 
 /* Everything standing on the plate, as a box with a name and an owner. */
 function obstacles() {
@@ -6679,6 +7390,26 @@ function obstacles() {
       box: [pose.at[0] - ex, pose.at[1] - ey, t0,
             pose.at[0] + ex, pose.at[1] + ey, t0 + floor + od + clear * 2 + wall]
     });
+  }
+
+  for (i = 0; i < doc.ribs.length; i++) {
+    var rib = doc.ribs[i];
+    var plan = ribPlan(rib);
+    for (var pk = 0; pk < plan.pieces.length; pk++) {
+      var pc = plan.pieces[pk];
+      /* One box per straight piece, not one for the whole rib: an L-shaped rib
+         boxed as a rectangle claims the empty corner it wraps around, which is
+         exactly where somebody has put a component. */
+      out.push({
+        kind: 'rib',
+        label: ribLabel(rib),
+        owner: null,
+        box: [Math.min(pc.a[0], pc.b[0]) - rib.width / 2,
+              Math.min(pc.a[1], pc.b[1]) - rib.width / 2, t0,
+              Math.max(pc.a[0], pc.b[0]) + rib.width / 2,
+              Math.max(pc.a[1], pc.b[1]) + rib.width / 2, t0 + rib.height]
+      });
+    }
   }
 
   var relief = numOr(doc.profile.markHeight, 0.4);
@@ -6751,6 +7482,13 @@ function findClashes() {
     for (j = i + 1; j < obs.length; j++) {
       if (obs[i].kind === 'text' || obs[j].kind === 'text') continue;
 
+      /* A rib running into a boss or into another rib is not a fault, it is
+         the point: they union into one braced structure, and a rib that ends
+         at a boss is stiffer than one that stops beside it. A rib through a
+         RETAINER is still a fault -- that one has a wire in it. */
+      if ((obs[i].kind === 'rib' || obs[j].kind === 'rib') &&
+          (obs[i].kind !== 'retainer' && obs[j].kind !== 'retainer')) continue;
+
       /* Two retainers on the SAME wire are allowed to merge. They are threading
          the one wire, the slicer unions them into a longer tunnel, and the
          bore stays a bore. Two retainers on DIFFERENT wires merging is a real
@@ -6801,6 +7539,21 @@ function findClashes() {
     }
   }
 
+  /* 6. a wire the rib could not be opened for. */
+  var blocks = ribBlocks();
+  for (i = 0; i < blocks.length; i++) {
+    var b2 = blocks[i];
+    var key = b2.blocked.why === 'shallow' ? 'clashRibShallow'
+            : b2.blocked.why === 'short' ? 'clashRibShort' : 'clashRibCorner';
+    out.push({
+      box: null,
+      text: t(key)
+        .replace('{a}', ribLabel(b2.rib))
+        .replace('{b}', wireLabel(b2.blocked.crossing.wire))
+        .replace('{n}', mm(b2.blocked.crossing.oh + Math.max(1, numOr(doc.profile.minRib, 1)), 1))
+    });
+  }
+
   return out;
 }
 
@@ -6847,7 +7600,7 @@ function setTab(next) {
      draw in, and the two that belong to the 3D tab have nothing to say in the
      diagram. Hiding rather than disabling: a greyed-out column of twenty
      fields is just noise with a lower contrast. */
-  var only2d = ['compPanel', 'bossPanel', 'wirePanel', 'retPanel', 'textPanel'];
+  var only2d = ['compPanel', 'bossPanel', 'wirePanel', 'retPanel', 'ribPanel', 'textPanel'];
   for (var i = 0; i < only2d.length; i++) {
     document.getElementById(only2d[i]).hidden = is3d;
   }
@@ -7044,6 +7797,7 @@ makeCollapsible('compPanel', true);
 makeCollapsible('bossPanel', true);
 makeCollapsible('wirePanel', true);
 makeCollapsible('retPanel', true);
+makeCollapsible('ribPanel', true);
 makeCollapsible('textPanel', true);
 makeCollapsible('profilePanel', false);
 makeCollapsible('exportPanel', true);
