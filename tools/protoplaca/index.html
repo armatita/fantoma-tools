@@ -1387,22 +1387,40 @@ function drawWires() {
     }
 
     if (showDims && w.name && pts.length > 1) {
-      // On the middle of the LONGEST run, not on a vertex. A vertex is usually
+      // On the middle of the LONGEST run, not on a vertex: a vertex is usually
       // a corner tucked against a component, which is the one place a label
       // has nothing to sit on.
-      var bestLen = -1, mid = pts[0];
+      var bestLen = -1, bi = 1;
       for (var m = 1; m < pts.length; m++) {
         var seg = Math.hypot(pts[m][0] - pts[m - 1][0], pts[m][1] - pts[m - 1][1]);
-        if (seg > bestLen) {
-          bestLen = seg;
-          mid = [(pts[m][0] + pts[m - 1][0]) / 2, (pts[m][1] + pts[m - 1][1]) / 2];
-        }
+        if (seg > bestLen) { bestLen = seg; bi = m; }
       }
+      var ax = sx(pts[bi - 1][0]), ay = sy(pts[bi - 1][1]);
+      var bx2 = sx(pts[bi][0]), by2 = sy(pts[bi][1]);
+
+      // Offset PERPENDICULAR to the run. Always offsetting upward puts the
+      // label straight down the middle of a vertical wire, in the wire's own
+      // colour, where it cannot be read at all.
+      var qx = -(by2 - ay), qy = (bx2 - ax);
+      var qlen = Math.hypot(qx, qy) || 1;
+      qx /= qlen; qy /= qlen;
+      if (qy > 0.01) { qx = -qx; qy = -qy; }              // prefer above
+      else if (Math.abs(qy) <= 0.01 && qx < 0) { qx = -qx; qy = -qy; }   // else right
+
+      var off = Math.max(1.5, w.od * view.scale) / 2 + 9;
+      var tx = (ax + bx2) / 2 + qx * off, ty = (ay + by2) / 2 + qy * off;
+
       ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
       ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
+      ctx.textBaseline = 'middle';
+      // A halo, so the name reads over its own wire, a component, or the grid.
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(13,13,18,0.9)';
+      ctx.strokeText(w.name, tx, ty);
+      ctx.lineWidth = 1;
       ctx.fillStyle = w.colour;
-      ctx.fillText(w.name, sx(mid[0]), sy(mid[1]) - 5);
+      ctx.fillText(w.name, tx, ty);
     }
   }
 }
@@ -1732,13 +1750,17 @@ function drawRulers() {
 
 /* A small plaque of text with a dark backing, so it stays readable over the
    grid, over a component, or over nothing. */
-function plaque(lines, x, y, colour) {
+function plaque(lines, x, y, colour, swatch) {
   ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
   var padX = 6, padY = 4, lineH = 14, w = 0, i;
-  for (i = 0; i < lines.length; i++) w = Math.max(w, ctx.measureText(lines[i]).width);
+  var dot = swatch ? 13 : 0;     // room for the colour marker on its line
+  for (i = 0; i < lines.length; i++) {
+    var lw = ctx.measureText(lines[i]).width + (swatch && swatch.line === i ? dot : 0);
+    w = Math.max(w, lw);
+  }
   var boxW = w + padX * 2, boxH = lines.length * lineH + padY * 2;
 
   // Keep it inside the drawing rather than half off the edge.
@@ -1751,10 +1773,38 @@ function plaque(lines, x, y, colour) {
   ctx.lineWidth = 1;
   ctx.strokeRect(crisp(x), crisp(y), Math.round(boxW), Math.round(boxH));
 
-  ctx.fillStyle = '#f4f4f2';
   for (i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], x + padX, y + padY + i * lineH);
+    var ty = y + padY + i * lineH;
+    var tx = x + padX;
+    if (swatch && swatch.line === i) {
+      // A filled marker in the thing's own colour, so the identification is
+      // not only a name but the same colour you are looking at on the plate.
+      ctx.fillStyle = swatch.colour;
+      ctx.beginPath();
+      ctx.arc(tx + 4, ty + 6, 4, 0, Math.PI * 2);
+      ctx.fill();
+      tx += dot;
+    }
+    ctx.fillStyle = '#f4f4f2';
+    ctx.fillText(lines[i], tx, ty);
   }
+}
+
+/* What the pointer is over, if anything. Resolved in the same order a click
+   resolves, so the readout names whatever a click would pick. */
+function hoverTarget(p) {
+  var b = bossAt(p);
+  if (b) {
+    var text = sizeLabel(b.size) + ' ' + t(b.fixing);
+    var host = b.of ? findIn(doc.components, b.of) : null;
+    if (host && host.name) text += ' \u00b7 ' + host.name;
+    return { text: text, colour: COL.boss };
+  }
+  var w = wireAt(p);
+  if (w) return { text: w.name || t('wires'), colour: w.colour };
+  var c = componentAt(p);
+  if (c) return { text: c.name || t('components'), colour: c.colour };
+  return null;
 }
 
 /* The pointer's position, where the pointer is.
@@ -1782,7 +1832,12 @@ function drawCursor() {
   line(plot.x0, crisp(py), plot.x1, crisp(py));
   ctx.setLineDash([]);
 
-  plaque(['(' + mm(cursor.x, 2) + ', ' + mm(cursor.y, 2) + ')'], px + 14, py + 14);
+  var lines = ['(' + mm(cursor.x, 2) + ', ' + mm(cursor.y, 2) + ')'];
+  var over = hoverTarget({ x: px, y: py });
+  if (over) lines.push(over.text);
+
+  plaque(lines, px + 14, py + 14, null,
+         over ? { colour: over.colour, line: 1 } : null);
 }
 
 /* The ruler between a dragged boss and the sibling it just snapped to. The

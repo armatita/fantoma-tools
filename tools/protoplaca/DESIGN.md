@@ -205,6 +205,13 @@ and obvious on the plate. The angle is checked *before* the grid and the result
 re-snapped along the locked axis; doing it the other way round lets the grid pull
 a point a fraction off the line it was just locked to.
 
+**Labels sit perpendicular to the run, with a halo.** Offsetting a label
+upward works for a horizontal wire and fails completely for a vertical one —
+the name lands straight down the middle of the wire, in the wire's own colour,
+where it cannot be read at all. So the offset is perpendicular to the segment
+it labels, preferring above and then the right, over a dark halo so it reads
+against its own wire, a component, or the grid.
+
 **Drawn at true insulated width.** Not decoration: six 24 AWG wires are 8.4 mm of
 jacket side by side, and seeing that they will not fit through a gap is the
 reason to draw the plan before building it.
@@ -585,9 +592,12 @@ headings hit it with their chevron.
 
 - **Measure**, as a toggle — moved off the View panel. Built.
 - **Clear guides**, as a push button — likewise. Built.
-- **Cursor readout** — **built**, though it lives on the View panel until
-  there is a toolbar to move it to. Dashed crosshair, a mark on each ruler, and
-  the coordinate beside the pointer. It was pulled forward because it is not
+- **Cursor readout** — **built**, and now on the toolbar. Dashed crosshair, a
+  mark on each ruler, the coordinate beside the pointer, and — when the pointer
+  is over something — a filled marker in that thing's own colour with its name
+  beside it. A boss names the board it holds, since that relationship is
+  otherwise invisible. The identification resolves in the same order a click
+  does, so the readout always names whatever a click would pick. It was pulled forward because it is not
   really a new feature: the X/Y readout had the same flaw the measure tool did
   — a strip below the canvas is not where you are looking — and with no
   component library the coordinate readout is how parts get placed, so it is
