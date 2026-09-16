@@ -345,6 +345,33 @@
         <div class="note" id="wireNote"></div>
       </section>
 
+      <section class="panel" id="retPanel">
+        <h2><span id="ttRetainers"></span></h2>
+        <div class="row">
+          <button type="button" id="addRetBtn"></button>
+        </div>
+        <div class="note" id="retEmpty"></div>
+        <div id="retFields" hidden>
+          <div class="field">
+            <label for="retKind" id="lbRetKind"></label>
+            <select id="retKind"></select>
+          </div>
+          <div class="field narrow">
+            <label for="retT" id="lbRetT"></label>
+            <input type="number" id="retT" inputmode="decimal" step="1" min="0" max="100">
+            <span class="unit">%</span>
+          </div>
+          <div class="field narrow">
+            <label for="retLevel" id="lbRetLevel"></label>
+            <input type="number" id="retLevel" inputmode="numeric" step="1" min="0" max="4">
+          </div>
+          <div class="row">
+            <button type="button" id="delRetBtn"></button>
+          </div>
+        </div>
+        <div class="note" id="retNote"></div>
+      </section>
+
       <section class="panel" id="textPanel">
         <h2><span id="ttTexts"></span></h2>
         <div class="row">
@@ -413,6 +440,25 @@
           <button type="button" id="promoteBtn"></button>
         </div>
         <div class="note warn" id="holeSmallWarn" hidden></div>
+        <div class="field narrow">
+          <label for="profWireClear" id="lbWireClear"></label>
+          <input type="number" id="profWireClear" inputmode="decimal" step="0.1" min="0">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field narrow">
+          <label for="profRetWall" id="lbRetWall"></label>
+          <input type="number" id="profRetWall" inputmode="decimal" step="0.1" min="0.4">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field narrow">
+          <label for="profRetLen" id="lbRetLen"></label>
+          <input type="number" id="profRetLen" inputmode="decimal" step="1" min="1">
+          <span class="unit">mm</span>
+        </div>
+        <div class="field">
+          <label for="profRoof" id="lbRoof"></label>
+          <select id="profRoof"></select>
+        </div>
         <div class="field">
           <label for="profSource" id="lbProfSource"></label>
         </div>
@@ -492,6 +538,25 @@ var STRINGS = {
     components: 'Components',
     bosses: 'Bosses',
     wires: 'Wires',
+    retainers: 'Retainers',
+    addRet: 'Add retainer',
+    retKind: 'Kind',
+    tunnel: 'Tunnel',
+    clip: 'Clip',
+    retT: 'Along wire',
+    retLevel: 'Level',
+    noRet: 'Select a wire and add a retainer, or click one on the plate.',
+    retNote: 'A tunnel is closed and the wire threads through it; a clip is open '
+      + 'and the wire presses in. A crimped connector will not pass through a '
+      + 'tunnel, so the ends of a run want clips.',
+    hintRet: 'drag along the wire \u00b7 Delete removes it',
+    needWire: 'Select a wire first.',
+    wireClear: 'Wire slack',
+    retWall: 'Retainer wall',
+    retLenLbl: 'Retainer length',
+    roof: 'Roof',
+    roofArch: 'Arched',
+    roofSquare: 'Square',
     texts: 'Text',
     addText: 'Add text',
     txtString: 'Text',
@@ -634,6 +699,25 @@ var STRINGS = {
     components: 'Componentes',
     bosses: 'Bossas',
     wires: 'Fios',
+    retainers: 'Retentores',
+    addRet: 'Adicionar retentor',
+    retKind: 'Tipo',
+    tunnel: 'T\u00fanel',
+    clip: 'Mola',
+    retT: 'Ao longo do fio',
+    retLevel: 'N\u00edvel',
+    noRet: 'Selecione um fio e adicione um retentor, ou clique num que esteja na placa.',
+    retNote: 'Um t\u00fanel \u00e9 fechado e o fio passa por dentro; uma mola \u00e9 aberta '
+      + 'e o fio encaixa \u00e0 press\u00e3o. Um conector cravado n\u00e3o passa por um '
+      + 't\u00fanel, por isso as pontas de um percurso pedem molas.',
+    hintRet: 'arraste ao longo do fio \u00b7 Delete apaga',
+    needWire: 'Selecione primeiro um fio.',
+    wireClear: 'Folga do fio',
+    retWall: 'Parede do retentor',
+    retLenLbl: 'Comprimento',
+    roof: 'Tecto',
+    roofArch: 'Em arco',
+    roofSquare: 'Quadrado',
     texts: 'Texto',
     addText: 'Adicionar texto',
     txtString: 'Texto',
@@ -799,6 +883,7 @@ function blankDoc() {
     bosses: [],           // see normBoss
     wires: [],            // see normWire
     texts: [],            // see normText
+    retainers: [],        // see normRetainer
     guides: []            // { axis: 'x' | 'y', v: mm }
   };
 }
@@ -826,6 +911,13 @@ function defaultProfile() {
     source: 'Elegoo Centauri Carbon \u00b7 PLA \u00b7 FINISH profile',
     minHole: 1.5,         // below this a round hole stops being round
     wall: 2,              // mm of material around the hole
+
+    // Retainers: the tunnels and clips that hold a wire on its path.
+    wireClear: 0.4,       // slack around the wire inside a retainer
+    retWall: 1.2,         // material around the opening
+    retLen: 6,            // how far a retainer runs along the wire
+    roof: 'arch',         // 'arch' or 'square'
+    maxBridge: 20,        // measured: the longest span that prints unsupported
     holes: {
       // size:   [ self-tap, heat-set insert, clearance ]
       M1_4:{ selftap: 1.1,  insert: 2.6, clearance: 1.6 },
@@ -939,10 +1031,15 @@ function selectedText() {
   return sel.kind === 'text' ? findIn(doc.texts, sel.id) : null;
 }
 
+function selectedRetainer() {
+  return sel.kind === 'retainer' ? findIn(doc.retainers, sel.id) : null;
+}
+
 /* Whatever is selected, of whichever kind. Used by the things that do not
    care -- delete, and the "is anything selected" hint. */
 function selectedAny() {
-  return selectedComponent() || selectedBoss() || selectedWire() || selectedText();
+  return selectedComponent() || selectedBoss() || selectedWire()
+      || selectedText() || selectedRetainer();
 }
 
 
@@ -1055,6 +1152,11 @@ function normProfile(raw) {
   var out = copyInto({}, raw && typeof raw === 'object' ? raw : {});
   out.wall = numOr(out.wall, d.wall, 0.4, 20);
   out.minHole = numOr(out.minHole, d.minHole, 0.1, 20);
+  out.wireClear = numOr(out.wireClear, d.wireClear, 0, 5);
+  out.retWall = numOr(out.retWall, d.retWall, 0.4, 10);
+  out.retLen = numOr(out.retLen, d.retLen, 1, 60);
+  out.roof = (out.roof === 'square') ? 'square' : 'arch';
+  out.maxBridge = numOr(out.maxBridge, d.maxBridge, 1, 200);
   out.source = typeof out.source === 'string' ? out.source.slice(0, 80) : d.source;
   var holes = copyInto({}, (raw && raw.holes) || {});
   for (var i = 0; i < SIZES.length; i++) {
@@ -1148,6 +1250,94 @@ function normText(raw, taken) {
   return x;
 }
 
+/* --------------------------------------------------------------------------
+   Retainers
+   --------------------------------------------------------------------------
+   What holds a wire down: a closed tunnel it threads through, or an open clip
+   it presses into.
+
+   `t` is a fraction of the wire's length rather than a coordinate, so a
+   retainer stays where it was put relative to the run when the wire is
+   redrawn around it. `origin` records whether it was placed automatically or
+   by hand, and remembers an automatic one you deleted, so pressing auto again
+   does not resurrect it.
+   -------------------------------------------------------------------------- */
+var RETAINER_KINDS = ['tunnel', 'clip'];
+var RETAINER_ORIGINS = ['manual', 'auto', 'auto-suppressed'];
+
+function normRetainer(raw, taken, wireIds) {
+  var r = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  r.id = (typeof r.id === 'string' && r.id && !taken[r.id]) ? r.id : nextId(taken, 'r');
+  taken[r.id] = true;
+  r.wire = (typeof r.wire === 'string' && wireIds[r.wire]) ? r.wire : null;
+  r.t = numOr(r.t, 0.5, 0, 1);
+  r.kind = RETAINER_KINDS.indexOf(r.kind) >= 0 ? r.kind : 'tunnel';
+  r.origin = RETAINER_ORIGINS.indexOf(r.origin) >= 0 ? r.origin : 'manual';
+  r.level = Math.max(0, Math.round(numOr(r.level, 0, 0, 4)));
+  return r;
+}
+
+/* Where a retainer sits and which way it points. A retainer whose wire has
+   gone, or whose wire is a single point, has no pose and is simply not drawn
+   -- the file keeps it, in case the wire comes back by an undo. */
+/* The fraction along a wire nearest a point, which is where a dragged
+   retainer lands. */
+function tAlongWire(wireId, at) {
+  var w = findIn(doc.wires, wireId);
+  if (!w || w.path.length < 2) return 0.5;
+
+  var total = 0, best = { d: Infinity, t: 0.5 }, run = 0, i;
+  for (i = 1; i < w.path.length; i++) {
+    total += Math.hypot(w.path[i].at[0] - w.path[i - 1].at[0],
+                        w.path[i].at[1] - w.path[i - 1].at[1]);
+  }
+  if (!total) return 0.5;
+
+  for (i = 1; i < w.path.length; i++) {
+    var a = w.path[i - 1].at, b = w.path[i].at;
+    var vx = b[0] - a[0], vy = b[1] - a[1];
+    var len2 = vx * vx + vy * vy;
+    var f = len2 ? Math.max(0, Math.min(1, ((at[0] - a[0]) * vx + (at[1] - a[1]) * vy) / len2)) : 0;
+    var px = a[0] + vx * f, py = a[1] + vy * f;
+    var d = Math.hypot(at[0] - px, at[1] - py);
+    if (d < best.d) best = { d: d, t: (run + Math.sqrt(len2) * f) / total };
+    run += Math.sqrt(len2);
+  }
+  return best.t;
+}
+
+function retainerPose(r) {
+  var w = r.wire ? findIn(doc.wires, r.wire) : null;
+  if (!w || w.path.length < 2) return null;
+
+  var segs = [], total = 0, i;
+  for (i = 1; i < w.path.length; i++) {
+    var a = w.path[i - 1].at, b = w.path[i].at;
+    var len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    segs.push({ a: a, b: b, len: len });
+    total += len;
+  }
+  if (total <= 0) return null;
+
+  var want = r.t * total, run = 0;
+  for (i = 0; i < segs.length; i++) {
+    if (run + segs[i].len >= want || i === segs.length - 1) {
+      var into = Math.max(0, Math.min(segs[i].len, want - run));
+      var f = segs[i].len ? into / segs[i].len : 0;
+      var dx = segs[i].b[0] - segs[i].a[0], dy = segs[i].b[1] - segs[i].a[1];
+      var dl = Math.hypot(dx, dy) || 1;
+      return {
+        wire: w,
+        at: [segs[i].a[0] + dx * f, segs[i].a[1] + dy * f],
+        dir: [dx / dl, dy / dl],
+        room: segs[i].len
+      };
+    }
+    run += segs[i].len;
+  }
+  return null;
+}
+
 function normGuide(raw) {
   if (!raw || typeof raw !== 'object') return null;
   if (raw.axis !== 'x' && raw.axis !== 'y') return null;
@@ -1198,6 +1388,13 @@ function normDoc(raw) {
   var xl = (raw.texts && raw.texts.length) ? raw.texts : [];
   out.texts = [];
   for (var q = 0; q < xl.length; q++) out.texts.push(normText(xl[q], taken));
+
+  var wireIds = {};
+  for (var v = 0; v < out.wires.length; v++) wireIds[out.wires[v].id] = true;
+
+  var rl = (raw.retainers && raw.retainers.length) ? raw.retainers : [];
+  out.retainers = [];
+  for (var u = 0; u < rl.length; u++) out.retainers.push(normRetainer(rl[u], taken, wireIds));
 
   var gs = (raw.guides && raw.guides.length) ? raw.guides : [];
   out.guides = [];
@@ -1578,6 +1775,67 @@ function textBox(x) {
   var w = textWidth(x.text, x.size);
   var left = x.align === 'centre' ? x.at[0] - w / 2 : x.at[0];
   return { x: left, y: x.at[1], w: w, h: x.size };
+}
+
+/* A retainer is drawn as its footprint: the rectangle it occupies on the
+   plate, across the wire. A tunnel is closed at the sides and drawn whole; a
+   clip is two jaws, so it is drawn as two, which is what you will hold. */
+function drawRetainers() {
+  for (var i = 0; i < doc.retainers.length; i++) {
+    var r = doc.retainers[i];
+    var pose = retainerPose(r);
+    if (!pose) continue;
+
+    var od = pose.wire.od;
+    var clear = numOr(doc.profile.wireClear, 0.4);
+    var wall = numOr(doc.profile.retWall, 1.2);
+    var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
+    var half = len / 2;
+    var across = od / 2 + clear + wall;
+
+    var ax = -pose.dir[1], ay = pose.dir[0];
+    function corner(u, v) {
+      return [sx(pose.at[0] + ax * u + pose.dir[0] * v),
+              sy(pose.at[1] + ay * u + pose.dir[1] * v)];
+    }
+
+    function band(u0, u1) {
+      var c = [corner(u0, -half), corner(u1, -half), corner(u1, half), corner(u0, half)];
+      ctx.beginPath();
+      ctx.moveTo(c[0][0], c[0][1]);
+      for (var k = 1; k < 4; k++) ctx.lineTo(c[k][0], c[k][1]);
+      ctx.closePath();
+      ctx.fillStyle = withAlpha(COL.boss, r.kind === 'tunnel' ? 0.42 : 0.30);
+      ctx.fill();
+      ctx.strokeStyle = COL.boss;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    if (r.kind === 'tunnel') {
+      band(-across, across);
+    } else {
+      band(-across, -(od / 2 + clear));      // one jaw
+      band(od / 2 + clear, across);          // and the other
+    }
+  }
+}
+
+function retainerAt(p) {
+  for (var i = doc.retainers.length - 1; i >= 0; i--) {
+    var r = doc.retainers[i];
+    var pose = retainerPose(r);
+    if (!pose) continue;
+    var od = pose.wire.od;
+    var across = od / 2 + numOr(doc.profile.wireClear, 0.4) + numOr(doc.profile.retWall, 1.2);
+    var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
+
+    var dx = wx(p.x) - pose.at[0], dy = wy(p.y) - pose.at[1];
+    var along = dx * pose.dir[0] + dy * pose.dir[1];
+    var side = dx * -pose.dir[1] + dy * pose.dir[0];
+    if (Math.abs(along) <= len / 2 && Math.abs(side) <= across) return r;
+  }
+  return null;
 }
 
 function drawTexts() {
@@ -2065,6 +2323,8 @@ function hoverTarget(p) {
   }
   var w = wireAt(p);
   if (w) return { text: w.name || t('wires'), colour: w.colour };
+  var rt = retainerAt(p);
+  if (rt) return { text: t(rt.kind), colour: COL.boss };
   var xt = textAt(p);
   if (xt) return { text: xt.text, colour: COL.text };
   var c = componentAt(p);
@@ -2180,6 +2440,7 @@ function render() {
   drawComponents();
   drawBosses();
   drawWires();
+  drawRetainers();
   drawTexts();
   drawGuides();
   drawSelection();
@@ -2231,6 +2492,8 @@ function updateStatus() {
     hint.textContent = t('hintGuide');
   } else if (tool === 'wire') {
     hint.textContent = t('hintWire');
+  } else if (sel.kind === 'retainer') {
+    hint.textContent = t('hintRet');
   } else if (sel.kind === 'text') {
     hint.textContent = t('hintText');
   } else if (sel.kind === 'wire') {
@@ -2373,6 +2636,16 @@ cv.addEventListener('pointerdown', function (e) {
     // Bosses are picked before components. A boss usually sits on top of the
     // component it holds down, and the small target has to win or it can never
     // be clicked at all.
+    var onRet = retainerAt(p);
+    if (onRet) {
+      select('retainer', onRet.id);
+      snapshot();
+      drag = { kind: 'slideRetainer', id: onRet.id };
+      syncControls();
+      draw();
+      return;
+    }
+
     var onText = textAt(p);
     if (onText) {
       select('text', onText.id);
@@ -2472,6 +2745,15 @@ cv.addEventListener('pointermove', function (e) {
       syncControls();
       scheduleSave();
     }
+  } else if (drag && drag.kind === 'slideRetainer') {
+    var sr = selectedRetainer();
+    if (sr) {
+      // Slid along its own wire rather than moved freely: a retainer that is
+      // not on the wire is not holding anything.
+      sr.t = tAlongWire(sr.wire, [wx(p.x), wy(p.y)]);
+      syncControls();
+      scheduleSave();
+    }
   } else if (drag && drag.kind === 'moveText') {
     var mt = selectedText();
     if (mt) {
@@ -2508,7 +2790,9 @@ cv.addEventListener('pointermove', function (e) {
   } else {
     var grip = handleAt(p);
     if (grip) cv.style.cursor = gripCursor(grip.id);
-    else if (bossAt(p) || textAt(p) || componentAt(p) || guideAt(p)) cv.style.cursor = 'move';
+    else if (retainerAt(p) || bossAt(p) || textAt(p) || componentAt(p) || guideAt(p)) {
+      cv.style.cursor = 'move';
+    }
     else cv.style.cursor = 'default';
   }
   draw();
@@ -2965,6 +3249,7 @@ function syncControls() {
   syncBossControls();
   syncWireControls();
   syncTextControls();
+  syncRetainerControls();
   if (c) {
     F.name.value = c.name;
     F.x.value = round2(c.at[0]);
@@ -3084,6 +3369,7 @@ function deleteSelected() {
   if (sel.kind === 'boss') { deleteBoss(); return; }
   if (sel.kind === 'wire') { deleteWire(); return; }
   if (sel.kind === 'text') { deleteText(); return; }
+  if (sel.kind === 'retainer') { deleteRetainer(); return; }
   var c = selectedComponent();
   if (!c) return;
   snapshot();
@@ -3391,6 +3677,10 @@ function ringArea(r) {
     a += p1[0] * p2[1] - p2[0] * p1[1];
   }
   return a / 2;
+}
+
+function samePoint(a, b) {
+  return Math.abs(a[0] - b[0]) < TRI_EPS && Math.abs(a[1] - b[1]) < TRI_EPS;
 }
 
 /* Outer rings run counter-clockwise, holes clockwise. Getting this wrong makes
@@ -3752,6 +4042,10 @@ function buildMesh() {
 
   for (var x = 0; x < doc.texts.length; x++) textMesh(out, doc.texts[x]);
 
+  for (var rr = 0; rr < doc.retainers.length; rr++) {
+    if (!retainerMesh(out, doc.retainers[rr])) return null;
+  }
+
   for (var i = 0; i < doc.bosses.length; i++) {
     var b = doc.bosses[i];
     var h = bossHeightOf(b);
@@ -3934,6 +4228,176 @@ function textMesh(out, label) {
                      label.stroke, t - WELD, t + label.height);
     }
   }
+}
+
+
+/* --------------------------------------------------------------------------
+   Retainer geometry
+   --------------------------------------------------------------------------
+   A retainer is one cross-section swept a short way along the wire. The
+   section is drawn in (u, v): u across the wire, v up from the plate. Sweeping
+   it gives a prism whose end caps are the section itself, triangulated -- the
+   first use of the triangulator for something that is not the plate.
+
+   A TUNNEL is closed: the wire threads through it. Its section is a single
+   ring -- up one leg, over the top, down the other, and back along the inside.
+
+   A CLIP is open at the top: the wire presses in. It is TWO solids, one jaw
+   either side, because a wire lying on the plate leaves nothing to join them
+   through. That is not a compromise, it is what the part looks like.
+   -------------------------------------------------------------------------- */
+
+/* The roof is the only real printing decision here.
+
+   A square roof is a flat bridge over the opening. Bridges print, and T5 put
+   the limit at 20 mm, so a 3 mm opening is far inside it -- but the underside
+   comes out rough and sags a little, and the sag eats the clearance the wire
+   needs. A pointed arch never exceeds 45 degrees of overhang, so nothing is
+   bridged and nothing sags. Both are offered because the coupon should settle
+   it rather than an argument. */
+function tunnelSection(bore, height, wall, roof) {
+  var hb = bore / 2;
+  var out = [];
+  var i, n = 10;
+
+  if (roof === 'square') {
+    out.push([-(hb + wall), 0]);
+    out.push([-(hb + wall), height + wall]);
+    out.push([hb + wall, height + wall]);
+    out.push([hb + wall, 0]);
+    out.push([hb, 0]);
+    out.push([hb, height]);
+    out.push([-hb, height]);
+    out.push([-hb, 0]);
+    return out;
+  }
+
+  /* A pointed arch: straight legs to the springing line, then two arcs meeting
+     at a peak. Drawn as inner and outer offsets of the same curve. */
+  function arch(r, spring, apex) {
+    var pts = [];
+    for (i = 0; i <= n; i++) {
+      var f = i / n;
+      // A simple ogee that leaves the leg vertically and meets the peak at 45.
+      pts.push([r * (1 - f), spring + (apex - spring) * Math.sin(f * Math.PI / 2)]);
+    }
+    return pts;
+  }
+
+  var spring = Math.max(0, height - bore * 0.35);
+  var apexIn = height;
+  var apexOut = height + wall;
+
+  out.push([-(hb + wall), 0]);
+  out.push([-(hb + wall), spring]);
+  var left = arch(-(hb + wall), spring, apexOut);
+  for (i = 0; i < left.length; i++) out.push(left[i]);
+  var right = arch(hb + wall, spring, apexOut);
+  for (i = right.length - 2; i >= 0; i--) out.push(right[i]);   // the apex is already in
+  out.push([hb + wall, spring]);
+  out.push([hb + wall, 0]);
+
+  out.push([hb, 0]);
+  out.push([hb, spring]);
+  var rin = arch(hb, spring, apexIn);
+  for (i = 0; i < rin.length; i++) out.push(rin[i]);
+  var lin = arch(-hb, spring, apexIn);
+  for (i = lin.length - 2; i >= 0; i--) out.push(lin[i]);       // likewise
+  out.push([-hb, spring]);
+  out.push([-hb, 0]);
+  return out;
+}
+
+/* One jaw of a clip. The inner face runs straight up from the plate to the
+   wire's centre height, then curls over it; the mouth is left narrower than
+   the wire so it has to be pressed in and cannot fall out. Mirrored for the
+   other side. */
+function clipSection(od, clear, wall, sign) {
+  var r = od / 2 + clear;
+  var cy = od / 2;
+  var mouth = Math.asin(Math.max(0.15, Math.min(0.95, (od * 0.42) / r)));  // half-angle from vertical
+  var n = 8;
+  var i, a;
+
+  var inner = [], outer = [];
+  for (i = 0; i <= n; i++) {
+    a = (i / n) * (Math.PI / 2 - mouth);       // from horizontal up to the mouth
+    inner.push([sign * r * Math.cos(a), cy + r * Math.sin(a)]);
+    outer.push([sign * (r + wall) * Math.cos(a), cy + (r + wall) * Math.sin(a)]);
+  }
+
+  var out = [];
+  out.push([sign * r, 0]);
+  for (i = 0; i < inner.length; i++) out.push(inner[i]);
+  for (i = outer.length - 1; i >= 0; i--) out.push(outer[i]);
+  out.push([sign * (r + wall), 0]);
+  return out;
+}
+
+/* Sweep a section along the wire. The caps are the section triangulated; the
+   sides are one quad per section edge. */
+function sweepSection(out, section, at, dir, len, z0) {
+  /* Split the section at every vertex height BEFORE triangulating, exactly as
+     the plate's faces are. The sweep puts vertices along the section that the
+     side walls would otherwise know nothing about, and a cap meeting a wall at
+     a point the wall does not have is a T-junction -- a crack that measures
+     perfect. The plate taught this; the retainers inherit it. */
+  var clean = [], q;
+  for (q = 0; q < section.length; q++) {
+    var prev = clean.length ? clean[clean.length - 1] : section[section.length - 1];
+    if (!samePoint(section[q], prev)) clean.push(section[q]);
+  }
+  if (clean.length < 3) return false;
+
+  var ring = splitRingsAtVertexHeights([oriented(clean, true)])[0];
+  var caps = triangulate(ring, []);
+  if (!caps) return false;
+
+  var ax = -dir[1], ay = dir[0];               // across the wire
+  var half = len / 2;
+
+  function pt(uv, s) {
+    return [at[0] + ax * uv[0] + dir[0] * s,
+            at[1] + ay * uv[0] + dir[1] * s,
+            z0 + uv[1]];
+  }
+
+  var i, k;
+  for (i = 0; i < caps.length; i++) {
+    var c = caps[i];
+    var f0 = pt(c[0], half), f1 = pt(c[1], half), f2 = pt(c[2], half);
+    tri(out, f0[0], f0[1], f0[2], f1[0], f1[1], f1[2], f2[0], f2[1], f2[2]);
+    var b0 = pt(c[0], -half), b1 = pt(c[1], -half), b2 = pt(c[2], -half);
+    tri(out, b0[0], b0[1], b0[2], b2[0], b2[1], b2[2], b1[0], b1[1], b1[2]);
+  }
+
+  for (k = 0; k < ring.length; k++) {
+    var p1 = ring[k], p2 = ring[(k + 1) % ring.length];
+    quad(out, pt(p1, -half), pt(p2, -half), pt(p2, half), pt(p1, half));
+  }
+  return true;
+}
+
+function retainerMesh(out, r) {
+  var pose = retainerPose(r);
+  if (!pose) return true;                      // nothing to draw, not a failure
+
+  var od = pose.wire.od;
+  var clear = numOr(doc.profile.wireClear, 0.4);
+  var wall = numOr(doc.profile.retWall, 1.2);
+  var len = Math.min(numOr(doc.profile.retLen, 6), Math.max(1, pose.room));
+  var z0 = doc.plate.thickness - WELD;
+
+  /* A retainer stacked over another wire starts higher: the wire below it,
+     plus its clearance, plus a floor to carry it. */
+  var lift = r.level * (od + clear + wall);
+
+  if (r.kind === 'clip') {
+    return sweepSection(out, clipSection(od, clear, wall, 1), pose.at, pose.dir, len, z0 + lift)
+        && sweepSection(out, clipSection(od, clear, wall, -1), pose.at, pose.dir, len, z0 + lift);
+  }
+  return sweepSection(out, tunnelSection(od + clear * 2, od + clear * 2, wall, doc.profile.roof),
+                      pose.at, pose.dir, len, z0 + lift);
 }
 
 
@@ -4284,6 +4748,108 @@ document.getElementById('delTextBtn').onclick = deleteText;
 
 
 /* --------------------------------------------------------------------------
+   The retainer panel
+   -------------------------------------------------------------------------- */
+var retFields = document.getElementById('retFields');
+var retEmpty = document.getElementById('retEmpty');
+var RT = {
+  kind: document.getElementById('retKind'),
+  t: document.getElementById('retT'),
+  level: document.getElementById('retLevel')
+};
+var profWireClear = document.getElementById('profWireClear');
+var profRetWall = document.getElementById('profRetWall');
+var profRetLen = document.getElementById('profRetLen');
+var profRoof = document.getElementById('profRoof');
+
+function syncRetainerControls() {
+  var r = selectedRetainer();
+  retFields.hidden = !r;
+  retEmpty.hidden = !!r;
+
+  fillSelect(RT.kind, RETAINER_KINDS, function (k) { return t(k); }, r ? r.kind : 'tunnel');
+  fillSelect(profRoof, ['arch', 'square'],
+             function (k) { return t(k === 'arch' ? 'roofArch' : 'roofSquare'); },
+             doc.profile.roof);
+
+  profWireClear.value = doc.profile.wireClear;
+  profRetWall.value = doc.profile.retWall;
+  profRetLen.value = doc.profile.retLen;
+
+  if (!r) return;
+  RT.t.value = Math.round(r.t * 100);
+  RT.level.value = r.level;
+}
+
+function onRetField() {
+  if (syncing) return;
+  var r = selectedRetainer();
+  if (!r) return;
+  r.kind = RETAINER_KINDS.indexOf(RT.kind.value) >= 0 ? RT.kind.value : r.kind;
+  r.t = Math.max(0, Math.min(1, num(RT.t, r.t * 100) / 100));
+  r.level = Math.max(0, Math.min(4, Math.round(num(RT.level, r.level))));
+  // Touching a retainer by hand makes it yours, so the auto pass leaves it be.
+  r.origin = 'manual';
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+for (var rtKey in RT) {
+  if (Object.prototype.hasOwnProperty.call(RT, rtKey)) {
+    RT[rtKey].addEventListener('input', onRetField);
+    RT[rtKey].addEventListener('change', onRetField);
+    RT[rtKey].addEventListener('focus', snapshot);
+  }
+}
+
+function onRetProfile() {
+  if (syncing) return;
+  doc.profile.wireClear = Math.max(0, num(profWireClear, doc.profile.wireClear));
+  doc.profile.retWall = Math.max(0.4, num(profRetWall, doc.profile.retWall));
+  doc.profile.retLen = Math.max(1, num(profRetLen, doc.profile.retLen));
+  doc.profile.roof = profRoof.value === 'square' ? 'square' : 'arch';
+  scheduleSave();
+  draw();
+}
+[profWireClear, profRetWall, profRetLen, profRoof].forEach(function (el) {
+  el.addEventListener('input', onRetProfile);
+  el.addEventListener('change', onRetProfile);
+  el.addEventListener('focus', snapshot);
+});
+
+/* Added to the selected wire, in the middle of whatever is clear. A retainer
+   with no wire would be a bridge over nothing. */
+document.getElementById('addRetBtn').onclick = function () {
+  var w = selectedWire() || (selectedRetainer() && findIn(doc.wires, selectedRetainer().wire));
+  if (!w) { say(t('needWire')); return; }
+  snapshot();
+  var taken = {};
+  for (var i = 0; i < doc.retainers.length; i++) taken[doc.retainers[i].id] = true;
+  var r = normRetainer({ wire: w.id, t: 0.5, kind: 'tunnel', origin: 'manual' },
+                       taken, makeIdSet(doc.wires));
+  r.wire = w.id;
+  doc.retainers.push(r);
+  select('retainer', r.id);
+  syncControls();
+  scheduleSave();
+  draw();
+};
+
+function deleteRetainer() {
+  var r = selectedRetainer();
+  if (!r) return;
+  snapshot();
+  doc.retainers.splice(doc.retainers.indexOf(r), 1);
+  deselect();
+  syncControls();
+  scheduleSave();
+  draw();
+}
+document.getElementById('delRetBtn').onclick = deleteRetainer;
+
+
+/* --------------------------------------------------------------------------
    Export
    -------------------------------------------------------------------------- */
 var triCount = document.getElementById('triCount');
@@ -4488,6 +5054,19 @@ function applyLang() {
   document.getElementById('wireNote').textContent = t('wireNote');
   tip('wireBtn', t('wires'));
 
+  document.getElementById('ttRetainers').textContent = t('retainers');
+  document.getElementById('addRetBtn').textContent = t('addRet');
+  document.getElementById('retEmpty').textContent = t('noRet');
+  document.getElementById('lbRetKind').textContent = t('retKind');
+  document.getElementById('lbRetT').textContent = t('retT');
+  document.getElementById('lbRetLevel').textContent = t('retLevel');
+  document.getElementById('delRetBtn').textContent = t('remove');
+  document.getElementById('retNote').textContent = t('retNote');
+  document.getElementById('lbWireClear').textContent = t('wireClear');
+  document.getElementById('lbRetWall').textContent = t('retWall');
+  document.getElementById('lbRetLen').textContent = t('retLenLbl');
+  document.getElementById('lbRoof').textContent = t('roof');
+
   document.getElementById('ttTexts').textContent = t('texts');
   document.getElementById('addTextBtn').textContent = t('addText');
   document.getElementById('textEmpty').textContent = t('noText');
@@ -4636,6 +5215,7 @@ makeCollapsible('platePanel', false);
 makeCollapsible('compPanel', true);
 makeCollapsible('bossPanel', true);
 makeCollapsible('wirePanel', true);
+makeCollapsible('retPanel', true);
 makeCollapsible('textPanel', true);
 makeCollapsible('profilePanel', false);
 makeCollapsible('exportPanel', true);

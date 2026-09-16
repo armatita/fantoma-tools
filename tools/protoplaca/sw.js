@@ -1,7 +1,7 @@
 /* Protoplaca — see ../../shared/sw-core.js for the caching strategy.
  * Bump the version below whenever this tool's files change, otherwise
  * installed copies keep serving the old build from cache. */
-self.SW_CACHE = 'protoplaca-v28';
+self.SW_CACHE = 'protoplaca-v32';
 self.SW_ASSETS = [
   './',
   './index.html',

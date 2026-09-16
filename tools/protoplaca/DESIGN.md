@@ -56,7 +56,8 @@ screw the ESP32 down" without any wire handling at all.
 
 **Phase 2** — wires: drawing, anchoring, colours, names, AWG, length readout.
 (built)
-**Phase 3** — retainers: auto-placement, tunnels and clips, crossings.
+**Phase 3** — retainers: tunnels and clips (built), auto-placement and
+crossings (not yet).
 **Phase 4** — the 3D tab: the mesh plus coloured wires and components, collision
 checks.
 **Phase 5** — ribs, recessed text.
@@ -432,6 +433,32 @@ flip it with a click. Automatic layering is a graph problem with no single right
 answer, and the final say is yours regardless.
 
 ---
+
+## Retainer geometry
+
+A retainer is one cross-section swept a short way along the wire. The section
+is drawn in (u, v) — across the wire and up from the plate — and sweeping it
+gives a prism whose end caps are the section triangulated. That is the first
+use of the triangulator for something other than the plate, and it inherited
+the plate's lesson immediately: the section must be split at every vertex
+height *before* triangulating, or the caps meet the side walls at points the
+walls do not have.
+
+**A tunnel is one solid; a clip is two.** A wire lying on the plate leaves
+nothing for a clip's two jaws to join through, so a clip is a jaw either side
+and the plate holds them apart. That is not a compromise, it is what the part
+looks like.
+
+**`t` is a fraction of the wire's length, not a coordinate**, so a retainer
+stays where it was put relative to the run when the wire is redrawn around it.
+Dragging one slides it along its own wire rather than moving it freely: a
+retainer that is not on the wire is not holding anything.
+
+Two failures on the way, both caught by the closed-surface test. The caps and
+walls disagreed until the section was pre-split. And the pointed arch emitted
+its apex twice — once ending the left arc, once beginning the right — giving a
+zero-length edge; there is now a guard that drops any repeated point in a
+section, since one repeated point becomes a zero-area quad.
 
 ## Geometry
 
