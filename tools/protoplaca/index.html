@@ -65,7 +65,13 @@
     color: #f4f4f2; padding: 6px 8px; font-size: 12px; font-family: inherit;
   }
   .field select { width: 110px; }
+  .field input[type=text] { width: 120px; }
+  .field input[type=color] {
+    width: 44px; height: 28px; padding: 2px; background: #17171f;
+    border: 1px solid #2b2b36; border-radius: 6px; cursor: pointer;
+  }
   .field .unit { color: #6b6b76; width: 18px; }
+  .field.narrow input[type=number] { width: 70px; }
 
   .row { display: flex; gap: 6px; margin-top: 10px; }
   button {
@@ -109,6 +115,20 @@
 
     <div>
       <section class="panel">
+        <h2 id="ttProject"></h2>
+        <div class="field">
+          <label for="docName" id="lbDocName"></label>
+          <input type="text" id="docName" maxlength="60">
+        </div>
+        <div class="row">
+          <button type="button" id="newBtn"></button>
+          <button type="button" id="openBtn"></button>
+          <button type="button" id="saveBtn"></button>
+        </div>
+        <div class="note" id="projectNote"></div>
+      </section>
+
+      <section class="panel">
         <h2 id="ttPlate"></h2>
         <div class="field">
           <label for="plateW" id="lbW"></label>
@@ -125,6 +145,64 @@
           <input type="number" id="plateT" inputmode="decimal" min="1" max="20" step="0.2" value="3">
           <span class="unit">mm</span>
         </div>
+      </section>
+
+      <section class="panel">
+        <h2 id="ttComponents"></h2>
+        <div class="row">
+          <button type="button" id="addCompBtn"></button>
+        </div>
+        <div class="note" id="compEmpty"></div>
+        <div id="compFields" hidden>
+          <div class="field">
+            <label for="compName" id="lbCompName"></label>
+            <input type="text" id="compName" maxlength="40">
+          </div>
+          <div class="field narrow">
+            <label for="compX">X</label>
+            <input type="number" id="compX" inputmode="decimal" step="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="compY">Y</label>
+            <input type="number" id="compY" inputmode="decimal" step="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="compW" id="lbCompW"></label>
+            <input type="number" id="compW" inputmode="decimal" step="1" min="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="compH" id="lbCompH"></label>
+            <input type="number" id="compH" inputmode="decimal" step="1" min="1">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="compStandoff" id="lbStandoff"></label>
+            <input type="number" id="compStandoff" inputmode="decimal" step="0.5" min="0">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="compBoard" id="lbBoard"></label>
+            <input type="number" id="compBoard" inputmode="decimal" step="0.1" min="0">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field narrow">
+            <label for="compBody" id="lbBody"></label>
+            <input type="number" id="compBody" inputmode="decimal" step="0.5" min="0">
+            <span class="unit">mm</span>
+          </div>
+          <div class="field">
+            <label for="compColour" id="lbColour"></label>
+            <input type="color" id="compColour">
+          </div>
+          <div class="row">
+            <button type="button" id="dupCompBtn"></button>
+            <button type="button" id="delCompBtn"></button>
+          </div>
+        </div>
+        <div class="note" id="compNote"></div>
       </section>
 
       <section class="panel">
@@ -160,12 +238,14 @@
 'use strict';
 
 /* ==========================================================================
-   Protoplaca — step 1: the canvas.
+   Protoplaca — steps 1 and 2.
 
-   Plate, grid, rulers, pan and zoom, guides, measuring. Nothing is generated
-   and nothing is saved yet beyond the language choice; the project document
-   and its file format arrive in step 2. See DESIGN.md for why the steps are
-   cut this way.
+   The drawing surface: plate, grid, rulers, pan and zoom, guides, measuring.
+   The document: components, and the .protoplaca.json file that holds them.
+
+   Nothing generated lives here yet -- bosses are step 3 and the mesh is step
+   4. See DESIGN.md for why the steps are cut this way, and for the decisions
+   the code below is an implementation of rather than an argument for.
    ========================================================================== */
 
 
@@ -178,7 +258,36 @@
    -------------------------------------------------------------------------- */
 var STRINGS = {
   en: {
-    subtitle: 'step 1 — the drawing surface',
+    subtitle: 'step 2 — components and the project file',
+    project: 'Project',
+    docName: 'Name',
+    untitled: 'untitled',
+    newDoc: 'New',
+    open: 'Open',
+    save: 'Save',
+    projectNote: 'Kept in this browser as you work. Save to a file to keep a real '
+      + 'copy, or to move the project to another machine.',
+    components: 'Components',
+    addComp: 'Add component',
+    duplicate: 'Duplicate',
+    remove: 'Delete',
+    compName: 'Name',
+    compW: 'Width',
+    compH: 'Height',
+    standoff: 'Standoff',
+    board: 'Board',
+    body: 'Body',
+    colour: 'Colour',
+    noSelection: 'Nothing selected. Add a component, or click one on the plate.',
+    compNote: 'Standoff is the clear space under the board — wires run through it. '
+      + 'Board is the PCB itself, body is whatever stands on top of it.',
+    hintComponent: 'drag to move · corners and edges to resize · Delete removes it',
+    confirmNew: 'Start a new project? Anything not saved to a file is lost.',
+    errNotProject: 'That file is not a Protoplaca project.',
+    newerFile: 'Saved by a newer Protoplaca. What this version does not understand '
+      + 'is kept in the file, but not shown.',
+    opened: 'Opened.',
+    saved: 'Saved.',
     plate: 'Plate',
     width: 'Width',
     height: 'Height',
@@ -200,7 +309,37 @@ var STRINGS = {
     dist: 'distance'
   },
   pt: {
-    subtitle: 'passo 1 — a área de desenho',
+    subtitle: 'passo 2 — componentes e o ficheiro do projeto',
+    project: 'Projeto',
+    docName: 'Nome',
+    untitled: 'sem título',
+    newDoc: 'Novo',
+    open: 'Abrir',
+    save: 'Guardar',
+    projectNote: 'Fica guardado neste navegador enquanto trabalha. Guarde num '
+      + 'ficheiro para ter uma cópia a sério, ou para levar o projeto para outra '
+      + 'máquina.',
+    components: 'Componentes',
+    addComp: 'Adicionar componente',
+    duplicate: 'Duplicar',
+    remove: 'Apagar',
+    compName: 'Nome',
+    compW: 'Largura',
+    compH: 'Altura',
+    standoff: 'Espaçador',
+    board: 'PCB',
+    body: 'Corpo',
+    colour: 'Cor',
+    noSelection: 'Nada selecionado. Adicione um componente, ou clique num que esteja na placa.',
+    compNote: 'O espaçador é o vão livre por baixo da PCB — é por aí que passam os '
+      + 'fios. A PCB é a placa de circuito, o corpo é o que fica por cima dela.',
+    hintComponent: 'arraste para mover · cantos e arestas para redimensionar · Delete apaga',
+    confirmNew: 'Começar um projeto novo? Tudo o que não esteja guardado num ficheiro perde-se.',
+    errNotProject: 'Esse ficheiro não é um projeto Protoplaca.',
+    newerFile: 'Guardado por um Protoplaca mais recente. O que esta versão não '
+      + 'percebe fica no ficheiro, mas não é mostrado.',
+    opened: 'Aberto.',
+    saved: 'Guardado.',
     plate: 'Placa',
     width: 'Largura',
     height: 'Altura',
@@ -237,9 +376,46 @@ function mm(value, places) {
 /* --------------------------------------------------------------------------
    The document, so far
    -------------------------------------------------------------------------- */
-var plate = { w: 120, h: 80, thickness: 3 };
-var guides = [];          // { axis: 'x' | 'y', v: mm }
+var DOC_VERSION = 1;
+
+/* The whole project is this one object, and it is what a .protoplaca.json file
+   contains. Nothing derived lives in it -- no mesh, no screen coordinates --
+   so the file cannot ever disagree with itself.
+
+   Components are a position and a size rather than an outline polygon. You
+   arrive at a component by measuring a real part with calipers, and what you
+   read off is a width and a height; an outline is not something anyone types.
+   Outlines stay possible later for the odd L-shaped board without changing
+   what is already written here. */
+function blankDoc() {
+  return {
+    format: 'protoplaca',
+    version: DOC_VERSION,
+    units: 'mm',
+    name: '',
+    plate: { w: 120, h: 80, thickness: 3 },
+    components: [],       // see normComponent for the fields
+    guides: []            // { axis: 'x' | 'y', v: mm }
+  };
+}
+
+var doc = blankDoc();
+
+/* Selection is held as an id, not as a reference to the object. Undo replaces
+   the whole document with a fresh parse, so any object reference kept across
+   it would point at a component that is no longer in the drawing. */
+var selectedId = null;
+
+/* The grid pitch is how you are working, not what you designed, so it is a
+   preference of this browser rather than part of the document. */
 var gridPitch = 1;        // mm; 0 means no grid and no snapping
+
+function selectedComponent() {
+  for (var i = 0; i < doc.components.length; i++) {
+    if (doc.components[i].id === selectedId) return doc.components[i];
+  }
+  return null;
+}
 
 
 /* --------------------------------------------------------------------------
@@ -266,6 +442,251 @@ function wy(py) { return view.y0 + (plot.y1 - py) / view.scale; }
 function snap(value) {
   if (!gridPitch) return value;
   return Math.round(value / gridPitch) * gridPitch;
+}
+
+
+/* --------------------------------------------------------------------------
+   Reading a document
+   --------------------------------------------------------------------------
+   Everything that enters the program from outside -- a file you opened, or
+   what this browser remembered from last time -- comes through here first.
+   Both routes use the same code, so a bug in one cannot hide in the other.
+
+   Unknown fields are carried through untouched. A file written by a later
+   version of Protoplaca will contain sections this build has never heard of;
+   dropping them on load would mean that merely opening a project quietly
+   destroyed part of it.
+   -------------------------------------------------------------------------- */
+var MIN_COMP = 1;         // mm: anything smaller is a mis-drag, not a part
+var idSeq = 0;
+
+function copyInto(target, source) {
+  for (var k in source) {
+    if (Object.prototype.hasOwnProperty.call(source, k)) target[k] = source[k];
+  }
+  return target;
+}
+
+function numOr(value, fallback, lo, hi) {
+  var v = typeof value === 'number' ? value : parseFloat(value);
+  if (!isFinite(v)) return fallback;
+  if (lo !== undefined) v = Math.max(lo, v);
+  if (hi !== undefined) v = Math.min(hi, v);
+  return v;
+}
+
+function pairOr(value, fallback, lo) {
+  if (!value || typeof value.length !== 'number' || value.length < 2) return fallback.slice();
+  return [numOr(value[0], fallback[0], lo), numOr(value[1], fallback[1], lo)];
+}
+
+function colourOr(value, fallback) {
+  return (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) ? value : fallback;
+}
+
+function nextId(taken) {
+  var id;
+  do { id = 'c' + (++idSeq); } while (taken && taken[id]);
+  return id;
+}
+
+function normComponent(raw, taken) {
+  var c = copyInto({}, raw && typeof raw === 'object' ? raw : {});
+  c.id = (typeof c.id === 'string' && c.id && !taken[c.id]) ? c.id : nextId(taken);
+  taken[c.id] = true;
+  c.name = typeof c.name === 'string' ? c.name.slice(0, 40) : '';
+  c.at = pairOr(c.at, [0, 0]);
+  c.size = pairOr(c.size, [20, 20], MIN_COMP);
+  c.colour = colourOr(c.colour, '#4dd8ff');
+  c.standoff = numOr(c.standoff, 6, 0, 200);    // clear space under the board
+  c.board = numOr(c.board, 1.6, 0, 50);         // the PCB itself
+  c.body = numOr(c.body, 10, 0, 300);           // whatever stands on top of it
+  return c;
+}
+
+function normGuide(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (raw.axis !== 'x' && raw.axis !== 'y') return null;
+  var v = numOr(raw.v, NaN);
+  return isFinite(v) ? { axis: raw.axis, v: v } : null;
+}
+
+/* Returns { doc: <document>, newer: <bool> }, or throws with a message meant
+   to be read by a person. */
+function normDoc(raw) {
+  if (!raw || typeof raw !== 'object' || raw.format !== 'protoplaca') {
+    throw new Error(t('errNotProject'));
+  }
+  var out = copyInto({}, raw);
+  var fileVersion = numOr(raw.version, DOC_VERSION);
+
+  out.format = 'protoplaca';
+  // Keep a newer file's own version number. This build preserved the parts it
+  // did not understand, so calling the result version 1 would be a lie.
+  out.version = Math.max(fileVersion, DOC_VERSION);
+  out.units = 'mm';
+  out.name = typeof raw.name === 'string' ? raw.name.slice(0, 60) : '';
+
+  var rawPlate = raw.plate && typeof raw.plate === 'object' ? raw.plate : {};
+  out.plate = copyInto({}, rawPlate);
+  out.plate.w = numOr(rawPlate.w, 120, 10, 2000);
+  out.plate.h = numOr(rawPlate.h, 80, 10, 2000);
+  out.plate.thickness = numOr(rawPlate.thickness, 3, 0.4, 100);
+
+  var taken = {};
+  var list = (raw.components && raw.components.length) ? raw.components : [];
+  out.components = [];
+  for (var i = 0; i < list.length; i++) out.components.push(normComponent(list[i], taken));
+
+  var gs = (raw.guides && raw.guides.length) ? raw.guides : [];
+  out.guides = [];
+  for (var j = 0; j < gs.length; j++) {
+    var g = normGuide(gs[j]);
+    if (g) out.guides.push(g);
+  }
+
+  return { doc: out, newer: fileVersion > DOC_VERSION };
+}
+
+
+/* --------------------------------------------------------------------------
+   Undo
+   --------------------------------------------------------------------------
+   The document is small enough that a snapshot is just its JSON, so undo is a
+   stack of strings rather than a pile of inverse operations with bugs of
+   their own.
+
+   It exists because the tool saves as you work. Without autosave a deletion
+   costs nothing -- you close without saving. With it, the previous state is
+   already overwritten, so undo is not a convenience here, it is the only way
+   back.
+   -------------------------------------------------------------------------- */
+var undoStack = [];
+var redoStack = [];
+var UNDO_LIMIT = 60;
+
+function snapshot() {
+  undoStack.push(JSON.stringify(doc));
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function restore(from, to) {
+  if (!from.length) return;
+  to.push(JSON.stringify(doc));
+  doc = JSON.parse(from.pop());
+  if (!selectedComponent()) selectedId = null;
+  syncControls();
+  scheduleSave();
+  draw();
+}
+
+function undo() { restore(undoStack, redoStack); }
+function redo() { restore(redoStack, undoStack); }
+
+
+/* --------------------------------------------------------------------------
+   Components on the canvas
+   -------------------------------------------------------------------------- */
+var HANDLE = 7;           // px, square side
+
+function withAlpha(hex, alpha) {
+  var n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+}
+
+function compRectPx(c) {
+  return {
+    x: sx(c.at[0]),
+    y: sy(c.at[1] + c.size[1]),           // screen y of the TOP edge
+    w: c.size[0] * view.scale,
+    h: c.size[1] * view.scale
+  };
+}
+
+/* The eight grips of a selection box, in screen pixels. Each carries which
+   world edges it moves -- ex/ey of -1, 0 or 1 for the low edge, neither, or
+   the high edge -- so one piece of arithmetic drives all eight. */
+function handlesOf(c) {
+  var r = compRectPx(c);
+  var mx = r.x + r.w / 2, my = r.y + r.h / 2;
+  return [
+    { id: 'nw', x: r.x,       y: r.y,       ex: -1, ey:  1 },
+    { id: 'n',  x: mx,        y: r.y,       ex:  0, ey:  1 },
+    { id: 'ne', x: r.x + r.w, y: r.y,       ex:  1, ey:  1 },
+    { id: 'e',  x: r.x + r.w, y: my,        ex:  1, ey:  0 },
+    { id: 'se', x: r.x + r.w, y: r.y + r.h, ex:  1, ey: -1 },
+    { id: 's',  x: mx,        y: r.y + r.h, ex:  0, ey: -1 },
+    { id: 'sw', x: r.x,       y: r.y + r.h, ex: -1, ey: -1 },
+    { id: 'w',  x: r.x,       y: my,        ex: -1, ey:  0 }
+  ];
+}
+
+function handleAt(p) {
+  var c = selectedComponent();
+  if (!c) return null;
+  var hs = handlesOf(c);
+  for (var i = 0; i < hs.length; i++) {
+    if (Math.abs(hs[i].x - p.x) <= HANDLE && Math.abs(hs[i].y - p.y) <= HANDLE) return hs[i];
+  }
+  return null;
+}
+
+/* Topmost first: later components are drawn on top, so they are picked first. */
+function componentAt(p) {
+  var x = wx(p.x), y = wy(p.y);
+  for (var i = doc.components.length - 1; i >= 0; i--) {
+    var c = doc.components[i];
+    if (x >= c.at[0] && x <= c.at[0] + c.size[0]
+     && y >= c.at[1] && y <= c.at[1] + c.size[1]) return c;
+  }
+  return null;
+}
+
+function drawComponents() {
+  ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (var i = 0; i < doc.components.length; i++) {
+    var c = doc.components[i];
+    var r = compRectPx(c);
+
+    ctx.fillStyle = withAlpha(c.colour, 0.22);
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = c.colour;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(crisp(r.x), crisp(r.y), Math.round(r.w), Math.round(r.h));
+
+    if (c.name && r.w > 34 && r.h > 14) {
+      ctx.fillStyle = c.colour;
+      var label = c.name;
+      while (label.length > 1 && ctx.measureText(label).width > r.w - 8) {
+        label = label.slice(0, -1);
+      }
+      ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
+    }
+  }
+}
+
+function drawSelection() {
+  var c = selectedComponent();
+  if (!c) return;
+  var r = compRectPx(c);
+
+  ctx.strokeStyle = COL.select;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(crisp(r.x), crisp(r.y), Math.round(r.w), Math.round(r.h));
+  ctx.setLineDash([]);
+
+  var hs = handlesOf(c);
+  for (var i = 0; i < hs.length; i++) {
+    ctx.fillStyle = COL.bg;
+    ctx.fillRect(hs[i].x - HANDLE / 2, hs[i].y - HANDLE / 2, HANDLE, HANDLE);
+    ctx.strokeStyle = COL.select;
+    ctx.strokeRect(crisp(hs[i].x - HANDLE / 2), crisp(hs[i].y - HANDLE / 2), HANDLE, HANDLE);
+  }
 }
 
 
@@ -334,7 +755,8 @@ var COL = {
   tick: '#4a4a58',
   label: '#8a8a96',
   guide: '#ffb648',
-  measure: '#4dd8ff'
+  measure: '#4dd8ff',
+  select: '#f4f4f2'
 };
 
 /* A "nice" step is one a person reads without counting: 1, 2, 5 and their
@@ -414,15 +836,15 @@ function drawGrid() {
   ctx.rect(plot.x0, plot.y0, plot.x1 - plot.x0, plot.y1 - plot.y0);
   ctx.clip();
   ctx.beginPath();
-  ctx.rect(sx(0), sy(plate.h), plate.w * view.scale, plate.h * view.scale);
+  ctx.rect(sx(0), sy(doc.plate.h), doc.plate.w * view.scale, doc.plate.h * view.scale);
   ctx.clip();
   drawGridLines(minor, major, COL.grid, COL.gridMajor);
   ctx.restore();
 }
 
 function drawPlate() {
-  var x = sx(0), y = sy(plate.h);
-  var w = plate.w * view.scale, h = plate.h * view.scale;
+  var x = sx(0), y = sy(doc.plate.h);
+  var w = doc.plate.w * view.scale, h = doc.plate.h * view.scale;
 
   ctx.fillStyle = COL.plate;
   ctx.fillRect(x, y, w, h);
@@ -449,8 +871,8 @@ function drawGuides() {
   ctx.lineWidth = 1;
   ctx.strokeStyle = COL.guide;
   ctx.setLineDash([4, 4]);
-  for (var i = 0; i < guides.length; i++) {
-    var g = guides[i];
+  for (var i = 0; i < doc.guides.length; i++) {
+    var g = doc.guides[i];
     if (g.axis === 'x') {
       var px = crisp(sx(g.v));
       if (px >= plot.x0 && px <= plot.x1) line(px, plot.y0, px, plot.y1);
@@ -566,7 +988,9 @@ function render() {
 
   drawPlate();
   drawGrid();
+  drawComponents();
   drawGuides();
+  drawSelection();
   drawMeasure();
 
   ctx.restore();
@@ -595,6 +1019,8 @@ function updateStatus() {
     hint.textContent = t('hintMeasureStart');
   } else if (drag && drag.kind === 'guide') {
     hint.textContent = t('hintGuide');
+  } else if (selectedId) {
+    hint.textContent = t('hintComponent');
   } else if (measure.a && measure.b) {
     var dx = measure.b.x - measure.a.x, dy = measure.b.y - measure.a.y;
     hint.textContent = 'Δx ' + mm(dx, 2) + '  Δy ' + mm(dy, 2)
@@ -612,10 +1038,10 @@ function fit() {
   var padPx = 26;
   var availW = Math.max(40, (plot.x1 - plot.x0) - padPx * 2);
   var availH = Math.max(40, (plot.y1 - plot.y0) - padPx * 2);
-  view.scale = Math.min(availW / plate.w, availH / plate.h);
+  view.scale = Math.min(availW / doc.plate.w, availH / doc.plate.h);
   // Centre the plate: put its middle at the middle of the plot area.
-  view.x0 = plate.w / 2 - (plot.x1 - plot.x0) / 2 / view.scale;
-  view.y0 = plate.h / 2 - (plot.y1 - plot.y0) / 2 / view.scale;
+  view.x0 = doc.plate.w / 2 - (plot.x1 - plot.x0) / 2 / view.scale;
+  view.y0 = doc.plate.h / 2 - (plot.y1 - plot.y0) / 2 / view.scale;
 }
 
 function zoomAt(px, py, factor) {
@@ -651,8 +1077,8 @@ function zoneOf(p) {
 
 function guideAt(p) {
   var tol = 4;
-  for (var i = 0; i < guides.length; i++) {
-    var g = guides[i];
+  for (var i = 0; i < doc.guides.length; i++) {
+    var g = doc.guides[i];
     if (g.axis === 'x' && Math.abs(sx(g.v) - p.x) <= tol) return g;
     if (g.axis === 'y' && Math.abs(sy(g.v) - p.y) <= tol) return g;
   }
@@ -660,7 +1086,11 @@ function guideAt(p) {
 }
 
 cv.addEventListener('pointerdown', function (e) {
-  cv.setPointerCapture(e.pointerId);
+  // Capture keeps a drag alive when the pointer leaves the canvas. It is a
+  // convenience, not a requirement -- but an exception here would abort the
+  // whole handler and the gesture would do nothing at all, which looks
+  // exactly like the tool being broken.
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { /* carry on */ }
   pointers[e.pointerId] = localPoint(e);
 
   var ids = Object.keys(pointers);
@@ -678,11 +1108,11 @@ cv.addEventListener('pointerdown', function (e) {
     // Dragging down from the top ruler produces a horizontal guide: one
     // constant Y. Same convention as every drawing program.
     var gy = { axis: 'y', v: snap(wy(p.y)) };
-    guides.push(gy);
+    doc.guides.push(gy);
     drag = { kind: 'guide', guide: gy };
   } else if (zone === 'rulerLeft') {
     var gx = { axis: 'x', v: snap(wx(p.x)) };
-    guides.push(gx);
+    doc.guides.push(gx);
     drag = { kind: 'guide', guide: gx };
   } else if (zone === 'plot') {
     if (measure.on) {
@@ -695,10 +1125,37 @@ cv.addEventListener('pointerdown', function (e) {
       draw();
       return;
     }
+    // Order matters: a resize grip sits on top of its own component, and a
+    // component may sit on top of a guide. Pick the smallest target first.
+    var grip = handleAt(p);
+    if (grip) {
+      var sel = selectedComponent();
+      snapshot();
+      drag = {
+        kind: 'resize', grip: grip, id: sel.id,
+        at: sel.at.slice(), size: sel.size.slice()
+      };
+      draw();
+      return;
+    }
+
+    var comp = componentAt(p);
+    if (comp) {
+      selectedId = comp.id;
+      snapshot();
+      drag = { kind: 'move', id: comp.id, from: p, at: comp.at.slice() };
+      syncControls();
+      draw();
+      return;
+    }
+
     var hit = guideAt(p);
     if (hit) {
+      snapshot();
       drag = { kind: 'guide', guide: hit };
     } else {
+      selectedId = null;
+      syncControls();
       drag = { kind: 'pan', from: p, x0: view.x0, y0: view.y0 };
     }
   }
@@ -723,8 +1180,19 @@ cv.addEventListener('pointermove', function (e) {
 
   cursor = zoneOf(p) === 'plot' ? { x: wx(p.x), y: wy(p.y) } : null;
 
-  if (drag && drag.kind === 'guide') {
+  if (drag && drag.kind === 'move') {
+    var moving = selectedComponent();
+    if (moving) {
+      moving.at[0] = snap(drag.at[0] + (p.x - drag.from.x) / view.scale);
+      moving.at[1] = snap(drag.at[1] - (p.y - drag.from.y) / view.scale);
+      syncControls();
+      scheduleSave();
+    }
+  } else if (drag && drag.kind === 'resize') {
+    resizeTo(p);
+  } else if (drag && drag.kind === 'guide') {
     drag.guide.v = snap(drag.guide.axis === 'x' ? wx(p.x) : wy(p.y));
+    scheduleSave();
   } else if (drag && drag.kind === 'pan') {
     userAdjusted = true;
     view.x0 = drag.x0 - (p.x - drag.from.x) / view.scale;
@@ -732,7 +1200,10 @@ cv.addEventListener('pointermove', function (e) {
   } else if (measure.on && measure.a && !measure.b) {
     measure.live = { x: snap(wx(p.x)), y: snap(wy(p.y)) };
   } else {
-    cv.style.cursor = guideAt(p) ? 'move' : 'default';
+    var grip = handleAt(p);
+    if (grip) cv.style.cursor = gripCursor(grip.id);
+    else if (componentAt(p) || guideAt(p)) cv.style.cursor = 'move';
+    else cv.style.cursor = 'default';
   }
   draw();
 });
@@ -771,15 +1242,73 @@ cv.addEventListener('wheel', function (e) {
   zoomAt(p.x, p.y, e.deltaY < 0 ? 1.12 : 1 / 1.12);
 }, { passive: false });
 
+var CURSORS = {
+  n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+  ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize'
+};
+function gripCursor(id) { return CURSORS[id] || 'move'; }
+
+/* Drag one edge (or two, at a corner) and leave the opposite edge where it is.
+   The grip carries ex/ey: -1 moves the low edge, +1 the high edge, 0 leaves
+   that axis alone. The dragged edge snaps to the grid -- not the size -- so a
+   component you line up against a guide stays lined up against it. */
+function resizeTo(p) {
+  var c = selectedComponent();
+  if (!c) return;
+  var g = drag.grip;
+
+  var lo = [drag.at[0], drag.at[1]];
+  var hi = [drag.at[0] + drag.size[0], drag.at[1] + drag.size[1]];
+  var world = [snap(wx(p.x)), snap(wy(p.y))];
+  var e = [g.ex, g.ey];
+
+  for (var a = 0; a < 2; a++) {
+    if (e[a] < 0) lo[a] = Math.min(world[a], hi[a] - MIN_COMP);
+    else if (e[a] > 0) hi[a] = Math.max(world[a], lo[a] + MIN_COMP);
+  }
+
+  c.at = [lo[0], lo[1]];
+  c.size = [hi[0] - lo[0], hi[1] - lo[1]];
+  syncControls();
+  scheduleSave();
+}
+
 function removeGuide(g) {
-  var i = guides.indexOf(g);
-  if (i >= 0) guides.splice(i, 1);
+  var i = doc.guides.indexOf(g);
+  if (i >= 0) doc.guides.splice(i, 1);
+}
+
+function typingInAField(e) {
+  var tag = (e.target && e.target.tagName) || '';
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
 window.addEventListener('keydown', function (e) {
+  var mod = e.ctrlKey || e.metaKey;
+
+  if (mod && (e.key === 'z' || e.key === 'Z')) {
+    e.preventDefault();
+    if (e.shiftKey) redo(); else undo();
+    return;
+  }
+  if (mod && (e.key === 'y' || e.key === 'Y')) {
+    e.preventDefault();
+    redo();
+    return;
+  }
+
   if (e.key === 'Escape') {
     measure.a = measure.b = measure.live = null;
+    selectedId = null;
+    syncControls();
     draw();
+    return;
+  }
+
+  // Delete only bites on the canvas. In a text box it is just a backspace.
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !typingInAField(e)) {
+    e.preventDefault();
+    deleteSelected();
   }
 });
 
@@ -797,10 +1326,11 @@ var plateH = document.getElementById('plateH');
 var plateT = document.getElementById('plateT');
 
 function readPlate() {
-  plate.w = Math.max(10, num(plateW, plate.w));
-  plate.h = Math.max(10, num(plateH, plate.h));
-  plate.thickness = Math.max(1, num(plateT, plate.thickness));
+  doc.plate.w = Math.max(10, num(plateW, doc.plate.w));
+  doc.plate.h = Math.max(10, num(plateH, doc.plate.h));
+  doc.plate.thickness = Math.max(1, num(plateT, doc.plate.thickness));
   if (!userAdjusted) fit();
+  scheduleSave();
   draw();
 }
 plateW.addEventListener('input', readPlate);
@@ -810,6 +1340,7 @@ plateT.addEventListener('input', readPlate);
 var gridSel = document.getElementById('gridSel');
 gridSel.addEventListener('change', function () {
   gridPitch = parseFloat(gridSel.value) || 0;
+  store.set('gridPitch', gridPitch);
   draw();
 });
 
@@ -828,7 +1359,236 @@ measureBtn.onclick = function () {
 };
 
 document.getElementById('clearGuidesBtn').onclick = function () {
-  guides.length = 0;
+  if (!doc.guides.length) return;
+  snapshot();
+  doc.guides.length = 0;
+  scheduleSave();
+  draw();
+};
+
+
+/* --------------------------------------------------------------------------
+   The project panel, the component panel, and the file
+   -------------------------------------------------------------------------- */
+var docName = document.getElementById('docName');
+var compFields = document.getElementById('compFields');
+var compEmpty = document.getElementById('compEmpty');
+var F = {
+  name: document.getElementById('compName'),
+  x: document.getElementById('compX'),
+  y: document.getElementById('compY'),
+  w: document.getElementById('compW'),
+  h: document.getElementById('compH'),
+  standoff: document.getElementById('compStandoff'),
+  board: document.getElementById('compBoard'),
+  body: document.getElementById('compBody'),
+  colour: document.getElementById('compColour')
+};
+
+/* Push the document into the controls. Called after anything that changes the
+   document from outside the panel -- a drag, an undo, opening a file -- so the
+   numbers you read are always the numbers the drawing is using. */
+var syncing = false;
+function syncControls() {
+  syncing = true;
+
+  docName.value = doc.name;
+  plateW.value = doc.plate.w;
+  plateH.value = doc.plate.h;
+  plateT.value = doc.plate.thickness;
+
+  var c = selectedComponent();
+  compFields.hidden = !c;
+  compEmpty.hidden = !!c;
+  if (c) {
+    F.name.value = c.name;
+    F.x.value = round2(c.at[0]);
+    F.y.value = round2(c.at[1]);
+    F.w.value = round2(c.size[0]);
+    F.h.value = round2(c.size[1]);
+    F.standoff.value = c.standoff;
+    F.board.value = c.board;
+    F.body.value = c.body;
+    F.colour.value = c.colour;
+  }
+
+  syncing = false;
+}
+
+/* Number inputs show a rounded value, but the drawing keeps full precision --
+   so writing the box back into the document on every sync would quietly round
+   a 43.75 you typed down to 43.75 and a dragged 12.3333 to 12.33. Rounding
+   only on display keeps the document honest. */
+function round2(v) { return Math.round(v * 100) / 100; }
+
+function onCompField() {
+  if (syncing) return;
+  var c = selectedComponent();
+  if (!c) return;
+  c.name = F.name.value.slice(0, 40);
+  c.at = [num(F.x, c.at[0]), num(F.y, c.at[1])];
+  c.size = [Math.max(MIN_COMP, num(F.w, c.size[0])), Math.max(MIN_COMP, num(F.h, c.size[1]))];
+  c.standoff = Math.max(0, num(F.standoff, c.standoff));
+  c.board = Math.max(0, num(F.board, c.board));
+  c.body = Math.max(0, num(F.body, c.body));
+  c.colour = colourOr(F.colour.value, c.colour);
+  scheduleSave();
+  draw();
+}
+
+for (var fieldKey in F) {
+  if (Object.prototype.hasOwnProperty.call(F, fieldKey)) {
+    F[fieldKey].addEventListener('input', onCompField);
+  }
+}
+
+// Typing in a box is one undoable act, not one per keystroke.
+for (var focusKey in F) {
+  if (Object.prototype.hasOwnProperty.call(F, focusKey)) {
+    F[focusKey].addEventListener('focus', snapshot);
+  }
+}
+
+docName.addEventListener('input', function () {
+  if (syncing) return;
+  doc.name = docName.value.slice(0, 60);
+  scheduleSave();
+});
+docName.addEventListener('focus', snapshot);
+
+/* A new component lands in the middle of what you are looking at, at a size
+   you will immediately retype anyway -- the point is to give the calipers
+   somewhere to go. */
+var PALETTE = ['#4dd8ff', '#5ee88f', '#ffb648', '#ff5cd6', '#b45cff', '#ff4d5e'];
+
+function occupied(at) {
+  for (var i = 0; i < doc.components.length; i++) {
+    var c = doc.components[i];
+    if (Math.abs(c.at[0] - at[0]) < 0.01 && Math.abs(c.at[1] - at[1]) < 0.01) return true;
+  }
+  return false;
+}
+
+document.getElementById('addCompBtn').onclick = function () {
+  snapshot();
+  var mid = { x: wx((plot.x0 + plot.x1) / 2), y: wy((plot.y0 + plot.y1) / 2) };
+  var taken = {};
+  for (var i = 0; i < doc.components.length; i++) taken[doc.components[i].id] = true;
+  var at = [snap(mid.x - 12.5), snap(mid.y - 10)];
+  // Cascade off anything already sitting exactly there. Three components
+  // stacked on the same square look like one, and only the top one can be
+  // grabbed.
+  var step = gridPitch ? Math.max(gridPitch, 2) : 3;
+  for (var guard = 0; guard < 40 && occupied(at); guard++) {
+    at = [at[0] + step, at[1] - step];
+  }
+
+  var c = normComponent({
+    at: at,
+    size: [25, 20],
+    colour: PALETTE[doc.components.length % PALETTE.length]
+  }, taken);
+  doc.components.push(c);
+  selectedId = c.id;
+  syncControls();
+  scheduleSave();
+  draw();
+  F.name.focus();
+  F.name.select();
+};
+
+document.getElementById('dupCompBtn').onclick = function () {
+  var c = selectedComponent();
+  if (!c) return;
+  snapshot();
+  var taken = {};
+  for (var i = 0; i < doc.components.length; i++) taken[doc.components[i].id] = true;
+  var copy = normComponent(copyInto({}, c), taken);
+  copy.id = nextId(taken);
+  copy.at = [snap(c.at[0] + 5), snap(c.at[1] - 5)];
+  doc.components.push(copy);
+  selectedId = copy.id;
+  syncControls();
+  scheduleSave();
+  draw();
+};
+
+function deleteSelected() {
+  var c = selectedComponent();
+  if (!c) return;
+  snapshot();
+  doc.components.splice(doc.components.indexOf(c), 1);
+  selectedId = null;
+  syncControls();
+  scheduleSave();
+  draw();
+}
+document.getElementById('delCompBtn').onclick = deleteSelected;
+
+
+/* --------------------------------------------------------------------------
+   Saving
+   --------------------------------------------------------------------------
+   Two kinds, and they are not alternatives. The browser copy is a safety net
+   against a closed tab; the file is the artefact you keep, copy to another
+   machine, and put in version control. See DESIGN.md.
+   -------------------------------------------------------------------------- */
+var saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function () { store.set('doc', doc); }, 400);
+}
+
+function say(text) {
+  var note = document.getElementById('compNote');
+  note.textContent = text;
+  clearTimeout(say._t);
+  say._t = setTimeout(function () { note.textContent = t('compNote'); }, 4000);
+}
+
+function adopt(raw) {
+  var result = normDoc(raw);       // throws if it is not one of ours
+  snapshot();
+  doc = result.doc;
+  selectedId = null;
+  userAdjusted = false;            // frame the plate we just opened
+  syncControls();
+  scheduleSave();
+  fit();
+  draw();
+  return result.newer;
+}
+
+function safeFileName() {
+  var base = (doc.name || t('untitled')).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return (base || 'protoplaca') + '-' + Fantoma.stamp() + '.protoplaca.json';
+}
+
+document.getElementById('saveBtn').onclick = function () {
+  Fantoma.downloadJSON(safeFileName(), doc);
+  say(t('saved'));
+};
+
+document.getElementById('openBtn').onclick = function () {
+  Fantoma.readJSONFile().then(function (raw) {
+    var newer = adopt(raw);
+    say(newer ? t('newerFile') : t('opened'));
+  }).catch(function (err) {
+    if (err && err.message !== 'No file chosen.') say(err.message);
+  });
+};
+
+document.getElementById('newBtn').onclick = function () {
+  if (!confirm(t('confirmNew'))) return;
+  snapshot();
+  doc = blankDoc();
+  selectedId = null;
+  userAdjusted = false;
+  syncControls();
+  scheduleSave();
+  fit();
   draw();
 };
 
@@ -841,6 +1601,29 @@ var store = Fantoma.store('protoplaca');
 function applyLang() {
   document.documentElement.lang = (lang === 'pt' ? 'pt-PT' : 'en');
   document.getElementById('subtitle').textContent = t('subtitle');
+
+  document.getElementById('ttProject').textContent = t('project');
+  document.getElementById('lbDocName').textContent = t('docName');
+  document.getElementById('docName').placeholder = t('untitled');
+  document.getElementById('newBtn').textContent = t('newDoc');
+  document.getElementById('openBtn').textContent = t('open');
+  document.getElementById('saveBtn').textContent = t('save');
+  document.getElementById('projectNote').textContent = t('projectNote');
+
+  document.getElementById('ttComponents').textContent = t('components');
+  document.getElementById('addCompBtn').textContent = t('addComp');
+  document.getElementById('compEmpty').textContent = t('noSelection');
+  document.getElementById('lbCompName').textContent = t('compName');
+  document.getElementById('lbCompW').textContent = t('compW');
+  document.getElementById('lbCompH').textContent = t('compH');
+  document.getElementById('lbStandoff').textContent = t('standoff');
+  document.getElementById('lbBoard').textContent = t('board');
+  document.getElementById('lbBody').textContent = t('body');
+  document.getElementById('lbColour').textContent = t('colour');
+  document.getElementById('dupCompBtn').textContent = t('duplicate');
+  document.getElementById('delCompBtn').textContent = t('remove');
+  document.getElementById('compNote').textContent = t('compNote');
+
   document.getElementById('ttPlate').textContent = t('plate');
   document.getElementById('lbW').textContent = t('width');
   document.getElementById('lbH').textContent = t('height');
@@ -868,7 +1651,23 @@ document.getElementById('langPt').onclick = function () { setLang('pt'); };
 lang = store.get('lang')
     || (String(navigator.language || '').toLowerCase().indexOf('pt') === 0 ? 'pt' : 'en');
 
+gridPitch = numOr(store.get('gridPitch'), 1, 0, 10);
+gridSel.value = String(gridPitch);
+
+/* What this browser remembered goes through the same door as an opened file.
+   If it is corrupt or from a version that never existed, we start clean rather
+   than run on a half-understood document. */
+var remembered = store.get('doc');
+if (remembered) {
+  try {
+    doc = normDoc(remembered).doc;
+  } catch (e) {
+    console.warn('[protoplaca] ignoring unreadable saved project', e);
+  }
+}
+
 applyLang();
+syncControls();
 render();     // synchronous, so the first paint is already the right size
 
 FantomaApp.init({

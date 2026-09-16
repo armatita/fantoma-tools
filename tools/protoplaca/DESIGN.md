@@ -43,7 +43,7 @@ removes any parsing ambiguity in numeric fields.
 Phase 1 is the smallest thing that is genuinely useful: it answers "where do I
 screw the ESP32 down" without any wire handling at all.
 
-**Phase 1 — plate, components, bosses, STL**
+**Phase 1 — plate, components, bosses, STL** (steps 1 and 2 are built)
 
 1. Canvas: grid, rulers, pan and zoom, guidelines, plate outline (rectangle
    first), live mm readouts. Nothing saved yet.
@@ -71,13 +71,15 @@ One JSON object. Schema sketch, not final:
   "format": "protoplaca",
   "version": 1,
   "units": "mm",
+  "name": "ESP32 test rig",   // what the project is called, and its filename
   "profile":   { /* print profile — see below */ },
-  "plate":     { "outline": [[0,0]], "thickness": 3 },
+  "plate":     { "w": 120, "h": 80, "thickness": 3 },
   "components": [ {
-      "id": "esp32",
+      "id": "c1",
       "name": "ESP32 DevKit v1",
-      "outline": [[0,0]],
-      "colour": "#3a7",
+      "at": [12, 44],         // bottom-left corner, in plate coordinates
+      "size": [52, 28],
+      "colour": "#4dd8ff",
       "standoff": 6,          // clear space beneath the board
       "board": 1.6,           // board thickness
       "body": 12              // height above the board, for the 3D view
@@ -97,6 +99,41 @@ One JSON object. Schema sketch, not final:
   "texts":     [ { "at": [0,0], "text": "5V", "size": 6, "depth": 0.6 } ]
 }
 ```
+
+### Why a position and a size, and not an outline
+
+An earlier draft of this sketch gave the plate and each component an `outline`
+polygon. Building the editor made it obvious that this was the wrong primitive.
+You arrive at a component by putting calipers on a real part, and what you read
+off is a width and a height. Nobody types an outline. A position and a size are
+what the panel asks for, what the grid snaps, and what the resize handles move.
+
+Arbitrary outlines are not ruled out — an L-shaped board can get an optional
+`outline` later, and a rectangle stays the fast path. But shipping the general
+case first would have made every common action harder in order to serve a part
+neither of us owns.
+
+Rotation is not in the format yet either. When it arrives it is one more field
+on a component, not a change to the two that are there.
+
+### Unknown fields survive a load
+
+A file carrying sections this build has never heard of — `bosses`, written by
+a later version — keeps them. They are read in, left untouched, and written
+back out. A file's version number is kept as its own, not rewritten down to
+ours, because the parts we did not understand are still in there and calling
+the result version 1 would be a lie.
+
+The alternative is that merely opening a project in an older build quietly
+destroys part of it, which is the kind of data loss nobody notices until it
+matters.
+
+### What is not in the file
+
+The **grid pitch** is how you are working, not what you designed, so it is a
+preference of the browser. Two people opening the same project should each get
+the grid they think in, and the file should not record that one of them likes
+2.54 mm.
 
 **The STL is not in the file.** It is fully determined by the document plus the
 print profile, and it regenerates in milliseconds on load. Storing it would mean
@@ -118,6 +155,17 @@ MIME negotiation from a static host.
 
 Both. They are not alternatives: the store is a safety net, the file is the
 artefact.
+
+### Undo
+
+Ctrl+Z and Ctrl+Y, as whole-document snapshots — the document is small enough
+that a snapshot is just its JSON, so this needs no inverse operations and has
+no bugs of its own.
+
+It is here because the tool saves as you work. Without autosave, a mistake
+costs nothing: you close without saving. With it, the previous state is already
+overwritten by the time you notice, so undo is not a convenience, it is the
+only way back. Autosave and undo arrived in the same step for that reason.
 
 ### The print profile
 
