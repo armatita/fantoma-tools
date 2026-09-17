@@ -544,6 +544,39 @@ are never touched by the auto pass, and they keep it away from their
 neighbourhood. A count of suppressed ones is shown with a button to restore
 them, so the decision is reversible.
 
+### Automatic means automatic for one wire
+
+Pressing auto used to rebuild every automatic retainer in the document. That is
+fine on a plate with one wire and quietly destructive on a plate with six: you
+tidy one wire's retainers by hand, draw a new wire, press auto to hold it down,
+and the tidying is gone. The button was doing something much larger than the
+thing you were looking at.
+
+It now works on **the selected wire and nothing else**. Everything survives
+being pressed: another wire's automatic retainers, anything placed by hand, and
+the record of the automatic ones you removed. The wire stays selected
+afterwards, so the button you just pressed is still the button for the wire you
+are working on — the old version deselected, which meant every run had to be
+preceded by finding the wire again.
+
+With no wire selected there is nothing for it to act on, so **both buttons go
+dead** and the panel says why. When there is one, they name it: *Place on 5V*
+rather than *Place automatically*. A button whose scope you have to remember is
+a button you press by accident.
+
+A selected retainer counts as its own wire being selected. The Add button
+already read the selection that way, and two different rules in one panel would
+be worse than either rule on its own.
+
+The suppression memory and the restore button are scoped the same way, for the
+same reason: a retainer belongs to exactly one wire, so every action in this
+panel does too.
+
+Touching a retainer by hand — through the panel or by sliding it along its
+wire — makes it yours, which is what keeps a raised crossing or a nudged
+position from being rebuilt away on the next press. That rule existed for the
+panel already; sliding one was the gap.
+
 ## Crossings
 
 Two wires that cross in plan cannot both lie on the plate, so the tool finds

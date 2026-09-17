@@ -111,6 +111,7 @@
   .field.narrow input[type=number] { width: 70px; }
 
   .row { display: flex; gap: 6px; margin-top: 10px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
   button {
     border: 1px solid #2b2b36; background: #17171f; color: #f4f4f2;
     border-radius: 6px; padding: 7px 10px; font-size: 12px; letter-spacing: 0.03em;
@@ -402,6 +403,7 @@
           <button type="button" id="addRetBtn"></button>
           <button type="button" id="autoRetBtn"></button>
         </div>
+        <div class="note" id="retPickWire" hidden></div>
         <div class="note" id="suppressedNote" hidden></div>
         <div class="row" id="restoreRow" hidden>
           <button type="button" id="restoreRetBtn"></button>
@@ -696,7 +698,9 @@ var STRINGS = {
     noRet: 'Select a wire and add a retainer, or click one on the plate.',
     retNote: 'A tunnel is closed and the wire threads through it; a clip is open '
       + 'and the wire presses in. A crimped connector will not pass through a '
-      + 'tunnel, so the ends of a run want clips.',
+      + 'tunnel, so the ends of a run want clips \u2014 but only up to {n} mm of '
+      + 'wire, which is as much as a clip was measured to hold. Thicker than '
+      + 'that and both ends get tunnels too.',
     hintRet: 'drag along the wire \u00b7 Delete removes it',
     needWire: 'Select a wire first.',
     wireClear: 'Wire slack',
@@ -794,6 +798,11 @@ var STRINGS = {
       + '{n} mm lightly and lets go of anything bigger. Use a tunnel.',
     clipMarginal: 'A clip holds {n} mm, but only just. A tunnel is the sure '
       + 'thing if the wire has to stay put.',
+    addRetOn: 'Add to {a}',
+    autoRetOn: 'Place on {a}',
+    retPickWire: 'Pick a wire. A retainer belongs to one wire, and so does '
+      + 'placing them automatically \u2014 pressing it works on the wire you '
+      + 'have selected and leaves every other wire alone.',
     exportTitle: 'Print',
     triangles: 'Triangles',
     downloadStl: 'Download STL',
@@ -929,7 +938,9 @@ var STRINGS = {
     noRet: 'Selecione um fio e adicione um retentor, ou clique num que esteja na placa.',
     retNote: 'Um t\u00fanel \u00e9 fechado e o fio passa por dentro; uma mola \u00e9 aberta '
       + 'e o fio encaixa \u00e0 press\u00e3o. Um conector cravado n\u00e3o passa por um '
-      + 't\u00fanel, por isso as pontas de um percurso pedem molas.',
+      + 't\u00fanel, por isso as pontas de um percurso pedem molas \u2014 mas s\u00f3 at\u00e9 '
+      + '{n} mm de fio, que \u00e9 o que se mediu uma mola a aguentar. Acima '
+      + 'disso, as pontas tamb\u00e9m levam t\u00fanel.',
     hintRet: 'arraste ao longo do fio \u00b7 Delete apaga',
     needWire: 'Selecione primeiro um fio.',
     wireClear: 'Folga do fio',
@@ -1031,6 +1042,11 @@ var STRINGS = {
       + '{n} mm com pouca for\u00e7a e larga tudo o que seja maior. Use um t\u00fanel.',
     clipMarginal: 'Uma mola segura {n} mm, mas \u00e0 justa. Se o fio tem mesmo de '
       + 'ficar no s\u00edtio, o t\u00fanel \u00e9 a aposta segura.',
+    addRetOn: 'Adicionar a {a}',
+    autoRetOn: 'Colocar em {a}',
+    retPickWire: 'Escolha um fio. Um retentor pertence a um fio, e a coloca\u00e7\u00e3o '
+      + 'autom\u00e1tica tamb\u00e9m \u2014 carregar no bot\u00e3o trabalha sobre o fio '
+      + 'selecionado e n\u00e3o toca em mais nenhum.',
     exportTitle: 'Imprimir',
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
@@ -3196,6 +3212,9 @@ cv.addEventListener('pointermove', function (e) {
       // Slid along its own wire rather than moved freely: a retainer that is
       // not on the wire is not holding anything.
       sr.t = tAlongWire(sr.wire, [wx(p.x), wy(p.y)]);
+      // Same rule as the panel: moving one by hand makes it yours, so running
+      // the auto pass again does not slide it back.
+      sr.origin = 'manual';
       syncControls();
       scheduleSave();
     }
@@ -5263,13 +5282,19 @@ function crossingFor(wireId, tt) {
    Nothing is placed where you have already put something by hand, or where
    you deleted an automatic one.
    -------------------------------------------------------------------------- */
-function autoPlaceRetainers() {
+function autoPlaceRetainers(wire) {
+  if (!wire) return 0;
   snapshot();
 
+  /* Only this wire's automatic retainers are cleared. Everything else --
+     another wire's automatic ones, anything placed by hand, and the record of
+     the automatic ones you removed -- survives being pressed. */
   var kept = [];
   var i, k;
   for (i = 0; i < doc.retainers.length; i++) {
-    if (doc.retainers[i].origin !== 'auto') kept.push(doc.retainers[i]);
+    var old = doc.retainers[i];
+    if (old.origin === 'auto' && old.wire === wire.id) continue;
+    kept.push(old);
   }
   doc.retainers = kept;
 
@@ -5283,8 +5308,9 @@ function autoPlaceRetainers() {
   for (i = 0; i < doc.retainers.length; i++) taken[doc.retainers[i].id] = true;
   var placed = 0;
 
-  for (var wi = 0; wi < doc.wires.length; wi++) {
-    var w = doc.wires[wi];
+  var wires = [wire];
+  for (var wi = 0; wi < wires.length; wi++) {
+    var w = wires[wi];
     if (w.path.length < 2) continue;
     var total = pathLength(w);
     if (total < retLen + 2) continue;
@@ -5353,26 +5379,52 @@ function autoPlaceRetainers() {
     }
   }
 
-  deselect();
+  /* The wire stays selected, so the button you just pressed is still the
+     button for the wire you are working on. The old version deselected, which
+     meant every run had to be preceded by finding the wire again. */
+  select('wire', wire.id);
   syncControls();
   scheduleSave();
   draw();
   return placed;
 }
 
-function suppressedCount() {
+/* The wire every button in the retainer panel acts on.
+
+   A retainer belongs to exactly one wire, so every action here does too --
+   adding one, placing them automatically, and forgetting the ones you removed.
+   Running automatic placement over the whole document was the original
+   behaviour and it was wrong in a way that only shows up on a busy plate: you
+   tidy one wire's retainers by hand, draw a new wire, press auto for it, and
+   the tidying is gone. Scoped to one wire, pressing it again is safe.
+
+   A selected retainer counts as its own wire selected. The Add button already
+   read the selection that way and two different rules in one panel would be
+   worse than either rule. */
+function retainerWire() {
+  var w = selectedWire();
+  if (w) return w;
+  var r = selectedRetainer();
+  return r && r.wire ? findIn(doc.wires, r.wire) : null;
+}
+
+function suppressedCount(wire) {
   var n = 0;
   for (var i = 0; i < doc.retainers.length; i++) {
-    if (doc.retainers[i].origin === 'auto-suppressed') n++;
+    if (doc.retainers[i].origin !== 'auto-suppressed') continue;
+    if (wire && doc.retainers[i].wire !== wire.id) continue;
+    n++;
   }
   return n;
 }
 
-function restoreSuppressed() {
+function restoreSuppressed(wire) {
   snapshot();
   var kept = [];
   for (var i = 0; i < doc.retainers.length; i++) {
-    if (doc.retainers[i].origin !== 'auto-suppressed') kept.push(doc.retainers[i]);
+    var r = doc.retainers[i];
+    var mine = r.origin === 'auto-suppressed' && (!wire || r.wire === wire.id);
+    if (!mine) kept.push(r);
   }
   doc.retainers = kept;
   syncControls();
@@ -6085,7 +6137,23 @@ function syncRetainerControls() {
              doc.profile.marks === false ? 'off' : 'on');
   profMarkHeight.value = doc.profile.markHeight;
   profAutoSpacing.value = doc.profile.autoSpacing;
-  var sup = suppressedCount();
+
+  /* Both buttons name the wire they will act on, and go dead when there is
+     none. A button whose scope you have to remember is a button you press by
+     accident. */
+  var host = retainerWire();
+  var addBtn = document.getElementById('addRetBtn');
+  var autoBtn = document.getElementById('autoRetBtn');
+  addBtn.disabled = !host;
+  autoBtn.disabled = !host;
+  addBtn.textContent = host ? t('addRetOn').replace('{a}', wireLabel(host)) : t('addRet');
+  autoBtn.textContent = host ? t('autoRetOn').replace('{a}', wireLabel(host)) : t('autoRet');
+  document.getElementById('retPickWire').hidden = !!host;
+
+  document.getElementById('retNote').textContent =
+    t('retNote').replace('{n}', mm(numOr(doc.profile.clipMaxOd, 1.7), 1));
+
+  var sup = suppressedCount(host);
   document.getElementById('suppressedNote').hidden = !sup;
   document.getElementById('restoreRow').hidden = !sup;
   if (sup) {
@@ -6154,7 +6222,7 @@ function onRetProfile() {
 /* Added to the selected wire, in the middle of whatever is clear. A retainer
    with no wire would be a bridge over nothing. */
 document.getElementById('addRetBtn').onclick = function () {
-  var w = selectedWire() || (selectedRetainer() && findIn(doc.wires, selectedRetainer().wire));
+  var w = retainerWire();
   if (!w) { say(t('needWire')); return; }
   snapshot();
   var taken = {};
@@ -6187,9 +6255,13 @@ function deleteRetainer() {
 document.getElementById('delRetBtn').onclick = deleteRetainer;
 
 document.getElementById('autoRetBtn').onclick = function () {
-  say(t('placedN') + autoPlaceRetainers());
+  var w = retainerWire();
+  if (!w) { say(t('needWire')); return; }
+  say(t('placedN') + autoPlaceRetainers(w));
 };
-document.getElementById('restoreRetBtn').onclick = restoreSuppressed;
+document.getElementById('restoreRetBtn').onclick = function () {
+  restoreSuppressed(retainerWire());
+};
 
 
 /* --------------------------------------------------------------------------
@@ -6526,6 +6598,7 @@ function applyLang() {
   document.getElementById('lbRetKind').textContent = t('retKind');
   document.getElementById('autoRetBtn').textContent = t('autoRet');
   document.getElementById('restoreRetBtn').textContent = t('restoreRet');
+  document.getElementById('retPickWire').textContent = t('retPickWire');
   document.getElementById('lbAutoSpacing').textContent = t('autoSpacing');
   document.getElementById('lbRetT').textContent = t('retT');
   document.getElementById('lbRetLevel').textContent = t('retLevel');
