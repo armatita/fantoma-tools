@@ -421,6 +421,7 @@
             <label for="retLevel" id="lbRetLevel"></label>
             <input type="number" id="retLevel" inputmode="numeric" step="1" min="0" max="4">
           </div>
+          <div class="note warn" id="clipWarn" hidden></div>
           <div class="row">
             <button type="button" id="delRetBtn"></button>
           </div>
@@ -490,6 +491,7 @@
             <input type="number" id="txtHeight" inputmode="decimal" step="0.2" min="0.1">
             <span class="unit">mm</span>
           </div>
+          <div class="note warn" id="textWarn" hidden></div>
           <div class="row">
             <button type="button" id="delTextBtn"></button>
           </div>
@@ -784,6 +786,14 @@ var STRINGS = {
       + 'of it. {n} mm tall would carry a roof.',
     clashRibCorner: '{a} crosses {b} at a corner of the rib, where an opening '
       + 'cannot be cut. Move the crossing off the corner.',
+    capTooSmall: 'At {n} mm the pen is {p} mm and the letters run {r}:1. Type '
+      + 'stops being readable under about 6:1, and the pen cannot go thinner '
+      + 'than two extrusions without printing as two lines. {c} mm is the '
+      + 'smallest cap height this nozzle can letter.',
+    clipTooThick: 'A clip does not hold a wire this thick. Measured: it grips '
+      + '{n} mm lightly and lets go of anything bigger. Use a tunnel.',
+    clipMarginal: 'A clip holds {n} mm, but only just. A tunnel is the sure '
+      + 'thing if the wire has to stay put.',
     exportTitle: 'Print',
     triangles: 'Triangles',
     downloadStl: 'Download STL',
@@ -795,7 +805,7 @@ var STRINGS = {
     retCoupon: 'Retainer coupon',
     retCouponKey: 'AWG DOWN THE SIDE',
     couponRows: 'SHC',
-    couponKey: 'S=SELF-TAP  H=HEAT-SET  C=CLEARANCE',
+    couponKey: 'S = SELF-TAP|H = HEAT-SET|C = CLEARANCE',
     couponConfirm: 'Replace the current project with a calibration coupon? '
       + 'Anything not saved to a file is lost.',
     exportNote: 'The plate and its bosses, in millimetres. Self-tapping and '
@@ -1013,6 +1023,14 @@ var STRINGS = {
       + 'isso p\u00e1ra de cada lado. Com {n} mm j\u00e1 levava um tecto por cima.',
     clashRibCorner: '{a} atravessa {b} num canto da nervura, onde n\u00e3o se pode '
       + 'abrir passagem. Afaste o cruzamento do canto.',
+    capTooSmall: 'A {n} mm o tra\u00e7o fica em {p} mm e as letras ficam a {r}:1. '
+      + 'Abaixo de cerca de 6:1 o texto deixa de se ler, e o tra\u00e7o n\u00e3o pode '
+      + 'ser mais fino do que duas extrus\u00f5es sem sair como duas linhas. '
+      + '{c} mm \u00e9 a menor altura de letra que este bico consegue.',
+    clipTooThick: 'Uma mola n\u00e3o segura um fio desta grossura. Medido: segura '
+      + '{n} mm com pouca for\u00e7a e larga tudo o que seja maior. Use um t\u00fanel.',
+    clipMarginal: 'Uma mola segura {n} mm, mas \u00e0 justa. Se o fio tem mesmo de '
+      + 'ficar no s\u00edtio, o t\u00fanel \u00e9 a aposta segura.',
     exportTitle: 'Imprimir',
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
@@ -1020,7 +1038,7 @@ var STRINGS = {
     retCoupon: 'Cup\u00e3o de retentores',
     retCouponKey: 'AWG NA LATERAL',
     couponRows: 'AIF',
-    couponKey: 'A=AUTOROSCANTE  I=INSERTO  F=FURO PASSANTE',
+    couponKey: 'A = AUTOROSCANTE|I = INSERTO|F = FURO PASSANTE',
     couponConfirm: 'Substituir o projeto atual por um cup\u00e3o de calibra\u00e7\u00e3o? '
       + 'Tudo o que n\u00e3o esteja guardado num ficheiro perde-se.',
     exportNote: 'A placa e as suas bossas, em mil\u00edmetros. As bossas '
@@ -1207,7 +1225,21 @@ function defaultProfile() {
        what heat-set wants, and nobody has yet pushed an insert into one. */
     allow: { selftap: 0.15, insert: 0, clearance: 0 },
 
-    minPen: 0.5,          // the thinnest raised line worth drawing
+    /* The nozzle. Not a measurement so much as a fact about the machine, and
+       the number every thin feature has to be a multiple of. */
+    nozzle: 0.4,
+
+    /* MEASURED, the hard way. A 0.5 mm pen is not a multiple of 0.4, so the
+       slicer walls it with two thin perimeters and leaves a valley down the
+       middle: the letters came off the plate looking like they had been drawn
+       with two lines each, which is exactly what had happened. Two extrusions
+       is the thinnest raised line that comes out as one solid line.
+
+       This has a consequence worth stating plainly rather than burying: at
+       6:1, the ratio type needs to stay legible, a 0.8 mm pen puts the
+       smallest readable cap height at 4.8 mm. On a 0.4 nozzle there is no
+       such thing as legible raised 3 mm text. */
+    minPen: 0.8,
 
     /* MEASURED, T3. Seven fins swept from 0.4 to 2.0 mm: 0.4, 0.6 and 0.8 all
        printed and all came away at the joint to the base plate; 1.0 held. The
@@ -1216,6 +1248,15 @@ function defaultProfile() {
        nothing. Arachne filled every fin solid, so there is no hidden void to
        account for either way. */
     minRib: 1.0,
+
+    /* MEASURED on the retainer coupon: a clip grips 1.7 mm (22 AWG), though
+       only lightly, and does not grip 2.4 mm (18 AWG) at all. Below 1.7 is
+       untested -- 26 AWG went on the coupon and there was none in the drawer
+       to try it with.
+
+       So this is a ceiling with nothing proven under it, which is the honest
+       shape of what was learnt. Above it, use a tunnel. */
+    clipMaxOd: 1.7,
     wall: 2,              // mm of material around the hole
 
     // Retainers: the tunnels and clips that hold a wire on its path.
@@ -1479,6 +1520,8 @@ function normProfile(raw) {
   out.wall = numOr(out.wall, d.wall, 0.4, 20);
   out.minHole = numOr(out.minHole, d.minHole, 0.1, 20);
   out.minPen = numOr(out.minPen, d.minPen, 0.2, 5);
+  out.nozzle = numOr(out.nozzle, d.nozzle, 0.1, 2);
+  out.clipMaxOd = numOr(out.clipMaxOd, d.clipMaxOd, 0.2, 20);
   out.minRib = numOr(out.minRib, d.minRib, 0.2, 20);
   var al = copyInto({}, out.allow || {});
   for (var f2 = 0; f2 < FIXINGS.length; f2++) {
@@ -1610,7 +1653,7 @@ function normText(raw, taken) {
   taken[x.id] = true;
   x.text = typeof x.text === 'string' ? x.text.slice(0, 40) : 'TEXT';
   x.at = pairOr(x.at, [10, 10]);
-  x.size = numOr(x.size, 4, 1, 100);          // cap height
+  x.size = numOr(x.size, 5, 1, 100);          // cap height
   x.stroke = numOr(x.stroke, penFor(x.size), 0.2, 10);
   x.height = numOr(x.height, 0.6, 0.1, 10);   // how far it stands proud
   x.align = (x.align === 'centre') ? 'centre' : 'left';
@@ -2144,7 +2187,7 @@ function drawWires() {
 }
 
 function textBox(x) {
-  var w = textWidth(x.text, x.size);
+  var w = textWidth(x.text, x.size, x.stroke);
   var left = x.align === 'centre' ? x.at[0] - w / 2 : x.at[0];
   return { x: left, y: x.at[1], w: w, h: x.size };
 }
@@ -2214,7 +2257,7 @@ function drawTexts() {
   for (var i = 0; i < doc.texts.length; i++) {
     var x = doc.texts[i];
     var box = textBox(x);
-    var strokes = textStrokes(x.text, x.size);
+    var strokes = textStrokes(x.text, x.size, x.stroke);
 
     ctx.strokeStyle = COL.text;
     ctx.lineWidth = Math.max(1, x.stroke * view.scale);
@@ -4905,26 +4948,41 @@ function buildMesh() {
    -------------------------------------------------------------------------- */
 var GLYPH_W = 6, GLYPH_H = 10, GLYPH_GAP = 2;
 
+/* Every segment is at least 2 units long -- 1 mm at the 5 mm cap height these
+   labels use, which is longer than the pen is wide.
+
+   That rule is the whole redesign. The first font chamfered its round letters
+   at 1.5 units, which is 0.75 mm at a 5 mm cap and 0.45 mm at a 3 mm one: far
+   SHORTER than the 0.8 mm pen laying it down. A segment shorter than the pen
+   contributes no length, only a corner, so an S built from eleven of them came
+   out as a lump with eight corners on it rather than as a letter. Eight of S's
+   eleven segments were under 2.5 units; twelve of the figure eight's fifteen.
+
+   Where a letter was round it is now either square or cut at 45 degrees over
+   two units or more. That is not a compromise forced by the printer so much as
+   what the printer was going to give us anyway -- the old chamfers were being
+   swallowed whole, so the letters were already square, just square with lumps
+   at the corners. */
 var FONT = {
   'A': [[[0,0],[3,10],[6,0]], [[1.2,3.5],[4.8,3.5]]],
-  'B': [[[0,0],[0,10],[4,10],[5.5,8.5],[4,5.5],[0,5.5]], [[4,5.5],[5.5,3],[4,0],[0,0]]],
-  'C': [[[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5]]],
+  'B': [[[0,0],[0,10]], [[0,10],[4,10],[6,8],[4,5.5],[0,5.5]], [[0,5.5],[4,5.5],[6,3],[4,0],[0,0]]],
+  'C': [[[6,8],[4.5,10],[1.5,10],[0,8],[0,2],[1.5,0],[4.5,0],[6,2]]],
   'D': [[[0,0],[0,10],[4,10],[6,8],[6,2],[4,0],[0,0]]],
   'E': [[[6,10],[0,10],[0,0],[6,0]], [[0,5],[4.5,5]]],
   'F': [[[6,10],[0,10],[0,0]], [[0,5],[4.5,5]]],
-  'G': [[[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5],[6,4.5],[3.5,4.5]]],
+  'G': [[[6,8],[4.5,10],[1.5,10],[0,8],[0,2],[1.5,0],[4.5,0],[6,2],[6,4.5],[3,4.5]]],
   'H': [[[0,0],[0,10]], [[6,0],[6,10]], [[0,5],[6,5]]],
   'I': [[[1,10],[5,10]], [[3,10],[3,0]], [[1,0],[5,0]]],
-  'J': [[[5,10],[5,2],[3.5,0],[1.5,0],[0,2]]],
+  'J': [[[5,10],[5,2],[3,0],[0,0],[0,2]]],
   'K': [[[0,0],[0,10]], [[6,10],[0,4.5]], [[2,6.2],[6,0]]],
   'L': [[[0,10],[0,0],[6,0]]],
   'M': [[[0,0],[0,10],[3,5],[6,10],[6,0]]],
   'N': [[[0,0],[0,10],[6,0],[6,10]]],
-  'O': [[[1.5,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0]]],
-  'P': [[[0,0],[0,10],[4.5,10],[6,8.5],[6,6.5],[4.5,5],[0,5]]],
-  'Q': [[[1.5,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0]], [[3.5,2.5],[6,0]]],
-  'R': [[[0,0],[0,10],[4.5,10],[6,8.5],[6,6.5],[4.5,5],[0,5]], [[3,5],[6,0]]],
-  'S': [[[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,6.5],[1.5,5],[4.5,5],[6,3.5],[6,1.5],[4.5,0],[1.5,0],[0,1.5]]],
+  'O': [[[1.5,0],[4.5,0],[6,2],[6,8],[4.5,10],[1.5,10],[0,8],[0,2],[1.5,0]]],
+  'P': [[[0,0],[0,10]], [[0,10],[4,10],[6,8],[4,5.5],[0,5.5]]],
+  'Q': [[[1.5,0],[4.5,0],[6,2],[6,8],[4.5,10],[1.5,10],[0,8],[0,2],[1.5,0]], [[3.5,2.5],[6,0]]],
+  'R': [[[0,0],[0,10]], [[0,10],[4,10],[6,8],[4,5.5],[0,5.5]], [[3,5.5],[6,0]]],
+  'S': [[[6,10],[2,10],[0,8],[2,5],[4,5],[6,2],[4,0],[0,0]]],
   'T': [[[0,10],[6,10]], [[3,10],[3,0]]],
   'U': [[[0,10],[0,2],[1.5,0],[4.5,0],[6,2],[6,10]]],
   'V': [[[0,10],[3,0],[6,10]]],
@@ -4932,16 +4990,16 @@ var FONT = {
   'X': [[[0,0],[6,10]], [[0,10],[6,0]]],
   'Y': [[[0,10],[3,5],[6,10]], [[3,5],[3,0]]],
   'Z': [[[0,10],[6,10],[0,0],[6,0]]],
-  '0': [[[1.5,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0]], [[1.5,2],[4.5,8]]],
+  '0': [[[1.5,0],[4.5,0],[6,2],[6,8],[4.5,10],[1.5,10],[0,8],[0,2],[1.5,0]], [[1.5,2],[4.5,8]]],
   '1': [[[1,8],[3,10],[3,0]], [[1,0],[5,0]]],
-  '2': [[[0,8.5],[1.5,10],[4.5,10],[6,8.5],[6,7],[0,0],[6,0]]],
-  '3': [[[0,10],[6,10],[3,5.5]], [[3,5.5],[4.5,5.5],[6,4],[6,1.5],[4.5,0],[1.5,0],[0,1.5]]],
+  '2': [[[0,8],[2,10],[4,10],[6,8],[6,6],[0,0],[6,0]]],
+  '3': [[[0,10],[6,10],[6,5.5],[2,5.5]], [[6,5.5],[6,0],[0,0]]],
   '4': [[[4.5,0],[4.5,10],[0,3],[6,3]]],
-  '5': [[[6,10],[0,10],[0,5.5],[4.5,5.5],[6,4],[6,1.5],[4.5,0],[1.5,0],[0,1.5]]],
-  '6': [[[5,10],[1.5,10],[0,8.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5],[6,3.5],[4.5,5],[1.5,5],[0,3.5]]],
+  '5': [[[6,10],[0,10],[0,5.5],[6,5.5],[6,0],[0,0]]],
+  '6': [[[6,10],[0,10],[0,0],[6,0],[6,5],[0,5]]],
   '7': [[[0,10],[6,10],[2,0]]],
-  '8': [[[1.5,5],[0,6.5],[0,8.5],[1.5,10],[4.5,10],[6,8.5],[6,6.5],[4.5,5],[1.5,5],[0,3.5],[0,1.5],[1.5,0],[4.5,0],[6,1.5],[6,3.5],[4.5,5]]],
-  '9': [[[1,0],[4.5,0],[6,1.5],[6,8.5],[4.5,10],[1.5,10],[0,8.5],[0,6.5],[1.5,5],[4.5,5],[6,6.5]]],
+  '8': [[[0,0],[0,10],[6,10],[6,0],[0,0]], [[0,5],[6,5]]],
+  '9': [[[0,0],[6,0],[6,10],[0,10],[0,5],[6,5]]],
   '.': [[[2.6,0],[3.4,0]]],
   ',': [[[3.4,0.8],[2.4,-1]]],
   '-': [[[1,5],[5,5]]],
@@ -4958,9 +5016,23 @@ var FONT = {
    baseline at 0. Anything the font does not have becomes a space rather than
    nothing, so a missing character leaves a visible gap instead of silently
    shortening the label. */
-function textStrokes(str, size) {
+/* The advance from one letter to the next.
+
+   GLYPH_GAP is drawn in glyph units, but the ink overhangs the glyph box by
+   half a pen on each side, so the air left between two letters was
+   GLYPH_GAP * k MINUS a whole pen width. At a 3 mm cap with a 0.5 mm pen that
+   came to a tenth of a millimetre, and the letters printed joined up.
+
+   Adding the pen to the advance makes the gap what it says it is: the glyph
+   gap, in millimetres, of clear air, whatever the pen is doing. */
+function advanceFor(size, pen) {
+  return (GLYPH_W + GLYPH_GAP) * (size / GLYPH_H) + pen;
+}
+
+function textStrokes(str, size, pen) {
   var k = size / GLYPH_H;
-  var out = [], pen = 0;
+  var step = advanceFor(size, pen === undefined ? penFor(size) : pen);
+  var out = [], x = 0;
   var text = String(str).toUpperCase();
 
   for (var i = 0; i < text.length; i++) {
@@ -4969,34 +5041,50 @@ function textStrokes(str, size) {
       for (var p1 = 0; p1 < g.length; p1++) {
         var line = [];
         for (var p2 = 0; p2 < g[p1].length; p2++) {
-          line.push([(pen + g[p1][p2][0]) * k, g[p1][p2][1] * k]);
+          line.push([x + g[p1][p2][0] * k, g[p1][p2][1] * k]);
         }
         out.push(line);
       }
     }
-    pen += GLYPH_W + GLYPH_GAP;
+    x += step;
   }
-  out.width = (pen - GLYPH_GAP) * k;
+  out.width = text.length ? x - step + GLYPH_W * k : 0;
   return out;
 }
 
 /* A pen for a given cap height.
 
-   A fixed 0.8 mm looked sensible on its own -- two nozzle widths, certainly
-   printable -- and produced 3:1 letters at the 2.4 mm the coupon labels use,
-   where the counters close up and every glyph becomes a blob. Type is legible
-   at somewhere between 6:1 and 10:1, so the pen follows the height instead of
-   standing still, and only stops at what the nozzle can lay down.
+   Two rules, and the second one is the one that took a printed plate to find.
 
-   It matters twice on a pale filament: raised letters have nothing but their
-   own shadow to read by, and a fat stroke casts less of it. */
+   Type is legible somewhere between 6:1 and 10:1, so the pen follows the cap
+   height at a sixth of it rather than standing still. That matters twice on a
+   pale filament: raised letters have nothing but their own shadow to read by,
+   and a fat stroke casts less of it.
+
+   And the pen is rounded to a whole number of extrusions. A width that is not
+   a multiple of the nozzle is walled with two thin perimeters and left hollow
+   between them, which reads as a letter drawn with two lines. Rounding rather
+   than flooring, because one extrusion too wide is a fatter letter and one
+   too narrow is not a letter at all.
+
+   The two rules fight below a 4.8 mm cap: the floor wins, the ratio loses, and
+   the text panel says so rather than letting it out quietly. */
 function penFor(size) {
-  return Math.max(numOr(doc.profile.minPen, 0.5), size / 6);
+  var nozzle = numOr(doc.profile.nozzle, 0.4, 0.1, 2);
+  var want = Math.max(numOr(doc.profile.minPen, 2 * nozzle), size / 6);
+  return Math.max(nozzle, Math.round(want / nozzle) * nozzle);
 }
 
-function textWidth(str, size) {
+/* The smallest cap height this pen floor can still make legible. */
+function minCapHeight() {
+  return numOr(doc.profile.minPen, 0.8) * 6;
+}
+
+function textWidth(str, size, pen) {
   var n = String(str).length;
-  return n ? ((n * (GLYPH_W + GLYPH_GAP)) - GLYPH_GAP) * size / GLYPH_H : 0;
+  if (!n) return 0;
+  var step = advanceFor(size, pen === undefined ? penFor(size) : pen);
+  return (n - 1) * step + GLYPH_W * (size / GLYPH_H);
 }
 
 /* One stroke, as a box standing on the plate.
@@ -5060,7 +5148,7 @@ function strokeBox(out, a, b, width, z0, z1) {
 
 function textMesh(out, label) {
   var t = doc.plate.thickness;
-  var strokes = textStrokes(label.text, label.size);
+  var strokes = textStrokes(label.text, label.size, label.stroke);
   var ox = label.at[0], oy = label.at[1];
   if (label.align === 'centre') ox -= strokes.width / 2;
 
@@ -5201,9 +5289,15 @@ function autoPlaceRetainers() {
     var total = pathLength(w);
     if (total < retLen + 2) continue;
 
+    /* Clips at the ends, where a connector has to be able to come out --
+       but only for a wire a clip was measured to hold. On the retainer coupon
+       a clip gripped 1.7 mm lightly and let go of 2.4 mm entirely, so above
+       the ceiling the ends get tunnels like everywhere else and the wire is
+       threaded rather than pressed in. */
+    var endKind = w.od > numOr(doc.profile.clipMaxOd, 1.7) ? 'tunnel' : 'clip';
     var want = [];
-    want.push({ s: Math.min(endInset, total / 2), kind: 'clip' });
-    want.push({ s: Math.max(total - endInset, total / 2), kind: 'clip' });
+    want.push({ s: Math.min(endInset, total / 2), kind: endKind });
+    want.push({ s: Math.max(total - endInset, total / 2), kind: endKind });
 
     var run = 0;
     for (k = 1; k < w.path.length - 1; k++) {
@@ -5891,6 +5985,20 @@ function syncTextControls() {
   TX.size.value = x.size;
   TX.stroke.value = x.stroke;
   TX.height.value = x.height;
+
+  /* The ratio, not the size, because a 3 mm label with a 0.4 mm pen would be
+     fine and it is the pen floor that makes it impossible. Saying "too small"
+     would send somebody looking for the wrong knob. */
+  var warn = document.getElementById('textWarn');
+  var ratio = x.stroke > 0 ? x.size / x.stroke : 99;
+  warn.hidden = ratio >= 6;
+  if (!warn.hidden) {
+    warn.textContent = t('capTooSmall')
+      .replace('{n}', mm(x.size, 1))
+      .replace('{p}', mm(x.stroke, 2))
+      .replace('{r}', mm(ratio, 1))
+      .replace('{c}', mm(minCapHeight(), 1));
+  }
 }
 
 function onTextField() {
@@ -5990,6 +6098,16 @@ function syncRetainerControls() {
   if (!r) return;
   RT.t.value = Math.round(r.t * 100);
   RT.level.value = r.level;
+
+  var clipWarn = document.getElementById('clipWarn');
+  var ceiling = numOr(doc.profile.clipMaxOd, 1.7);
+  var wire = r.wire ? findIn(doc.wires, r.wire) : null;
+  var od = wire ? wire.od : 0;
+  var over = r.kind === 'clip' && od > ceiling + 1e-9;
+  var atLimit = r.kind === 'clip' && !over && od >= ceiling - 1e-9;
+  clipWarn.hidden = !(over || atLimit);
+  if (over) clipWarn.textContent = t('clipTooThick').replace('{n}', mm(ceiling, 1));
+  else if (atLimit) clipWarn.textContent = t('clipMarginal').replace('{n}', mm(ceiling, 1));
 }
 
 function onRetField() {
@@ -6142,25 +6260,55 @@ function couponDoc() {
   var d = blankDoc();
   d.name = t('coupon');
 
-  /* A column per screw size, a row per fixing, with room round the edges for
-     the labels. The plate is sized from the layout rather than the other way
-     round, so adding a screw size later widens the coupon instead of crowding
-     it. */
-  var pitch = 15;
-  var left = 14, bottom = 14;             // to the first boss centre
-  var rowLabelX = 5;                      // the S / I / C column
-  var keyY = 3.5;                         // the key along the bottom
-  var headGap = 4;                        // boss edge to column heading
+  /* A ROW per screw size and a COLUMN per fixing -- the other way round from
+     the first two coupons, and not for looks.
 
-  d.plate.w = left + (SIZES.length - 1) * pitch + left;
-  d.plate.h = bottom + (FIXINGS.length - 1) * pitch + 15;
+     5 mm lettering is the smallest a 0.8 mm pen can draw and still be read
+     (see penFor), and at 5 mm "M1.4" is 17.4 mm wide. Six of those across the
+     top needed a 24 mm column pitch to stop them reading as one long word, and
+     that makes a plate 152 mm wide to hold eighteen holes.
+
+     Turned ninety degrees, the wide label goes in the left margin where it has
+     a whole row to itself and nothing beside it, and the three fixings across
+     the top are one letter each. The column pitch drops back to what the
+     BOSSES need rather than what the labels need, and the plate comes out at
+     about 71 x 113 -- half the area, and the size you actually care about is
+     spelled out in full rather than abbreviated.
+
+     Everything below is laid out from the lettering. The plate is sized from
+     the layout rather than the other way round, so adding a screw size later
+     lengthens the coupon instead of crowding it. */
+  var size = 5;
+  var pen = penFor(size);
+  var lead = size * 1.5;                   // baseline to baseline
+  var keyLines = t('couponKey').split('|');
+
+  var colPitch = 15;                       // set by the widest boss, not the label
+  var rowPitch = 14;
+  var keyY = 4;
+  var headGap = 4;                         // boss edge to column heading
+  var margin = 5;
+
+  var i, j, labelW = 0, keyW = 0;
+  for (i = 0; i < SIZES.length; i++) {
+    labelW = Math.max(labelW, textWidth(sizeLabel(SIZES[i]), size, pen));
+  }
+  for (i = 0; i < keyLines.length; i++) {
+    keyW = Math.max(keyW, textWidth(keyLines[i], size, pen));
+  }
+
+  var left = margin + labelW + 8;          // first column centre
+  var bottom = keyY + keyLines.length * lead + 6;   // first row centre
+
+  d.plate.w = Math.ceil(Math.max(left + (FIXINGS.length - 1) * colPitch + 10,
+                                 keyW + margin * 2));
+  d.plate.h = Math.ceil(bottom + (SIZES.length - 1) * rowPitch + size + 10);
 
   var taken = {};
-  var i, j;
   for (i = 0; i < SIZES.length; i++) {
     for (j = 0; j < FIXINGS.length; j++) {
       d.bosses.push(normBoss({
-        at: [left + i * pitch, bottom + j * pitch],
+        at: [left + j * colPitch, bottom + i * rowPitch],
         size: SIZES[i],
         fixing: FIXINGS[j],
         height: 8
@@ -6169,9 +6317,9 @@ function couponDoc() {
   }
 
   /* Labelled on the plate itself, which is what makes the coupon usable away
-     from the screen. A heading per column, a letter per row, and a key along
-     the bottom -- the fixing names are far too long to repeat eighteen times
-     on a plate this size. */
+     from the screen. The size spelled out per row, one letter per fixing along
+     the top, and a key at the bottom -- the fixing names are far too long to
+     repeat eighteen times. */
   var prev = doc;
   doc = d;                                 // bossOuterDia reads the profile
   var widest = 0;
@@ -6180,47 +6328,35 @@ function couponDoc() {
   }
   doc = prev;
 
-  var topRow = bottom + (FIXINGS.length - 1) * pitch;
-  var headY = topRow + widest + headGap;
-  // 3 mm, so the pen comes out at 0.5 and the letters run 6:1. At 2.4 they
-  // were 3:1 and unreadable on the plate.
-  var size = 3;
+  var topRow = bottom + (SIZES.length - 1) * rowPitch;
 
   for (i = 0; i < SIZES.length; i++) {
     d.texts.push(normText({
       text: sizeLabel(SIZES[i]),
-      at: [left + i * pitch, headY],
-      size: size, align: 'centre'
+      at: [margin, bottom + i * rowPitch - size / 2],
+      size: size
     }, taken));
   }
   for (j = 0; j < FIXINGS.length; j++) {
     d.texts.push(normText({
       text: t('couponRows').charAt(j) || String(j + 1),
-      at: [rowLabelX, bottom + j * pitch - size / 2],
+      at: [left + j * colPitch, topRow + widest + headGap],
       size: size, align: 'centre'
     }, taken));
   }
-  d.texts.push(normText({
-    text: t('couponKey'),
-    at: [d.plate.w / 2, keyY],
-    size: 2.6, align: 'centre'
-  }, taken));
+  /* Bottom line first, so the key reads left to right in the order the
+     headings do: S, then H, then C. */
+  for (i = 0; i < keyLines.length; i++) {
+    d.texts.push(normText({
+      text: keyLines[i],
+      at: [d.plate.w / 2, keyY + (keyLines.length - 1 - i) * lead],
+      size: size, align: 'centre'
+    }, taken));
+  }
 
   return d;
 }
 
-/* --------------------------------------------------------------------------
-   The retainer coupon
-   --------------------------------------------------------------------------
-   A second coupon, not an extension of the first. They answer different
-   questions at different times: hole sizes are settled once, and retention is
-   tested when there is wire in hand. Putting both on one plate would mean
-   reprinting eighteen bosses to try a tunnel.
-
-   A row per wire gauge, a column per kind. The wires are in the document so
-   the retainers have something to sit on and the witness lines show where to
-   lay the real ones.
-   -------------------------------------------------------------------------- */
 function retainerCouponDoc() {
   var d = blankDoc();
   d.name = t('retCoupon');
@@ -6232,11 +6368,19 @@ function retainerCouponDoc() {
     { kind: 'clip', roof: null }
   ];
 
-  var colPitch = 26, rowPitch = 15;
-  var left = 18, bottom = 13;
+  /* Same 5 mm lettering, same consequence: "SQUARE" is 24 mm wide at that
+     size, so the columns move from 26 mm apart to 32. */
+  var size = 5;
+  var colPitch = 32, rowPitch = 16;
+  var left = 22, bottom = 16;
+
+  /* The wires start clear of the gauge labels rather than under them. At 3 mm
+     the label fitted in the margin; at 5 mm it sat on the wire, and on the
+     witness line the wire leaves on the plate. */
+  var wireX0 = 16, wireX1pad = 6;
 
   d.plate.w = left + (kinds.length - 1) * colPitch + left;
-  d.plate.h = bottom + (gauges.length - 1) * rowPitch + 16;
+  d.plate.h = bottom + (gauges.length - 1) * rowPitch + size + 12;
 
   var taken = {};
   var i, j;
@@ -6245,16 +6389,20 @@ function retainerCouponDoc() {
     var w = normWire({
       name: gauges[i] + 'AWG',
       awg: gauges[i],
-      path: [{ at: [6, y] }, { at: [d.plate.w - 6, y] }]
+      path: [{ at: [wireX0, y] }, { at: [d.plate.w - wireX1pad, y] }]
     }, taken, {});
     w.od = odForAwg(gauges[i]);
     d.wires.push(w);
 
     for (j = 0; j < kinds.length; j++) {
       var centre = left + j * colPitch;
+      /* t is a fraction of the wire, and the wire does not start at zero.
+         Without the offset every retainer landed one left margin to the right
+         of the heading that names it. */
+      var span = d.plate.w - wireX1pad - wireX0;
       var r = normRetainer({
         wire: w.id,
-        t: centre / (d.plate.w - 12),
+        t: (centre - wireX0) / span,
         kind: kinds[j].kind,
         origin: 'manual'
       }, taken, {});
@@ -6265,8 +6413,8 @@ function retainerCouponDoc() {
 
     d.texts.push(normText({
       text: String(gauges[i]),
-      at: [8, y - 1.5],
-      size: 3, align: 'centre'
+      at: [8, y - size / 2],
+      size: size, align: 'centre'
     }, taken));
   }
 
@@ -6274,14 +6422,14 @@ function retainerCouponDoc() {
   for (j = 0; j < kinds.length; j++) {
     d.texts.push(normText({
       text: heads[j],
-      at: [left + j * colPitch, d.plate.h - 9],
-      size: 3, align: 'centre'
+      at: [left + j * colPitch, d.plate.h - size - 4],
+      size: size, align: 'centre'
     }, taken));
   }
   d.texts.push(normText({
     text: t('retCouponKey'),
-    at: [d.plate.w / 2, 3],
-    size: 2.6, align: 'centre'
+    at: [d.plate.w / 2, 4],
+    size: size, align: 'centre'
   }, taken));
 
   return d;

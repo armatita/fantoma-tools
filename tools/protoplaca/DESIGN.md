@@ -1127,6 +1127,115 @@ because that is where it is. A ring marks every crossing the rib arches over and
 a red cross marks every one it could not — from above those two look identical,
 and they are opposites.
 
+## What the retainer coupon said
+
+Three gauges by three kinds, printed and handled.
+
+**Both tunnels work.** The square roof leaves debris in the bore that has to be
+picked out before a wire will go through; the arch does not, or not enough to
+mention. That is the sag the arch was chosen to avoid, showing up as swarf
+rather than as a closed hole. `roof` stays on `arch` by default and square stays
+available, now with a reason attached rather than an argument.
+
+**Clips are for thin wire, and only just.** A clip gripped 1.7 mm — 22 AWG —
+but lightly, and did not hold 2.4 mm at all. 26 AWG went on the coupon and there
+was no 26 AWG in the drawer to test it with, so below 1.7 is untested.
+
+So `clipMaxOd` is 1.7: a ceiling with nothing proven under it, which is the
+honest shape of what was learnt. Above it, automatic placement puts tunnels at
+the ends of a wire instead of clips, and a clip placed by hand on a wire that
+thick says so. At exactly the ceiling it says something quieter — that it holds,
+but a tunnel is the sure thing.
+
+This does not retire the clips-at-the-ends rule, it bounds it. The rule exists
+because a Dupont connector has to be able to come out; on a 24 AWG jumper, which
+is what most of them are, the clip still does that job.
+
+## Why the lettering still came out badly
+
+The first fix — pen following the cap height at a sixth of it — was the right
+idea and fixed the wrong third of the problem. The second printing had three
+faults, and each one turned out to be arithmetic rather than judgement.
+
+### The pen was not a whole number of extrusions
+
+0.5 mm on a 0.4 mm nozzle is not one line and not two. The slicer walls it with
+two thin perimeters and leaves a valley between them, which off the plate reads
+as **every letter drawn with two lines** — which is exactly what had happened.
+
+The pen is now rounded to a multiple of the nozzle, and floored at two of them.
+Rounding rather than flooring: one extrusion too wide is a fatter letter, one
+too narrow is not a letter at all.
+
+This has a consequence worth stating rather than burying. At 6:1, a 0.8 mm pen
+puts the smallest readable cap height at **4.8 mm**. On a 0.4 nozzle there is no
+such thing as legible raised 3 mm text, and the tool now says so on the text
+panel instead of letting it out quietly. It says it as a ratio, too, because
+"too small" would send somebody looking for the wrong knob.
+
+### The letters were touching because the gap was measured in the wrong units
+
+`GLYPH_GAP` is drawn in glyph units, but the ink overhangs its glyph box by half
+a pen on each side. The air actually left between two letters was the gap
+**minus a whole pen width**: at a 3 mm cap with a 0.5 mm pen, one tenth of a
+millimetre. They printed joined up because they were drawn joined up.
+
+The advance now includes the pen, so the gap is what it says it is —
+`GLYPH_GAP` millimetres of clear air, whatever the pen is doing. Same letters,
+1.0 mm apart instead of 0.1.
+
+### Half the font was shorter than the pen drawing it
+
+The font was already straight lines only — the round letters were polygons with
+1.5-unit chamfers. At a 5 mm cap that is 0.75 mm, and at a 3 mm cap 0.45 mm:
+both **shorter than the 0.8 mm pen**. A segment shorter than the pen contributes
+no length, only a corner. Eight of S's eleven segments were under 2.5 units, and
+twelve of the figure eight's fifteen, so those two were not letters with corners,
+they were corners with a letter's worth of lumps.
+
+Every segment is now at least 2 units — 1 mm at a 5 mm cap, longer than the pen
+is wide. Where a letter was round it is now square, or cut at 45 degrees over two
+units or more. That is less a compromise forced by the printer than an admission
+of what the printer was already doing: the old chamfers were being swallowed
+whole, so the letters were already square, just square with lumps on the corners.
+
+B and 8 had to be told apart after both went rectangular — B keeps a full-height
+stem with two pointed bowls, 8 is a rectangle with a bar. S and 5 likewise: S has
+its corners cut, 5 does not.
+
+### The coupon turned ninety degrees
+
+Everything on the calibration coupon is laid out from the cap height now rather
+than the other way round, and at 5 mm that moves things. The first attempt kept
+the old arrangement — a column per screw size — and a 5 mm `M1.4` is 17.4 mm
+wide, so the headings ran into each other and printed `M1.4M1.7`. Widening the
+column pitch until six of them read as six separate labels took the plate to
+137 x 89.5 mm, and they *still* read as one long word at 21 mm pitch, because
+2.8 mm of air between two labels next to 1.0 mm between two letters is not a
+big enough difference to see.
+
+Turning it round fixes it properly. A **row** per screw size puts the wide label
+in the left margin with a whole row to itself and nothing beside it; a **column**
+per fixing puts one letter across the top. The column pitch drops back to what
+the bosses need rather than what the labels need.
+
+71 x 118 mm, against 137 x 89.5 for the wide version: a third less plate, and
+the number you actually care about is spelled out in full instead of abbreviated.
+The key needs three lines either way, because one would be 139 mm long.
+
+The Portuguese coupon comes out at 90 x 118, because `A = AUTOROSCANTE` is
+longer than `S = SELF-TAP`. The plate is measured from the text rather than
+fixed, so that happens by itself.
+
+Two bugs fell out of moving the retainer coupon to the same size. Its gauge
+labels had been sitting on top of the wires — invisible at 3 mm, obvious at 5 —
+and its retainers had been one left margin to the right of the headings that name
+them, because `t` is a fraction of the wire and the wire does not start at zero.
+
+**Saved documents keep their own numbers.** A project written before this has
+0.5 mm text in it and will stay that way; the panel warns rather than the file
+being quietly rewritten, because a document is the user's and not the tool's.
+
 ## The palette
 
 Fifteen colours, the same fifteen the model viewer offers, **copied rather than
@@ -1156,6 +1265,8 @@ than quietly solved by inventing two colours the other tool does not have.
 - **Junctions.** Wires run point to point. Where three wires must meet, that is a
   component — a terminal block — not a wire feature.
 - **Lightening and ventilation holes** in the plate.
+- **Heat-set inserts**, until there are some. None on hand; they have to be
+  ordered.
 - **Ribs on the underside**, which would be out of the way and would need
   either supports or a second print orientation.
 - **Engraved text.** Raised text is legible now that the pen follows the cap
