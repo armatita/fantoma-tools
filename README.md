@@ -485,8 +485,47 @@ Pixel Studio is the phone tool. English only, being Pedro's own.
   refused where they would collide with the header's own (`palette`, `states`,
   `state_count`, the cell and box defines, anything ending `_data`).
 
-Next: phase 3 (the export, checked by decoding against `build_hero.py`'s
-headers), then the scene, paths, and a built-in editor.
+### Phase 3 plan: the export (not built yet)
+
+The contract is `fantoma/docs/image-format.md`, which already shows the full
+header shape. Split in two, so each half ends somewhere finished:
+
+**3a: generate.** One header per object, downloaded as `<obj>.h`:
+
+- One `<obj>_palette[1 << bpp]` of RGB565 (truncation, `rgb565()` in
+  `image.h`), padded with `0x0000`. **With transparency, slot 0 is the
+  transparent entry (`0x0000`) and every stored index `k` is exported as
+  `k + 1`**, exactly as `img2c.py --transparent` does; `.flags =
+  IMAGE_HAS_TRANSPARENT, .transparent = 0`. Without it, indices export as
+  stored and `.flags = 0, .transparent = 0`.
+- Per state: `<obj>_<state>_data[]`, frames in `playOrder()` (reverse and
+  ping-pong expanded), MSB-first, rows padded to `stride = (w*bpp + 7) / 8`;
+  then `static const Image <obj>_<state>` with **every field in declaration
+  order** (C++ under `-Werror`), `frame_ms = 0` for a single frame.
+- `enum { <OBJ>_<STATE> = 0, ..., <OBJ>_STATE_COUNT };`,
+  `static const Image *const <obj>_states[<OBJ>_STATE_COUNT]`,
+  `<OBJ>_CELL_W/H`, `<OBJ>_BOX_W/H` (the box's size; an offset is warned,
+  not exported).
+- The `#include` path is an option: `../engine/image.h` for
+  `cpp/fantoma/assets/`, `../../fantoma/engine/image.h` for the
+  `cpp/refactor/` workbench.
+- Refuse to export on a name problem (`stateNameProblem()` already exists)
+  or a symbol clash across objects (`hero` + `idle_x` vs `hero_idle` + `x`).
+  Warn, as the spec asks, on: the transparency bpp bump, durations under
+  17 ms, play-once, a box offset, and a clash with a `build_hero.py` header
+  (`hero_idle`...), since one build must not include both.
+
+**3b: prove.** A test page or script that decodes headers the way
+`image_decode_row_idx()` does, and compares Canvas's `hero.h` against the
+eleven `cpp/refactor/assets/hero_*.h`: the same RGB565 colour or
+transparency at every pixel of every frame, and the same width, height,
+frames, stride, bpp, flags and `frame_ms` per state. Byte-for-byte
+equality is **not** the test, because `img2c.py`'s palette order is
+Pillow's choice. The hero's import JSON is built with `build_hero.py`'s own
+rules (4x8 cells, frames counted from the alpha channel; see that script).
+Then Pedro compiles it in the sketch (`.\flash build`, compile only).
+
+After phase 3: the scene, paths, and a built-in editor.
 
 ---
 
