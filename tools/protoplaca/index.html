@@ -618,10 +618,12 @@
         </div>
         <div class="row">
           <button type="button" id="stlBtn"></button>
+          <button type="button" id="paperBtn"></button>
         </div>
         <div class="note warn" id="clearanceWarn" hidden></div>
         <div class="note warn" id="smallHoleWarn" hidden></div>
         <div class="note" id="exportNote"></div>
+        <div class="note" id="paperNote"></div>
       </section>
 
       <section class="panel" id="viewPanel">
@@ -806,6 +808,22 @@ var STRINGS = {
     exportTitle: 'Print',
     triangles: 'Triangles',
     downloadStl: 'Download STL',
+    paperBtn: 'Paper template (PDF)',
+    paperNote: 'The plate at real size on paper, to lay parts on before '
+      + 'printing it. Print the PDF at 100% \u2014 \u201cActual size\u201d, never '
+      + '\u201cFit to page\u201d \u2014 then measure both 50 mm bars: a printer can '
+      + 'scale one direction and not the other.',
+    paperMaking: 'Drawing the paper template\u2026',
+    paperSaved: 'Saved \u2014 {p}. Print at 100% and measure the 50 mm bars.',
+    paperBigPage: 'Saved \u2014 {p}. This plate needs paper larger than A4, '
+      + 'which most home printers cannot take.',
+    paperFailed: 'Could not draw the paper template.',
+    paperPortrait: 'portrait',
+    paperLandscape: 'landscape',
+    paperScale: 'scale 1:1',
+    paperThick: 'thick',
+    paperPrintAt: 'Print at 100% (\u201cActual size\u201d), not \u201cFit to page\u201d.',
+    paperCheck: 'Both bars must measure exactly 50 mm. If not, the print was scaled.',
     coupon: 'Calibration coupon',
     // One letter per fixing, in the order of FIXINGS, and the key that
     // explains them. Both are written out rather than taken from the first
@@ -1050,6 +1068,22 @@ var STRINGS = {
     exportTitle: 'Imprimir',
     triangles: 'Tri\u00e2ngulos',
     downloadStl: 'Descarregar STL',
+    paperBtn: 'Molde em papel (PDF)',
+    paperNote: 'A placa em tamanho real, em papel, para pousar as pe\u00e7as antes '
+      + 'de a imprimir. Imprima o PDF a 100% \u2014 \u201cTamanho real\u201d, nunca '
+      + '\u201cAjustar \u00e0 p\u00e1gina\u201d \u2014 e me\u00e7a as duas barras de 50 mm: '
+      + 'uma impressora pode alterar a escala numa dire\u00e7\u00e3o e n\u00e3o na outra.',
+    paperMaking: 'A desenhar o molde em papel\u2026',
+    paperSaved: 'Guardado \u2014 {p}. Imprima a 100% e me\u00e7a as barras de 50 mm.',
+    paperBigPage: 'Guardado \u2014 {p}. Esta placa precisa de papel maior do que '
+      + 'A4, que a maioria das impressoras dom\u00e9sticas n\u00e3o aceita.',
+    paperFailed: 'N\u00e3o foi poss\u00edvel desenhar o molde em papel.',
+    paperPortrait: 'vertical',
+    paperLandscape: 'horizontal',
+    paperScale: 'escala 1:1',
+    paperThick: 'de espessura',
+    paperPrintAt: 'Imprimir a 100% (\u201cTamanho real\u201d), n\u00e3o \u201cAjustar \u00e0 p\u00e1gina\u201d.',
+    paperCheck: 'As duas barras t\u00eam de medir exatamente 50 mm. Se n\u00e3o, a impress\u00e3o foi reescalada.',
     coupon: 'Cup\u00e3o de calibra\u00e7\u00e3o',
     retCoupon: 'Cup\u00e3o de retentores',
     retCouponKey: 'AWG NA LATERAL',
@@ -6310,11 +6344,400 @@ document.getElementById('stlBtn').onclick = function () {
     say(t('meshBroken'));
     return;
   }
-  var base = (doc.name || t('untitled')).toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  downloadBytes((base || 'protoplaca') + '-' + Fantoma.stamp() + '.stl',
+  downloadBytes(fileBase() + '-' + Fantoma.stamp() + '.stl',
                 stlBytes(mesh), 'model/stl');
   say(t('saved'));
+};
+
+// The plate's name as a filename: lower case, dashes, nothing a filesystem
+// could object to. Shared by every download so they sort together.
+function fileBase() {
+  var base = (doc.name || t('untitled')).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return base || 'protoplaca';
+}
+
+
+/* --------------------------------------------------------------------------
+   Paper template
+   --------------------------------------------------------------------------
+   The plate at 1:1 on paper, to lay the real parts on before spending an hour
+   of printer time -- the same check as the calibration coupon, one step
+   earlier and for the price of a sheet of paper.
+
+   WHY A PDF. An image has no physical size that printing honours: DPI
+   metadata is ignored and "fit to page" is the default nearly everywhere. A
+   PDF page IS a size -- 210 x 297 mm for A4 -- and every viewer offers
+   "Actual size". /PrintScaling /None asks for that by default; some viewers
+   listen. None of that is trusted, which is what the two 50 mm bars are for:
+   a printer can be off in one direction only, so there is one per axis.
+
+   WHY THE SCREEN'S OWN DRAWING CODE. The paper is meant to look like the
+   editor, so it IS the editor's drawing: the same draw functions run against
+   an offscreen canvas, by pointing the globals they read (ctx, view, plot,
+   COL...) at paper for the length of one render and putting them back in a
+   finally. The alternative, a second drawing of every part in some vector
+   format, would drift from the screen the first time either changed.
+
+   UNITS. Two scales are in play and it is worth keeping them apart:
+     - view.scale is CSS px per mm (96 / 25.4). The draw functions size their
+       lines and labels in px -- a 1 px outline, 11 px names -- and at this
+       scale those become exactly what a browser would print: 1 px = 0.26 mm,
+       11 px = 2.9 mm.
+     - the canvas transform then maps those px onto device pixels at up to
+       300 dpi, separately per axis so that the page's width and height in
+       mm land exactly on the image's width and height in pixels.
+   The editor snaps lines to whole screen pixels (crisp) for sharpness; on
+   paper that would move them by up to 0.13 mm, so it is switched off, and
+   the plate outline is redrawn at its exact size on top. The component
+   outlines still round their SIZE to a px (Math.round in their strokeRect):
+   at most 0.13 mm, below what a home printer holds.
+   -------------------------------------------------------------------------- */
+var PAPER = {
+  sizes: [['A4', 210, 297], ['A3', 297, 420], ['A2', 420, 594],
+          ['A1', 594, 841], ['A0', 841, 1189]],
+  margin: 10,       // mm; most home printers cannot reach the outer ~5
+  head: 17,         // title block
+  foot: 20,         // horizontal check bar and the instruction
+  side: 16,         // vertical check bar
+  pad: 9,           // around the plate: room for the "0,0" mark and edge sizes
+  check: 50,        // mm, the length of each check bar
+  pxPerMm: 96 / 25.4,
+  maxDpi: 300,
+  // A4 at 300 dpi is 8.7 megapixels. Past this the dpi comes down instead,
+  // so an A2 plate does not ask a phone for a quarter-gigabyte canvas.
+  maxPixels: 12e6
+};
+
+/* The smallest ISO page that holds the plate with its margins and bars, in
+   whichever orientation fits -- trying the plate's own orientation first, so
+   a wide plate lands on landscape A4 rather than on portrait A3. */
+function paperPage(pw, ph) {
+  var needW = 2 * PAPER.margin + PAPER.side + pw + 2 * PAPER.pad;
+  var needH = 2 * PAPER.margin + PAPER.head + PAPER.foot
+    + Math.max(ph + 2 * PAPER.pad, PAPER.check + 12);
+  var wide = pw > ph;
+  for (var i = 0; i < PAPER.sizes.length; i++) {
+    var z = PAPER.sizes[i];
+    var tries = wide ? [[z[2], z[1], true], [z[1], z[2], false]]
+                     : [[z[1], z[2], false], [z[2], z[1], true]];
+    for (var k = 0; k < 2; k++) {
+      if (tries[k][0] >= needW && tries[k][1] >= needH) {
+        return { name: z[0], w: tries[k][0], h: tries[k][1], landscape: tries[k][2] };
+      }
+    }
+  }
+  return null;   // over A0: the plate inputs stop well short of this
+}
+
+// The screen's light palette, on white paper.
+function paperPalette() {
+  var p = {};
+  for (var k in THEMES.light) p[k] = THEMES.light[k];
+  p.bg = '#ffffff';
+  return p;
+}
+
+/* Graph paper, not the screen's grid. drawGrid() strokes 1 px lines, and on
+   paper 1 px is 0.26 mm: a line that heavy every millimetre is a grey wash
+   that fights the parts for attention. Graph paper uses hairlines -- 0.1 mm
+   every millimetre, 0.2 mm every ten -- which read as a grid when you look
+   for one and disappear when you do not. Fainter outside the plate, as on
+   screen, and counted from the plate's 0,0 like everything else. */
+function paperGrid() {
+  var left = Math.ceil(wx(plot.x0)), right = Math.floor(wx(plot.x1));
+  var bottom = Math.ceil(wy(plot.y1)), top = Math.floor(wy(plot.y0));
+  var hair = view.scale * 0.1;               // px for a 0.1 mm line
+
+  function lines(major, width, colour) {
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    for (var i = left; i <= right; i++) {
+      if ((i % 10 === 0) !== major) continue;
+      ctx.moveTo(sx(i), plot.y0); ctx.lineTo(sx(i), plot.y1);
+    }
+    for (var j = bottom; j <= top; j++) {
+      if ((j % 10 === 0) !== major) continue;
+      ctx.moveTo(plot.x0, sy(j)); ctx.lineTo(plot.x1, sy(j));
+    }
+    ctx.stroke();
+  }
+
+  lines(false, hair, 'rgba(0,0,0,0.13)');
+  lines(true, hair * 2, 'rgba(0,0,0,0.22)');
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(sx(0), sy(doc.plate.h), doc.plate.w * view.scale, doc.plate.h * view.scale);
+  ctx.clip();
+  lines(false, hair, 'rgba(0,0,0,0.13)');    // twice over: darker inside the plate
+  lines(true, hair * 2, 'rgba(0,0,0,0.22)');
+  ctx.restore();
+  ctx.lineWidth = 1;
+}
+
+/* Draw the sheet. Returns the canvas; everything below is in mm from the
+   page's top-left, converted to px with P(). */
+function paperCanvas(page) {
+  var S = PAPER.pxPerMm;
+  function P(v) { return v * S; }
+
+  var dpmm = Math.min(PAPER.maxDpi / 25.4,
+                      Math.sqrt(PAPER.maxPixels / (page.w * page.h)));
+  var canvas = document.createElement('canvas');
+  canvas.width = Math.round(page.w * dpmm);
+  canvas.height = Math.round(page.h * dpmm);
+  var c = canvas.getContext('2d');
+  c.setTransform(canvas.width / page.w / S, 0, 0, canvas.height / page.h / S, 0, 0);
+  c.fillStyle = '#ffffff';
+  c.fillRect(0, 0, P(page.w), P(page.h));
+
+  var pw = doc.plate.w, ph = doc.plate.h;
+  var m = PAPER.margin;
+
+  // The drawing area: everything between the title block, the foot band and
+  // the side band. The background grid covers this and nothing else.
+  var area = { x0: m, y0: m + PAPER.head, x1: page.w - m - PAPER.side, y1: page.h - m - PAPER.foot };
+  var plateL = (area.x0 + area.x1) / 2 - pw / 2;
+  var plateB = (area.y0 + area.y1) / 2 + ph / 2;   // bottom edge, mm from the top
+
+  // ---- borrow the editor's drawing, pointed at paper ----
+  var saved = { ctx: ctx, view: view, plot: plot, COL: COL, themeName: themeName,
+                crisp: crisp, wireDraw: wireDraw, ribDraw: ribDraw };
+  try {
+    ctx = c;
+    plot = { x0: P(area.x0), y0: P(area.y0), x1: P(area.x1), y1: P(area.y1) };
+    view = { scale: S,
+             x0: (plot.x0 - P(plateL)) / S,       // so that sx(0) is the plate's left edge
+             y0: (P(plateB) - plot.y1) / S };      // and sy(0) its bottom edge
+    COL = paperPalette();
+    themeName = 'light';         // labelInk() darkens pale label colours by this
+    crisp = function (v) { return v; };
+    wireDraw = null;             // no half-drawn wire or rib on paper
+    ribDraw = null;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(plot.x0, plot.y0, plot.x1 - plot.x0, plot.y1 - plot.y0);
+    ctx.clip();
+    // The same layers, in the same order, as render(); minus the screen's
+    // own furniture -- guides, selection, cursor, hints, measure, rulers --
+    // and with paper's own grid in place of the screen's.
+    drawPlate();
+    paperGrid();
+    drawComponents();
+    drawBosses();
+    drawRibs();
+    drawWires();
+    drawRibMarks();
+    drawRetainers();
+    drawTexts();
+    ctx.restore();
+  } finally {
+    ctx = saved.ctx; view = saved.view; plot = saved.plot; COL = saved.COL;
+    themeName = saved.themeName; crisp = saved.crisp;
+    wireDraw = saved.wireDraw; ribDraw = saved.ribDraw;
+  }
+
+  var ink = '#1a1a20', soft = '#5a5a64';
+  var mono = 'ui-monospace, Menlo, Consolas, monospace';
+
+  // ---- the plate outline, at its exact size, over the rounded one ----
+  c.strokeStyle = ink;
+  c.lineWidth = 0.8;
+  c.strokeRect(P(plateL), P(plateB - ph), P(pw), P(ph));
+
+  // Its size along two edges: a second check, and the numbers you would
+  // otherwise go back to the screen for.
+  c.fillStyle = soft;
+  c.font = '9px ' + mono;
+  c.textAlign = 'center';
+  c.textBaseline = 'bottom';
+  c.fillText(round2(pw) + ' mm', P(plateL + pw / 2), P(plateB - ph) - 3);
+  c.save();
+  c.translate(P(plateL + pw) + 3, P(plateB - ph / 2));
+  c.rotate(Math.PI / 2);
+  c.textBaseline = 'bottom';
+  c.fillText(round2(ph) + ' mm', 0, 0);
+  c.restore();
+
+  // ---- title block ----
+  c.textAlign = 'left';
+  c.textBaseline = 'top';
+  c.fillStyle = ink;
+  c.font = 'bold 13px ' + mono;
+  c.fillText(doc.name || t('untitled'), P(m), P(m));
+  c.fillStyle = soft;
+  c.font = '10px ' + mono;
+  var d = new Date();
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  c.fillText(round2(pw) + ' × ' + round2(ph) + ' mm · '
+    + round2(doc.plate.thickness) + ' mm ' + t('paperThick') + ' · ' + t('paperScale')
+    + ' · ' + page.name + ' ' + t(page.landscape ? 'paperLandscape' : 'paperPortrait')
+    + ' · ' + d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()),
+    P(m), P(m) + 18);
+  c.textAlign = 'right';
+  c.fillText('Protoplaca', P(page.w - m), P(m));
+
+  // ---- the two check bars ----
+  function bar(x, y, dx, dy) {
+    // A 50 mm bar from (x, y) in direction (dx, dy): end stops, and a tick
+    // every 10 mm so a short ruler can check it piece by piece.
+    var nx = -dy, ny = dx;           // perpendicular, for the ticks
+    c.strokeStyle = ink;
+    c.lineCap = 'butt';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(P(x), P(y));
+    c.lineTo(P(x + dx * PAPER.check), P(y + dy * PAPER.check));
+    for (var i = 0; i <= PAPER.check; i += 10) {
+      var len = (i === 0 || i === PAPER.check) ? 2.5 : 1.2;
+      var px = x + dx * i, py = y + dy * i;
+      c.moveTo(P(px - nx * len), P(py - ny * len));
+      c.lineTo(P(px + nx * len), P(py + ny * len));
+    }
+    c.stroke();
+  }
+
+  // Horizontal: bottom left, in the foot band.
+  var hy = page.h - m - PAPER.foot + 8;
+  bar(m, hy, 1, 0);
+  c.fillStyle = ink;
+  c.font = 'bold 10px ' + mono;
+  c.textAlign = 'center';
+  c.textBaseline = 'top';
+  c.fillText(PAPER.check + ' mm', P(m + PAPER.check / 2), P(hy) + 11);
+
+  // Vertical: in the side band, standing on the same baseline as the plate
+  // area's bottom, so the two bars read as a pair.
+  var vx = page.w - m - PAPER.side / 2;
+  bar(vx, area.y1, 0, -1);
+  c.save();
+  c.translate(P(vx) - 11, P(area.y1 - PAPER.check / 2));
+  c.rotate(-Math.PI / 2);
+  c.textAlign = 'center';
+  c.textBaseline = 'bottom';
+  c.fillText(PAPER.check + ' mm', 0, 0);
+  c.restore();
+
+  // The instruction, beside the horizontal bar where the eye already is.
+  c.textAlign = 'left';
+  c.textBaseline = 'top';
+  c.font = '10px ' + mono;
+  c.fillStyle = ink;
+  var tx = P(m + PAPER.check + 7);
+  c.fillText(t('paperPrintAt'), tx, P(hy) - 5);
+  c.fillStyle = soft;
+  c.fillText(t('paperCheck'), tx, P(hy) + 9);
+
+  return canvas;
+}
+
+/* The canvas as image data a PDF can carry. Lossless (Flate) where the
+   browser can deflate, which is where a grid of thin lines wants to be; JPEG
+   otherwise, which at 300 dpi still prints clean. PDF's FlateDecode is the
+   zlib format, which is what CompressionStream calls 'deflate'. */
+function paperImage(canvas) {
+  if (window.CompressionStream && window.Response) {
+    var w = canvas.width, h = canvas.height;
+    var rgba = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+    var rgb = new Uint8Array(w * h * 3);
+    for (var i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+      rgb[j] = rgba[i]; rgb[j + 1] = rgba[i + 1]; rgb[j + 2] = rgba[i + 2];
+    }
+    var stream = new Blob([rgb]).stream().pipeThrough(new CompressionStream('deflate'));
+    return new Response(stream).arrayBuffer().then(function (buf) {
+      return { w: w, h: h, filter: 'FlateDecode', bytes: new Uint8Array(buf) };
+    });
+  }
+  return new Promise(function (resolve, reject) {
+    canvas.toBlob(function (blob) {
+      if (!blob) { reject(new Error('toBlob failed')); return; }
+      blob.arrayBuffer().then(function (buf) {
+        resolve({ w: canvas.width, h: canvas.height, filter: 'DCTDecode', bytes: new Uint8Array(buf) });
+      }, reject);
+    }, 'image/jpeg', 0.92);
+  });
+}
+
+/* A one-page PDF holding one image, stretched to exactly the page. Small
+   enough to write by hand, which spares the tool a library: five objects and
+   a cross-reference table of their byte offsets. */
+function pdfBytes(pageWmm, pageHmm, img, title) {
+  var PT = 72 / 25.4;
+  var wpt = (pageWmm * PT).toFixed(3), hpt = (pageHmm * PT).toFixed(3);
+  var parts = [], offsets = [], length = 0;
+  var enc = new TextEncoder();
+
+  function add(chunk) {
+    var bytes = typeof chunk === 'string' ? enc.encode(chunk) : chunk;
+    parts.push(bytes);
+    length += bytes.length;
+  }
+  function obj(n, body) { offsets[n] = length; add(n + ' 0 obj\n' + body + '\nendobj\n'); }
+  // A PDF string with its specials escaped, and anything past ASCII dropped
+  // rather than risk an encoding the Info dictionary will not read.
+  function pdfString(v) {
+    return '(' + String(v).replace(/[^\x20-\x7e]/g, '?').replace(/([\\()])/g, '\\$1') + ')';
+  }
+
+  add('%PDF-1.4\n');
+  add(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]));   // "binary inside" marker
+
+  obj(1, '<< /Type /Catalog /Pages 2 0 R /ViewerPreferences << /PrintScaling /None >> >>');
+  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + wpt + ' ' + hpt + ']'
+    + ' /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>');
+  var content = 'q ' + wpt + ' 0 0 ' + hpt + ' 0 0 cm /Im0 Do Q';
+  obj(4, '<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream');
+
+  offsets[5] = length;
+  add('5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + img.w + ' /Height ' + img.h
+    + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /' + img.filter
+    + ' /Length ' + img.bytes.length + ' >>\nstream\n');
+  add(img.bytes);
+  add('\nendstream\nendobj\n');
+
+  obj(6, '<< /Title ' + pdfString(title) + ' /Creator (Protoplaca - Fantoma Tools) >>');
+
+  var xref = length;
+  var table = 'xref\n0 7\n0000000000 65535 f \n';
+  for (var n = 1; n <= 6; n++) table += ('000000000' + offsets[n]).slice(-10) + ' 00000 n \n';
+  add(table + 'trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+
+  var out = new Uint8Array(length), at = 0;
+  for (var p = 0; p < parts.length; p++) { out.set(parts[p], at); at += parts[p].length; }
+  return out;
+}
+
+var paperBtn = document.getElementById('paperBtn');
+paperBtn.onclick = function () {
+  var page = paperPage(doc.plate.w, doc.plate.h);
+  if (!page) { say(t('paperFailed')); return; }
+  paperBtn.disabled = true;
+  say(t('paperMaking'));
+  // A moment's grace so the button and the message repaint before the render
+  // holds the main thread. A timer rather than requestAnimationFrame: rAF
+  // only fires while the window is painting, and an export that silently
+  // never happens in a window that is not is worse than a message that
+  // occasionally does not get to show.
+  setTimeout(function () {
+    Promise.resolve().then(function () {
+      return paperImage(paperCanvas(page));
+    }).then(function (img) {
+      var title = (doc.name || t('untitled')) + ' - paper template 1:1';
+      downloadBytes(fileBase() + '-paper-' + Fantoma.stamp() + '.pdf',
+                    pdfBytes(page.w, page.h, img, title), 'application/pdf');
+      var where = page.name + ' ' + t(page.landscape ? 'paperLandscape' : 'paperPortrait');
+      say(t(page.name === 'A4' ? 'paperSaved' : 'paperBigPage').replace('{p}', where));
+    }).catch(function (err) {
+      console.error('[protoplaca] paper template failed', err);
+      say(t('paperFailed'));
+    }).then(function () {
+      paperBtn.disabled = false;
+    });
+  }, 30);
 };
 
 /* --------------------------------------------------------------------------
@@ -6569,6 +6992,8 @@ function applyLang() {
   document.getElementById('ttExport').textContent = t('exportTitle');
   document.getElementById('lbTriangles').textContent = t('triangles');
   document.getElementById('stlBtn').textContent = t('downloadStl');
+  document.getElementById('paperBtn').textContent = t('paperBtn');
+  document.getElementById('paperNote').textContent = t('paperNote');
   document.getElementById('exportNote').textContent = t('exportNote');
   document.getElementById('clearanceWarn').textContent = t('clearanceWarn');
   document.getElementById('couponBtn').textContent = t('coupon');

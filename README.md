@@ -393,6 +393,30 @@ letting bad text out quietly.
 Heat-set inserts are the last thing standing on assumption, and they have to be
 ordered before they can be measured.
 
+**A paper template**, next to the STL button: the plate at 1:1 as a one-page
+PDF, to lay the real parts on before spending printer time. The decisions, and
+why:
+
+- **A PDF, not an image.** A PNG has no physical size that printing honours;
+  a PDF page *is* 210 × 297 mm. It asks viewers not to scale
+  (`/PrintScaling /None`), which some honour, and that is not trusted: there
+  are two **50 mm check bars**, one per axis, because a printer can be off in
+  one direction only. Print at 100% / "Actual size", never "Fit to page".
+- **Drawn by the editor's own drawing code**, pointed at an offscreen canvas
+  for one render, so the paper cannot drift from the screen. The screen's
+  furniture — rulers, guides, selection, measure — stays off it; the
+  Dimensions toggle carries over. Rasterised at up to 300 dpi and embedded
+  losslessly; the PDF is written by hand (six objects), not by a library.
+- **Measured, not assumed:** on a 150 × 90 mm test plate the rendered outline
+  came out 150.02 × 89.97 mm and both bars 50 mm, i.e. within one 300 dpi pixel.
+  Screen line snapping is switched off for the render, and the plate outline is
+  redrawn at its exact size over the editor's rounded one.
+- **A graph-paper grid of its own** — 0.1 mm lines every mm, 0.2 mm every
+  10 mm — because the screen's 1 px grid is 0.26 mm on paper, a grey wash.
+- **The smallest ISO page that fits**, A4 first, turned landscape if that is
+  what fits; past A4 the message says so, since most home printers stop there.
+  Big pages lower the dpi to stay under 12 megapixels, for phones.
+
 ---
 
 ## Updating a tool
