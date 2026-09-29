@@ -550,7 +550,55 @@ of its own and only adds a line to the listing. **Still to do: compile it in
 the sketch** (`.\flash build`, compile only), which is the one check that uses
 the real ESP32 toolchain and the sketch's own flags.
 
-After phase 3: the scene, paths, and a built-in editor.
+**Phase 4 is built**: the scene, a preview of what the engine will draw.
+Built on the workbench engine's own model (`cpp/refactor/engine/object.h`
+and `scene.h`), so anything arranged here is something the device can show.
+Nothing in it is exported.
+
+- **Six draw bands, not free layers**: `backdrop, back, play, play front,
+  foreground, hud`, named after the engine's `LAYER_*`. This replaces the
+  earlier "three layers, move above/below": the engine has bands, so "above"
+  means a later band. Within a band the engine draws in pool-slot order,
+  which nobody authors; Canvas draws in list order and **warns when two
+  sprites overlap in one band**, the one place its order and the device's can
+  differ.
+- **Per instance, the engine's flags**: flip X / flip Y (`OBJ_FLIP_X/_Y`,
+  the whole cell), fixed to the screen (`OBJ_FIXED`: screen coordinates, for
+  a HUD or a backdrop that does not scroll), hidden (`OBJ_HIDDEN`). Toggling
+  "fixed" converts the position so the instance stays where it is.
+- **The scene's `bg_color`**, a camera position (dragged by its tab, with
+  Alt, or typed), whole-pixel positions anchored top-left.
+- **Collision boxes as the engine uses them**: at the instance's top-left,
+  never mirrored, whatever offset the Objects tab shows. Boxes overlapping in
+  the play band, where `scene_collide()` runs, are shaded.
+- **The camera view is the compositor, transcribed** from `scene_render()`
+  and `obj_draw()`: bg fill, bands in order, `image_frame_at()` on the 16 ms
+  tick, mirroring as a source-index swap, transparency by index. The editor
+  and the camera view draw with the same function; bands hidden in the
+  editor still show in the camera view, because the device draws them.
+- **Checks**: the pool limit (255, a `uint8_t` capacity), same-band overlap,
+  play-band collisions, instances outside the scene or off the screen,
+  objects without a palette, box offsets. **Flash** is counted once per
+  object however often it is placed; each instance is a pool slot (RAM).
+- **Editing**: drag objects in from the list (or click to place at the
+  camera's centre); drag to move, drag empty space to pan, wheel to zoom
+  around the pointer; arrows nudge (Shift: 8 px), `[` `]` change band,
+  Ctrl+D duplicates beside, Delete removes, Space plays. All of it undoes.
+- **References stay whole**: deleting an object removes its instances (Undo
+  restores both); re-importing an object keeps each instance's state by
+  name; an instance whose state was deleted falls back to the first.
+
+**How it was proven** (2026-09-29): a test scene built for coverage -- the
+camera away from the origin, sprites clipped on every edge including negative
+screen coordinates, overlap across and within bands, every flip, fixed and
+hidden instances, four animation speeds -- was rendered by Canvas and by
+the workbench engine's real `scene_render()` (compiled with gcc under
+`-Werror`, the engine headers included in place). **All 4096 pixels were
+identical at 0, 16, 96, 128, 240, 768, 1008 and 5008 ms**, and changing one
+sprite's flip on the engine side alone made the test fail on exactly its
+pixels.
+
+After phase 4: paths, and a built-in editor.
 
 ---
 

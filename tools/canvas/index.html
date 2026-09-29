@@ -195,11 +195,31 @@ ul.warns li.bad { color: var(--bad); }
 ul.warns li.warn { color: var(--warn); }
 ul.warns li.info { color: var(--ink-dim); }
 
-/* ---- scene (phase 1: the project's frame only) ---- */
+/* ---- scene ---- */
 .field { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
 .field label { flex: 1; color: var(--ink-dim); font-size: 12px; }
 .field .x { color: var(--ink-faint); }
-#sceneStage { flex: 1; position: relative; min-width: 0; }
+#sceneStage { flex: 1; position: relative; min-width: 0; touch-action: none; }
+.mono { font-family: var(--mono); }
+.scnobj {
+  display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; column-gap: 8px;
+  align-items: center; padding: 5px 6px; border-radius: 6px; cursor: grab; margin: 0 -6px;
+}
+.scnobj:hover { background: var(--panel-2); }
+.scnobj .th { grid-row: 1 / 3; display: flex; align-items: center; justify-content: center; height: 30px; }
+.scnobj .th canvas { image-rendering: pixelated; }
+.scnobj .nm { font: 600 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scnobj .tag { font: 10px var(--mono); color: var(--ink-faint); }
+#scnViewWrap { display: flex; justify-content: center; background: #000; border-radius: 6px; padding: 8px; }
+#scnView { display: block; image-rendering: pixelated; }
+#scnReadout { font: 11px var(--mono); color: var(--ink-dim); margin-left: auto; }
+.bandrow { display: flex; align-items: center; gap: 6px; padding: 5px 0 3px; font-size: 12px; font-weight: 600; }
+.bandrow.off .nm { color: var(--ink-faint); }
+.bandrow .nm { flex: 1; }
+.bandrow .tag { font: 10px var(--mono); color: var(--ink-faint); }
+.bandrow .eye { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0 2px; font-size: 12px; width: 18px; }
+.bandrow.off .eye { color: var(--ink-faint); }
+#scnBandSect .srow { padding-left: 24px; margin: 0 -14px; }
 #sceneCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .placeholder {
   flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px;
@@ -332,7 +352,7 @@ h4.mh:first-child { margin-top: 0; }
   <!-- ================= SCENE ================= -->
   <section class="view" id="view-scene" hidden>
     <aside class="side">
-      <div class="sidehead">Project</div>
+      <div class="sidehead">Scene</div>
       <div class="scroll" style="padding: 4px 12px 12px">
         <div class="field">
           <label for="camW">Camera</label>
@@ -341,18 +361,56 @@ h4.mh:first-child { margin-top: 0; }
           <input class="num" id="camH" type="number" min="1" max="1024" step="1">
         </div>
         <div class="field">
+          <label for="camX">Camera at</label>
+          <input class="num" id="camX" type="number" min="0" step="1">
+          <span class="x">,</span>
+          <input class="num" id="camY" type="number" min="0" step="1">
+        </div>
+        <div class="field">
           <label for="sceneW">Scene</label>
           <input class="num" id="sceneW" type="number" min="1" max="4096" step="1">
           <span class="x">&times;</span>
           <input class="num" id="sceneH" type="number" min="1" max="4096" step="1">
         </div>
-        <p class="note">The <b>camera</b> is what the screen shows, in pixels &mdash;
-          64 &times; 64 for Fantoma, but every project sets its own. The <b>scene</b>
-          is the world the camera moves over; it is never smaller than the camera.</p>
-        <p class="note">Placing objects in the scene arrives in phase 4.</p>
+        <div class="field">
+          <label for="sceneBg">Background</label>
+          <span class="small mono" id="sceneBg565"></span>
+          <input type="color" id="sceneBg">
+        </div>
+        <p class="note">The <b>camera</b> is what the screen shows &mdash; 64 &times; 64 for
+          Fantoma, but every project sets its own. The <b>scene</b> is the world it moves
+          over. The <b>background</b> is the engine&rsquo;s <code>bg_color</code>, one RGB565
+          colour under everything.</p>
+        <span class="lbl">Objects</span>
+        <div id="scnObjList"></div>
+        <p class="note">Drag an object into the scene, or click it to place one at the
+          camera&rsquo;s centre. Nothing here is exported: the scene is a preview.</p>
       </div>
     </aside>
-    <div id="sceneStage"><canvas id="sceneCanvas"></canvas></div>
+
+    <div class="objstage">
+      <div class="objbar">
+        <button type="button" class="chip" id="scnPlay"></button>
+        <label>Zoom <select id="scnZoom"></select></label>
+        <label title="Collision boxes as the engine uses them: at the object&rsquo;s top-left, never mirrored"><input type="checkbox" id="scnBoxes"> Collision boxes</label>
+        <label><input type="checkbox" id="scnGrid"> Pixel grid</label>
+        <span id="scnReadout"></span>
+      </div>
+      <div id="sceneStage"><canvas id="sceneCanvas"></canvas></div>
+    </div>
+
+    <aside class="side right">
+      <div class="scroll">
+        <div class="sect">
+          <h3>Camera view</h3>
+          <div id="scnViewWrap"><canvas id="scnView"></canvas></div>
+          <p class="note" id="scnViewNote"></p>
+        </div>
+        <div class="sect" id="scnInstSect"></div>
+        <div class="sect" id="scnBandSect"></div>
+        <div class="sect" id="scnCheckSect"></div>
+      </div>
+    </aside>
   </section>
 
   <!-- ================= OBJECTS ================= -->
@@ -598,8 +656,8 @@ function bytesLabel(b) { return b >= 10240 ? (b / 1024).toFixed(1) + ' KB' : b +
 function blankProject() {
   return {
     format: FORMAT, version: VERSION, name: 'untitled',
-    camera: { w: 64, h: 64 },
-    scene: { w: 64, h: 64 },
+    camera: { w: 64, h: 64, x: 0, y: 0 },
+    scene: { w: 64, h: 64, bg: '#000000', instances: [] },
     include: DEFAULT_INCLUDE,
     palettes: [],
     objects: []
@@ -625,8 +683,12 @@ function normProject(raw) {
   var sc = (raw.scene && typeof raw.scene === 'object') ? raw.scene : {};
   p.scene = {
     w: Math.max(p.camera.w, intIn(sc.w, 1, MAX_SCENE, p.camera.w)),
-    h: Math.max(p.camera.h, intIn(sc.h, 1, MAX_SCENE, p.camera.h))
+    h: Math.max(p.camera.h, intIn(sc.h, 1, MAX_SCENE, p.camera.h)),
+    bg: normHex(sc.bg) || '#000000',       // bg_color; black is an unlit panel
+    instances: []
   };
+  p.camera.x = intIn(cam.x, 0, p.scene.w - p.camera.w, 0);
+  p.camera.y = intIn(cam.y, 0, p.scene.h - p.camera.h, 0);
 
   p.include = (typeof raw.include === 'string' && !includeProblem(raw.include.trim()))
     ? raw.include.trim() : DEFAULT_INCLUDE;
@@ -656,6 +718,21 @@ function normProject(raw) {
     objNames[obj.name] = true;
     return obj;
   });
+
+  // Instances point at objects and states by id. One whose object is gone
+  // is dropped; one whose state is gone falls back to the first, at draw.
+  var objIds = {};
+  p.objects.forEach(function (o) { objIds[o.id] = true; });
+  p.scene.instances = (Array.isArray(sc.instances) ? sc.instances : []).filter(function (i) {
+    return isObj(i) && objIds[i.obj];
+  }).map(function (i) {
+    var id = (typeof i.id === 'string' && i.id && !taken[i.id]) ? i.id : newId('in', taken);
+    taken[id] = true;
+    return { id: id, obj: i.obj, state: typeof i.state === 'string' ? i.state : null,
+             x: intIn(i.x, -MAX_SCENE, 2 * MAX_SCENE, 0), y: intIn(i.y, -MAX_SCENE, 2 * MAX_SCENE, 0),
+             band: intIn(i.band, 0, BANDS.length - 1, BAND_PLAY),
+             flipX: !!i.flipX, flipY: !!i.flipY, fixed: !!i.fixed, hidden: !!i.hidden };
+  });
   return p;
 }
 
@@ -672,6 +749,7 @@ function allIds() {
     t[o.id] = true;
     o.states.forEach(function (st) { t[st.id] = true; });
   });
+  project.scene.instances.forEach(function (i) { t[i.id] = true; });
   return t;
 }
 
@@ -696,6 +774,13 @@ delete ui.bg;
 ui.showBox = ui.showBox !== false;
 ui.grid = !!ui.grid;
 ui.hold = -1;
+ui.scnPlaying = ui.scnPlaying !== false;
+ui.scnZoom = typeof ui.scnZoom === 'number' && ui.scnZoom > 0 && ui.scnZoom <= 32 ? ui.scnZoom : 0;   // 0 = fit
+ui.scnBoxes = !!ui.scnBoxes;
+ui.scnGrid = !!ui.scnGrid;
+ui.scnBand = typeof ui.scnBand === 'number' && ui.scnBand >= 0 && ui.scnBand <= 5 ? ui.scnBand : 2;
+ui.scnHide = ui.scnHide && typeof ui.scnHide === 'object' ? ui.scnHide : {};
+ui.scnSel = typeof ui.scnSel === 'string' ? ui.scnSel : null;
 
 
 /* --------------------------------------------------------------------------
@@ -1344,85 +1429,839 @@ function renderPalettes() {
    -------------------------------------------------------------------------- */
 var sceneCv = $('sceneCanvas');
 
-function renderSceneFields() {
-  [['camW', project.camera.w], ['camH', project.camera.h], ['sceneW', project.scene.w], ['sceneH', project.scene.h]]
-    .forEach(function (p) { if (document.activeElement !== $(p[0])) $(p[0]).value = p[1]; });
+/* --------------------------------------------------------------------------
+   The scene (phase 4)
+   --------------------------------------------------------------------------
+   A preview of what the engine will draw, built on the workbench engine's
+   own model (cpp/refactor/engine/object.h and scene.h), so that anything
+   arranged here is something the device can actually show:
+
+   - Draw order is SIX FIXED BANDS, not a free z. Within a band the engine
+     draws in pool-slot order, which nobody authors; Canvas draws in list
+     order and warns when two sprites in one band overlap, because that is
+     where the device's order and this preview's can differ. The engine's
+     own advice is the fix: put them in different bands.
+   - Per instance, the engine's flags: OBJ_FLIP_X / _Y mirror the whole
+     cell; OBJ_FIXED puts the position in screen space (a HUD, or a backdrop
+     that does not scroll); OBJ_HIDDEN skips drawing.
+   - One bg_color under everything, a camera that is an int16 position plus
+     the panel size, and positions in whole pixels, anchored top-left.
+   - The collision box is drawn where the engine puts it: the instance's
+     top-left, never mirrored, whatever offset the object tab shows.
+
+   The scene lives only in the Canvas project; nothing here is exported.
+   -------------------------------------------------------------------------- */
+var BANDS = [
+  { key: 'LAYER_BACKDROP',   name: 'backdrop',   note: 'scenery; never collides' },
+  { key: 'LAYER_BACK',       name: 'back',       note: '' },
+  { key: 'LAYER_PLAY',       name: 'play',       note: 'the world: collision runs here' },
+  { key: 'LAYER_PLAY_FRONT', name: 'play front', note: '' },
+  { key: 'LAYER_FOREGROUND', name: 'foreground', note: 'drawn over the world; never collides' },
+  { key: 'LAYER_HUD',        name: 'hud',        note: '' }
+];
+var BAND_PLAY = 2;
+var POOL_MAX = 255;          // Scene.capacity is a uint8_t
+var SCN_ZOOMS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
+
+var scnView = { cx: 0, cy: 0 };      // scene point at the canvas centre, when not fitting
+var scnStart = performance.now(), scnPausedAt = 0;
+var scnRaf = 0, scnSig = '';
+var scnDrag = null;                  // what the pointer is doing
+var scnOff = document.createElement('canvas');
+
+function scnInstances() { return project.scene.instances; }
+function findInst(id) {
+  var a = scnInstances();
+  for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
+  return null;
 }
+function selInst() { return findInst(ui.scnSel); }
+function instState(inst, o) {
+  for (var i = 0; i < o.states.length; i++) if (o.states[i].id === inst.state) return o.states[i];
+  return o.states[0] || null;
+}
+// "hero 2": the object's name and which of its copies this is, in list order.
+function instLabel(inst) {
+  var o = findObject(inst.obj), k = 0;
+  if (!o) return '?';
+  var a = scnInstances();
+  for (var i = 0; i < a.length && a[i] !== inst; i++) if (a[i].obj === inst.obj) k++;
+  return o.name + ' ' + (k + 1);
+}
+
+/* ---- the clock: image_frame_at() on the 16 ms tick, as the preview in the
+   Objects tab. Every instance starts together, as a level spawned at once
+   would. ---- */
+function scnElapsed() {
+  var t = ui.scnPlaying ? performance.now() - scnStart : scnPausedAt;
+  return Math.floor(t / TICK_MS) * TICK_MS;
+}
+function instFrame(st, elapsed) {
+  var order = playOrder(st);
+  if (order.length <= 1 || !st.ms) return order[0] || 0;
+  return order[Math.floor(elapsed / st.ms) % order.length];
+}
+
+// Palette index -> packed RGBA, in the colour the panel receives.
+function objColours32(o) {
+  var pal = findPalette(o.palette);
+  if (!pal) return null;
+  return pal.colors.map(function (h) {
+    var c = hexToRgb(panelOf(h).hex);
+    return ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0;
+  });
+}
+
+// Where the instance's cell sits in the world: a fixed one rides the camera.
+function instWorld(inst) {
+  var c = project.camera;
+  return inst.fixed ? { x: c.x + inst.x, y: c.y + inst.y } : { x: inst.x, y: inst.y };
+}
+
+// Instances in the order they are drawn: band by band, list order within.
+function drawOrder() {
+  var out = [];
+  for (var b = 0; b < BANDS.length; b++) {
+    scnInstances().forEach(function (inst) { if (inst.band === b) out.push(inst); });
+  }
+  return out;
+}
+
+/* The compositor: scene_render() and obj_draw(), transcribed. Fills
+   buf (bw x bh, covering the world from ox, oy) with bg_color, then each
+   band in order. `skipBand` hides bands in the EDITOR only -- the camera
+   view always shows what the device would. */
+function composite(buf, bw, bh, ox, oy, elapsed, skipBand) {
+  var bg = hexToRgb(panelOf(project.scene.bg).hex);
+  buf.fill(((255 << 24) | (bg[2] << 16) | (bg[1] << 8) | bg[0]) >>> 0);
+  var cache = {};
+  drawOrder().forEach(function (inst) {
+    if (inst.hidden || (skipBand && skipBand[inst.band])) return;
+    var o = findObject(inst.obj);
+    if (!o) return;
+    var st = instState(inst, o);
+    if (!st) return;
+    var cols = cache[o.id] || (cache[o.id] = objColours32(o));
+    if (!cols) return;
+    var px = decodeFrame(st.frames[instFrame(st, elapsed)]);
+    var w = o.w, h = o.h, at = instWorld(inst);
+    var sx = at.x - ox, sy = at.y - oy;
+    for (var ry = 0; ry < h; ry++) {
+      var py = sy + ry;
+      if (py < 0 || py >= bh) continue;
+      var srow = (inst.flipY ? h - 1 - ry : ry) * w;
+      for (var cx = 0; cx < w; cx++) {
+        var pxx = sx + cx;
+        if (pxx < 0 || pxx >= bw) continue;
+        var v = px[srow + (inst.flipX ? w - 1 - cx : cx)];
+        if (v === TRANSPARENT) continue;
+        buf[py * bw + pxx] = cols[v] !== undefined ? cols[v] : 0xffff00ff;
+      }
+    }
+  });
+}
+
+function blit(canvas, bw, bh, fill) {
+  canvas.width = bw; canvas.height = bh;
+  var g = canvas.getContext('2d');
+  var img = g.createImageData(bw, bh);
+  fill(new Uint32Array(img.data.buffer));
+  g.putImageData(img, 0, 0);
+}
+
+/* ---- geometry of the editor view ---- */
+function scnGeom() {
+  var r = sceneCv.getBoundingClientRect();
+  var W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
+  var sw = project.scene.w, sh = project.scene.h, k, cx, cy;
+  if (!ui.scnZoom) {
+    var fit = Math.min((W - 60) / sw, (H - 60) / sh);
+    k = fit >= 1 ? Math.floor(fit) : fit;       // whole screen pixels per scene pixel where it fits
+    cx = sw / 2; cy = sh / 2;
+  } else { k = ui.scnZoom; cx = scnView.cx; cy = scnView.cy; }
+  return { W: W, H: H, k: k, ox: Math.round(W / 2 - cx * k), oy: Math.round(H / 2 - cy * k) };
+}
+function toWorld(gm, mx, my) { return { x: (mx - gm.ox) / gm.k, y: (my - gm.oy) / gm.k }; }
 
 function drawScene() {
   if (ui.tab !== 'scene') return;
-  var r = sceneCv.getBoundingClientRect();
+  var gm = scnGeom(), W = gm.W, H = gm.H, k = gm.k;
   var dpr = window.devicePixelRatio || 1;
-  var W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
   sceneCv.width = W * dpr; sceneCv.height = H * dpr;
   var g = sceneCv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.fillStyle = '#14141a';
+  g.fillStyle = '#101015';
   g.fillRect(0, 0, W, H);
 
-  var sw = project.scene.w, sh = project.scene.h, cw = project.camera.w, ch = project.camera.h;
-  // Whole pixels per scene pixel where it fits, so a pixel-art scene is
-  // never shown at a blurry fractional scale.
-  var fit = Math.min((W - 60) / sw, (H - 60) / sh);
-  var k = fit >= 1 ? Math.floor(fit) : fit;
-  var x0 = Math.round((W - sw * k) / 2), y0 = Math.round((H - sh * k) / 2);
+  var sw = project.scene.w, sh = project.scene.h, cam = project.camera;
+  function X(x) { return gm.ox + x * k; }
+  function Y(y) { return gm.oy + y * k; }
 
-  g.fillStyle = '#1c1c24';
-  g.fillRect(x0, y0, sw * k, sh * k);
-  if (k >= 6) {                         // a pixel grid, once pixels are big enough to see
-    g.strokeStyle = 'rgba(255,255,255,0.04)';
+  // Only the part of the scene on screen is composited, so a big scene
+  // costs what is visible, not what exists.
+  var x0 = Math.max(0, Math.floor(-gm.ox / k)), y0 = Math.max(0, Math.floor(-gm.oy / k));
+  var x1 = Math.min(sw, Math.ceil((W - gm.ox) / k)), y1 = Math.min(sh, Math.ceil((H - gm.oy) / k));
+  if (x1 > x0 && y1 > y0) {
+    var skip = ui.scnHide || {}, el0 = scnElapsed();
+    blit(scnOff, x1 - x0, y1 - y0, function (buf) { composite(buf, x1 - x0, y1 - y0, x0, y0, el0, skip); });
+    g.imageSmoothingEnabled = false;
+    g.drawImage(scnOff, X(x0), Y(y0), (x1 - x0) * k, (y1 - y0) * k);
+  }
+
+  // What the camera cannot see, dimmed: the frame is the point.
+  g.fillStyle = 'rgba(8,8,12,0.55)';
+  g.beginPath();
+  g.rect(X(0), Y(0), sw * k, sh * k);
+  g.rect(X(cam.x), Y(cam.y), cam.w * k, cam.h * k);
+  g.fill('evenodd');
+
+  if (ui.scnGrid && k >= 6) {
+    g.strokeStyle = 'rgba(255,255,255,0.06)';
     g.lineWidth = 1;
     g.beginPath();
-    for (var x = 1; x < sw; x++) { g.moveTo(x0 + x * k + 0.5, y0); g.lineTo(x0 + x * k + 0.5, y0 + sh * k); }
-    for (var y = 1; y < sh; y++) { g.moveTo(x0, y0 + y * k + 0.5); g.lineTo(x0 + sw * k, y0 + y * k + 0.5); }
+    for (var gx = x0 + 1; gx < x1; gx++) { g.moveTo(Math.round(X(gx)) + 0.5, Y(y0)); g.lineTo(Math.round(X(gx)) + 0.5, Y(y1)); }
+    for (var gy = y0 + 1; gy < y1; gy++) { g.moveTo(X(x0), Math.round(Y(gy)) + 0.5); g.lineTo(X(x1), Math.round(Y(gy)) + 0.5); }
     g.stroke();
   }
-  g.strokeStyle = '#33333f';
-  g.strokeRect(x0 + 0.5, y0 + 0.5, sw * k - 1, sh * k - 1);
+  g.strokeStyle = '#3a3a48';
+  g.lineWidth = 1;
+  g.strokeRect(X(0) - 0.5, Y(0) - 0.5, sw * k + 1, sh * k + 1);
 
+  // Hidden instances (OBJ_HIDDEN) still need to be findable.
+  g.setLineDash([2, 3]);
+  g.strokeStyle = 'rgba(200,200,220,0.45)';
+  scnInstances().forEach(function (inst) {
+    var o = findObject(inst.obj);
+    if (!o || !inst.hidden || (ui.scnHide || {})[inst.band]) return;
+    var at = instWorld(inst);
+    g.strokeRect(X(at.x) + 0.5, Y(at.y) + 0.5, o.w * k - 1, o.h * k - 1);
+  });
+  g.setLineDash([]);
+
+  if (ui.scnBoxes) {
+    var hits = playOverlaps();
+    scnInstances().forEach(function (inst) {
+      var o = findObject(inst.obj);
+      if (!o || (ui.scnHide || {})[inst.band] || !o.box.w || !o.box.h) return;
+      var at = instWorld(inst), play = inst.band === BAND_PLAY;
+      if (hits[inst.id]) { g.fillStyle = 'rgba(255,90,90,0.25)'; g.fillRect(X(at.x), Y(at.y), o.box.w * k, o.box.h * k); }
+      g.strokeStyle = play ? '#ff6b6b' : 'rgba(200,200,220,0.35)';
+      g.setLineDash(play ? [] : [3, 3]);
+      g.strokeRect(X(at.x) + 0.5, Y(at.y) + 0.5, o.box.w * k - 1, o.box.h * k - 1);
+    });
+    g.setLineDash([]);
+  }
+
+  // The camera, and its handle.
   g.strokeStyle = '#b98cff';
   g.lineWidth = 2;
-  g.strokeRect(x0 + 1, y0 + 1, cw * k - 2, ch * k - 2);
+  g.strokeRect(X(cam.x) - 1, Y(cam.y) - 1, cam.w * k + 2, cam.h * k + 2);
+  var tab = camTab(gm);
+  g.fillStyle = '#b98cff';
+  g.fillRect(tab.x, tab.y, tab.w, tab.h);
+  g.fillStyle = '#14141a';
+  g.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
+  g.textBaseline = 'middle';
+  g.fillText(tab.text, tab.x + 6, tab.y + tab.h / 2 + 0.5);
+
+  var sel = selInst(), so = sel && findObject(sel.obj);
+  if (so) {
+    var sa = instWorld(sel);
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 1;
+    g.strokeRect(X(sa.x) - 1.5, Y(sa.y) - 1.5, so.w * k + 3, so.h * k + 3);
+    g.strokeStyle = '#14141a';
+    g.strokeRect(X(sa.x) - 2.5, Y(sa.y) - 2.5, so.w * k + 5, so.h * k + 5);
+  }
 
   g.fillStyle = '#a2a2a4';
   g.font = '11px ui-monospace, Menlo, Consolas, monospace';
   g.textBaseline = 'bottom';
-  g.fillText('scene ' + sw + '×' + sh + (k >= 1 ? '  ·  ' + k + '× zoom' : ''), x0, y0 - 6);
-  g.fillStyle = '#b98cff';
-  g.textBaseline = 'top';
-  g.fillText('camera ' + cw + '×' + ch, x0 + 6, y0 + 6);
+  g.fillText('scene ' + sw + '×' + sh + '  ·  ' + (k >= 1 ? k : k.toFixed(2)) + '× zoom', X(0), Y(0) - 22 > 12 ? Y(0) - 22 : 14);
+  drawCamView();
+}
+
+function camTab(gm) {
+  var cam = project.camera, text = 'camera ' + cam.x + ',' + cam.y;
+  var g = sceneCv.getContext('2d');
+  g.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
+  var w = Math.ceil(g.measureText(text).width) + 12;
+  return { x: gm.ox + cam.x * gm.k - 1, y: gm.oy + cam.y * gm.k - 18, w: w, h: 16, text: text };
+}
+
+// The camera view: exactly the panel's pixels, at a whole-number scale.
+function drawCamView() {
+  var cam = project.camera, cv = $('scnView');
+  var k = Math.min(256 / cam.w, 256 / cam.h);
+  k = k >= 1 ? Math.floor(k) : k;
+  var el1 = scnElapsed();
+  blit(scnOff, cam.w, cam.h, function (buf) { composite(buf, cam.w, cam.h, cam.x, cam.y, el1, null); });
+  cv.width = Math.round(cam.w * k); cv.height = Math.round(cam.h * k);
+  var g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(scnOff, 0, 0, cv.width, cv.height);
+  $('scnViewNote').textContent = cam.w + '×' + cam.h + ' at ' + (k >= 1 ? k : k.toFixed(2)) + '×, camera at ('
+    + cam.x + ', ' + cam.y + '). Every band, as the device draws it, whatever the editor hides.';
+}
+
+/* ---- playback ---- */
+function scnSignature() {
+  var el2 = scnElapsed();
+  return scnInstances().map(function (inst) {
+    var o = findObject(inst.obj), st = o && instState(inst, o);
+    return st ? instFrame(st, el2) : 0;
+  }).join(',');
+}
+function scnLoop() {
+  scnRaf = 0;
+  if (ui.tab !== 'scene' || !ui.scnPlaying) return;
+  var sig = scnSignature();
+  if (sig !== scnSig) { scnSig = sig; drawScene(); }
+  scnRaf = requestAnimationFrame(scnLoop);
+}
+function scnStartLoop() { if (!scnRaf && ui.scnPlaying && ui.tab === 'scene') scnRaf = requestAnimationFrame(scnLoop); }
+function scnStopLoop() { if (scnRaf) cancelAnimationFrame(scnRaf); scnRaf = 0; }
+function syncScnPlay() {
+  $('scnPlay').textContent = ui.scnPlaying ? '❚❚ Pause' : '▶ Play';
+  if (ui.scnPlaying) scnStartLoop(); else scnStopLoop();
+}
+$('scnPlay').onclick = function () {
+  if (ui.scnPlaying) { scnPausedAt = performance.now() - scnStart; ui.scnPlaying = false; }
+  else { scnStart = performance.now() - scnPausedAt; ui.scnPlaying = true; }
+  saveUi(); syncScnPlay(); drawScene();
+};
+
+/* ---- checks ---- */
+function rectsOverlap(a, b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
+
+// Collision boxes overlapping in the PLAY band, where scene_collide() runs.
+function playOverlaps() {
+  var hit = {}, a = scnInstances().filter(function (i) { return i.band === BAND_PLAY && findObject(i.obj); });
+  for (var i = 0; i < a.length; i++) {
+    for (var j = i + 1; j < a.length; j++) {
+      var oi = findObject(a[i].obj), oj = findObject(a[j].obj), pi = instWorld(a[i]), pj = instWorld(a[j]);
+      if (rectsOverlap({ x: pi.x, y: pi.y, w: oi.box.w, h: oi.box.h }, { x: pj.x, y: pj.y, w: oj.box.w, h: oj.box.h })) {
+        hit[a[i].id] = hit[a[j].id] = true;
+      }
+    }
+  }
+  return hit;
+}
+
+function sceneChecks() {
+  var bad = [], warns = [], infos = [], list = scnInstances();
+  if (list.length > POOL_MAX) bad.push(list.length + ' instances: the engine’s pool holds at most ' + POOL_MAX + ' (its capacity is a uint8_t).');
+
+  var sameBand = [], collide = [];
+  for (var i = 0; i < list.length; i++) {
+    var a = list[i], oa = findObject(a.obj);
+    if (!oa || a.hidden) continue;
+    for (var j = i + 1; j < list.length; j++) {
+      var b = list[j], ob = findObject(b.obj);
+      if (!ob || b.hidden || a.band !== b.band || a.fixed !== b.fixed) continue;
+      var pa = instWorld(a), pb = instWorld(b);
+      if (rectsOverlap({ x: pa.x, y: pa.y, w: oa.w, h: oa.h }, { x: pb.x, y: pb.y, w: ob.w, h: ob.h })) sameBand.push([a, b]);
+      if (a.band === BAND_PLAY && rectsOverlap({ x: pa.x, y: pa.y, w: oa.box.w, h: oa.box.h }, { x: pb.x, y: pb.y, w: ob.box.w, h: ob.box.h })) collide.push([a, b]);
+    }
+  }
+  function pairs(ps) {
+    return ps.slice(0, 3).map(function (p) { return instLabel(p[0]) + ' / ' + instLabel(p[1]); }).join(', ')
+      + (ps.length > 3 ? ' and ' + (ps.length - 3) + ' more' : '');
+  }
+  if (sameBand.length) {
+    warns.push('Overlapping in one band: ' + pairs(sameBand) + '. The engine draws a band in pool-slot order, '
+      + 'which is not authored, so which one is on top may differ on the device. Put them in different bands.');
+  }
+  if (collide.length) {
+    infos.push('Collision boxes overlap in the play band: ' + pairs(collide) + '. on_hit fires every frame while they do.');
+  }
+
+  var used = {};
+  list.forEach(function (inst) {
+    var o = findObject(inst.obj);
+    if (!o) return;
+    used[o.id] = o;
+    var at = instWorld(inst);
+    if (!inst.fixed && !rectsOverlap({ x: at.x, y: at.y, w: o.w, h: o.h }, { x: 0, y: 0, w: project.scene.w, h: project.scene.h })) {
+      warns.push(instLabel(inst) + ' is entirely outside the scene.');
+    }
+    if (inst.fixed && !rectsOverlap({ x: inst.x, y: inst.y, w: o.w, h: o.h }, { x: 0, y: 0, w: project.camera.w, h: project.camera.h })) {
+      warns.push(instLabel(inst) + ' is fixed to the screen but entirely off it.');
+    }
+  });
+  Object.keys(used).forEach(function (id) {
+    var o = used[id];
+    if (!findPalette(o.palette)) bad.push(o.name + ' has no palette, so it cannot be drawn.');
+    if (o.box.x || o.box.y) warns.push(o.name + '’s box is drawn offset in the Objects tab; the engine, and this scene, put it at the top-left.');
+  });
+  return { bad: bad, warns: warns, infos: infos, used: used };
+}
+
+/* ---- rendering the panels ---- */
+function renderSceneFields() {
+  [['camW', project.camera.w], ['camH', project.camera.h], ['camX', project.camera.x], ['camY', project.camera.y],
+   ['sceneW', project.scene.w], ['sceneH', project.scene.h]]
+    .forEach(function (p) { if (document.activeElement !== $(p[0])) $(p[0]).value = p[1]; });
+  $('camX').max = project.scene.w - project.camera.w;
+  $('camY').max = project.scene.h - project.camera.h;
+  $('sceneBg').value = project.scene.bg;
+  $('sceneBg565').textContent = hex565(panelOf(project.scene.bg).c565);
+}
+
+function objThumb(o, size) {
+  var c = document.createElement('canvas'), st = o.states[0];
+  var k = Math.max(1, Math.floor(size / Math.max(o.w, o.h)));
+  c.width = o.w; c.height = o.h;
+  c.style.width = o.w * k + 'px'; c.style.height = o.h * k + 'px';
+  if (st) c.getContext('2d').putImageData(frameImage(o, decodeFrame(st.frames[0])), 0, 0);
+  return c;
+}
+
+function renderScnObjList() {
+  var box = $('scnObjList');
+  box.innerHTML = '';
+  if (!project.objects.length) { box.appendChild(el('p', 'note', 'No objects yet: import some in the Objects tab.')); return; }
+  project.objects.forEach(function (o) {
+    var row = el('div', 'scnobj');
+    row.draggable = true;
+    row.title = 'Drag into the scene, or click to place at the camera’s centre';
+    var th = el('div', 'th');
+    th.appendChild(objThumb(o, 28));
+    row.appendChild(th);
+    row.appendChild(el('span', 'nm', o.name));
+    var n = scnInstances().filter(function (i) { return i.obj === o.id; }).length;
+    row.appendChild(el('span', 'tag', o.w + '×' + o.h + (n ? ' · ' + n + ' placed' : '')));
+    row.ondragstart = function (e) { e.dataTransfer.setData('text/plain', 'canvas-obj:' + o.id); e.dataTransfer.effectAllowed = 'copy'; };
+    row.onclick = function () {
+      var c = project.camera;
+      placeInstance(o, c.x + Math.floor((c.w - o.w) / 2), c.y + Math.floor((c.h - o.h) / 2));
+    };
+    box.appendChild(row);
+  });
+}
+
+function placeInstance(o, x, y) {
+  if (!o.states.length) { toast(o.name + ' has no states to show.'); return; }
+  snapshot();
+  var inst = { id: newId('in', allIds()), obj: o.id, state: o.states[0].id, x: Math.round(x), y: Math.round(y),
+               band: ui.scnBand, flipX: false, flipY: false, fixed: false, hidden: false };
+  scnInstances().push(inst);
+  ui.scnSel = inst.id; saveUi();
+  changed(); renderScene();
+}
+
+function checkRow(label, on, title, apply) {
+  var l = el('label', 'check');
+  var c = document.createElement('input');
+  c.type = 'checkbox'; c.checked = on;
+  c.onchange = function () { apply(c.checked); };
+  l.appendChild(c);
+  l.appendChild(document.createTextNode(label));
+  if (title) l.title = title;
+  return l;
+}
+
+function editInst(inst, key, fn) {
+  snapshot(key);
+  fn(inst);
+  changed(); renderScene();
+}
+
+function setBand(inst, b) {
+  if (b < 0 || b >= BANDS.length || b === inst.band) return;
+  editInst(inst, null, function (x) { x.band = b; });
+  ui.scnBand = b; saveUi();
+}
+
+function duplicateInst(inst) {
+  var o = findObject(inst.obj);
+  snapshot();
+  var copy = JSON.parse(JSON.stringify(inst));
+  copy.id = newId('in', allIds());
+  copy.x += o ? o.w : 1;             // beside it: tiles are the usual reason to duplicate
+  var a = scnInstances();
+  a.splice(a.indexOf(inst) + 1, 0, copy);
+  ui.scnSel = copy.id; saveUi();
+  changed(); renderScene();
+}
+
+function deleteInst(inst) {
+  snapshot();
+  var a = scnInstances(), i = a.indexOf(inst);
+  a.splice(i, 1);
+  ui.scnSel = null; saveUi();
+  changed(); renderScene();
+}
+
+function renderScnInst() {
+  var box = $('scnInstSect'), inst = selInst();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Instance'));
+  var o = inst && findObject(inst.obj);
+  if (!o) {
+    box.appendChild(el('p', 'note', 'Click an instance to select it. Drag it to move; drag empty space to pan; '
+      + 'drag the camera by its tab, or with Alt held. Keys: arrows nudge (Shift: 8 px), [ ] change band, '
+      + 'Ctrl+D duplicates, Delete removes, Space plays.'));
+    return;
+  }
+  var head = el('div', 'btnrow');
+  head.style.marginTop = '0';
+  head.appendChild(el('span', 'enum', instLabel(inst)));
+  var go = el('button', 'chip', 'Edit object');
+  go.type = 'button'; go.style.flex = '0 0 auto';
+  go.onclick = function () { ui.obj = o.id; ui.state = instState(inst, o).id; saveUi(); setTab('objects'); };
+  head.appendChild(go);
+  box.appendChild(head);
+
+  box.appendChild(el('span', 'lbl', 'State'));
+  var sel = document.createElement('select');
+  sel.className = 'sel2';
+  o.states.forEach(function (st) { var op = el('option', null, st.name); op.value = st.id; sel.appendChild(op); });
+  sel.value = instState(inst, o).id;
+  sel.onchange = function () { editInst(inst, null, function (x) { x.state = sel.value; }); };
+  box.appendChild(sel);
+
+  box.appendChild(el('span', 'lbl', inst.fixed ? 'Position on screen' : 'Position in the scene'));
+  var pr = el('div', 'pickrow');
+  ['x', 'y'].forEach(function (key) {
+    pr.appendChild(el('span', 'small', key));
+    pr.appendChild(numInput(inst[key], -MAX_SCENE, 2 * MAX_SCENE, function (inp) {
+      var v = intIn(inp.value, -MAX_SCENE, 2 * MAX_SCENE, inst[key]);
+      if (v === inst[key]) { inp.value = v; return; }
+      editInst(inst, null, function (x) { x[key] = v; });
+    }));
+  });
+  box.appendChild(pr);
+
+  box.appendChild(el('span', 'lbl', 'Band'));
+  var br = el('div', 'pickrow');
+  var bs = document.createElement('select');
+  bs.className = 'sel2';
+  BANDS.forEach(function (b, i) { var op = el('option', null, i + ' ' + b.name); op.value = i; op.title = b.key; bs.appendChild(op); });
+  bs.value = inst.band;
+  bs.onchange = function () { setBand(inst, +bs.value); };
+  var up = el('button', 'chip', '▲'); up.type = 'button'; up.title = 'Drawn later (over more) — ]'; up.disabled = inst.band === BANDS.length - 1;
+  var dn = el('button', 'chip', '▼'); dn.type = 'button'; dn.title = 'Drawn earlier (under more) — ['; dn.disabled = inst.band === 0;
+  up.style.flex = dn.style.flex = '0 0 34px';
+  up.onclick = function () { setBand(inst, inst.band + 1); };
+  dn.onclick = function () { setBand(inst, inst.band - 1); };
+  br.appendChild(bs); br.appendChild(up); br.appendChild(dn);
+  box.appendChild(br);
+  box.appendChild(el('p', 'note', BANDS[inst.band].key + (BANDS[inst.band].note ? ': ' + BANDS[inst.band].note : '') + '.'));
+
+  box.appendChild(checkRow('Flip horizontally', inst.flipX, 'OBJ_FLIP_X: mirrors the whole cell', function (v) { editInst(inst, null, function (x) { x.flipX = v; }); }));
+  box.appendChild(checkRow('Flip vertically', inst.flipY, 'OBJ_FLIP_Y', function (v) { editInst(inst, null, function (x) { x.flipY = v; }); }));
+  box.appendChild(checkRow('Fixed to the screen', inst.fixed, 'OBJ_FIXED: the position is screen space, so it does not scroll', function (v) {
+    // Keep it where it is on screen: only the coordinate space changes.
+    editInst(inst, null, function (x) {
+      var c = project.camera;
+      if (v) { x.x -= c.x; x.y -= c.y; } else { x.x += c.x; x.y += c.y; }
+      x.fixed = v;
+    });
+  }));
+  box.appendChild(checkRow('Hidden', inst.hidden, 'OBJ_HIDDEN: kept, not drawn', function (v) { editInst(inst, null, function (x) { x.hidden = v; }); }));
+  if (inst.flipX && o.box.w < o.w) {
+    box.appendChild(el('p', 'note', 'Mirroring flips the cell, not the box: the box stays at the top-left, as in the engine.'));
+  }
+
+  var ar = el('div', 'btnrow');
+  var dup = el('button', 'chip', 'Duplicate'); dup.type = 'button'; dup.onclick = function () { duplicateInst(inst); };
+  var del = el('button', 'chip danger', 'Delete'); del.type = 'button'; del.onclick = function () { deleteInst(inst); };
+  ar.appendChild(dup); ar.appendChild(del);
+  box.appendChild(ar);
+}
+
+function renderScnBands() {
+  var box = $('scnBandSect');
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Bands, top to bottom'));
+  var hide = ui.scnHide || {};
+  for (var b = BANDS.length - 1; b >= 0; b--) {
+    (function (b) {
+      var members = scnInstances().filter(function (i) { return i.band === b; });
+      var row = el('div', 'bandrow' + (hide[b] ? ' off' : ''));
+      var eye = el('button', 'eye', hide[b] ? '◌' : '●');
+      eye.type = 'button';
+      eye.title = hide[b] ? 'Show in the editor' : 'Hide in the editor (the camera view still shows it)';
+      eye.onclick = function () { ui.scnHide = ui.scnHide || {}; ui.scnHide[b] = !hide[b]; saveUi(); renderScene(); };
+      row.appendChild(eye);
+      row.appendChild(el('span', 'nm', b + ' ' + BANDS[b].name));
+      row.appendChild(el('span', 'tag', members.length ? String(members.length) : ''));
+      row.title = BANDS[b].key + (BANDS[b].note ? ': ' + BANDS[b].note : '');
+      box.appendChild(row);
+      // Drawn in list order within the band: the last one here is on top.
+      members.slice().reverse().forEach(function (inst) {
+        var r = el('div', 'srow' + (inst.id === ui.scnSel ? ' sel' : ''));
+        r.appendChild(el('span', 'nm', instLabel(inst)));
+        var o = findObject(inst.obj), st = o && instState(inst, o);
+        var tags = [st ? st.name : ''];
+        if (inst.fixed) tags.push('fixed');
+        if (inst.hidden) tags.push('hidden');
+        if (inst.flipX || inst.flipY) tags.push('flip ' + (inst.flipX ? 'x' : '') + (inst.flipY ? 'y' : ''));
+        r.appendChild(el('span', 'tag', tags.join(' · ')));
+        r.onclick = function () { ui.scnSel = inst.id; saveUi(); renderScene(); };
+        box.appendChild(r);
+      });
+    })(b);
+  }
+  box.appendChild(el('p', 'note', 'Within a band this list order is Canvas’s preview only: the engine uses pool-slot order there.'));
+}
+
+function renderScnChecks() {
+  var box = $('scnCheckSect');
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Checks and flash'));
+  var chk = sceneChecks();
+  var ul = el('ul', 'warns');
+  chk.bad.forEach(function (x) { ul.appendChild(el('li', 'bad', x)); });
+  chk.warns.forEach(function (x) { ul.appendChild(el('li', 'warn', x)); });
+  chk.infos.forEach(function (x) { ul.appendChild(el('li', 'info', x)); });
+  if (!ul.children.length) ul.appendChild(el('li', 'info', 'Nothing to report.'));
+  box.appendChild(ul);
+
+  var ids = Object.keys(chk.used);
+  if (!ids.length) return;
+  var t = el('table', 'cost'), total = 0, hr = el('tr');
+  ['object', 'placed', 'flash'].forEach(function (x) { hr.appendChild(el('th', null, x)); });
+  t.appendChild(hr);
+  ids.forEach(function (id) {
+    var o = chk.used[id], b = objBudget(o), tr = el('tr');
+    var n = scnInstances().filter(function (i) { return i.obj === id; }).length;
+    tr.appendChild(el('td', null, o.name));
+    tr.appendChild(el('td', null, String(n)));
+    tr.appendChild(el('td', null, b.total ? bytesLabel(b.total) : '—'));
+    total += b.total || 0;
+    t.appendChild(tr);
+  });
+  var tt = el('tr');
+  tt.appendChild(el('td', 'up', 'total'));
+  tt.appendChild(el('td', null, String(scnInstances().length)));
+  tt.appendChild(el('td', 'up', bytesLabel(total)));
+  t.appendChild(tt);
+  box.appendChild(t);
+  box.appendChild(el('p', 'note', 'Flash is paid once per object, however many times it is placed. Each instance '
+    + 'costs a slot in the engine’s object pool (RAM) instead.'));
+}
+
+function syncScnZoom() {
+  var s = $('scnZoom');
+  s.innerHTML = '';
+  var list = [0].concat(SCN_ZOOMS);
+  if (ui.scnZoom && list.indexOf(ui.scnZoom) < 0) list.push(ui.scnZoom);
+  list.sort(function (a, b) { return a - b; }).forEach(function (z) {
+    var op = el('option', null, z ? (z >= 1 ? z : z.toFixed(2)) + '×' : 'fit');
+    op.value = z; s.appendChild(op);
+  });
+  s.value = ui.scnZoom;
+}
+
+function renderScene() {
+  if (ui.scnSel && !selInst()) ui.scnSel = null;
+  renderSceneFields();
+  renderScnObjList();
+  renderScnInst();
+  renderScnBands();
+  renderScnChecks();
+  $('scnBoxes').checked = ui.scnBoxes;
+  $('scnGrid').checked = ui.scnGrid;
+  syncScnZoom();
+  syncScnPlay();
+  drawScene();
 }
 
 if (window.ResizeObserver) new ResizeObserver(function () { drawScene(); }).observe($('sceneStage'));
 
+$('scnZoom').onchange = function () {
+  var gm = scnGeom();
+  var c = toWorld(gm, gm.W / 2, gm.H / 2);           // keep the centre where it is
+  ui.scnZoom = +this.value;
+  scnView.cx = c.x; scnView.cy = c.y;
+  saveUi(); drawScene();
+};
+$('scnBoxes').onchange = function () { ui.scnBoxes = this.checked; saveUi(); drawScene(); };
+$('scnGrid').onchange = function () { ui.scnGrid = this.checked; saveUi(); drawScene(); };
+
+/* ---- pointer: select, move, pan, move the camera, drop ---- */
+// Topmost first: an opaque pixel wins over a transparent corner of a
+// sprite drawn later, so small sprites stay clickable in a crowd.
+function hitInstance(wx, wy) {
+  var order = drawOrder().reverse(), el3 = scnElapsed(), hide = ui.scnHide || {}, fx = Math.floor(wx), fy = Math.floor(wy);
+  var cellHit = null;
+  for (var i = 0; i < order.length; i++) {
+    var inst = order[i], o = findObject(inst.obj);
+    if (!o || hide[inst.band]) continue;
+    var at = instWorld(inst);
+    if (fx < at.x || fy < at.y || fx >= at.x + o.w || fy >= at.y + o.h) continue;
+    if (!cellHit) cellHit = inst;
+    var st = instState(inst, o);
+    if (!st || inst.hidden) continue;
+    var cx = fx - at.x, cy = fy - at.y;
+    if (inst.flipX) cx = o.w - 1 - cx;
+    if (inst.flipY) cy = o.h - 1 - cy;
+    if (decodeFrame(st.frames[instFrame(st, el3)])[cy * o.w + cx] !== TRANSPARENT) return inst;
+  }
+  return cellHit;
+}
+
+sceneCv.addEventListener('pointerdown', function (e) {
+  var gm = scnGeom(), r = sceneCv.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top, w = toWorld(gm, mx, my);
+  var tab = camTab(gm), cam = project.camera;
+  sceneCv.setPointerCapture(e.pointerId);
+  if (e.button === 1) { scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm }; e.preventDefault(); return; }
+  if (e.altKey || (mx >= tab.x && mx < tab.x + tab.w && my >= tab.y && my < tab.y + tab.h)) {
+    scnDrag = { kind: 'camera', wx: w.x, wy: w.y, x: cam.x, y: cam.y, moved: false };
+    return;
+  }
+  var inst = hitInstance(w.x, w.y);
+  if (inst) {
+    ui.scnSel = inst.id; saveUi();
+    var at = instWorld(inst);
+    scnDrag = { kind: 'move', inst: inst, dx: w.x - at.x, dy: w.y - at.y, moved: false };
+    renderScnInst(); renderScnBands(); drawScene();
+    return;
+  }
+  if (ui.scnSel) { ui.scnSel = null; saveUi(); renderScnInst(); renderScnBands(); }
+  scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm };
+  drawScene();
+});
+
+sceneCv.addEventListener('pointermove', function (e) {
+  var gm = scnGeom(), r = sceneCv.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top, w = toWorld(gm, mx, my);
+  $('scnReadout').textContent = Math.floor(w.x) + ', ' + Math.floor(w.y);
+  if (!scnDrag) {
+    var tab = camTab(gm);
+    sceneCv.style.cursor = (e.altKey || (mx >= tab.x && mx < tab.x + tab.w && my >= tab.y && my < tab.y + tab.h)) ? 'move'
+      : hitInstance(w.x, w.y) ? 'pointer' : 'grab';
+    return;
+  }
+  if (scnDrag.kind === 'pan') {
+    if (!ui.scnZoom) {                   // leaving "fit": keep the current view as the starting point
+      var c0 = toWorld(scnDrag.gm, scnDrag.gm.W / 2, scnDrag.gm.H / 2);
+      ui.scnZoom = scnDrag.gm.k; scnView.cx = c0.x; scnView.cy = c0.y; syncScnZoom();
+    }
+    scnView.cx -= (mx - scnDrag.mx) / gm.k; scnView.cy -= (my - scnDrag.my) / gm.k;
+    scnDrag.mx = mx; scnDrag.my = my;
+    sceneCv.style.cursor = 'grabbing';
+    drawScene();
+  } else if (scnDrag.kind === 'move') {
+    var inst = scnDrag.inst, c = project.camera;
+    var nx = Math.round(w.x - scnDrag.dx), ny = Math.round(w.y - scnDrag.dy);
+    if (inst.fixed) { nx -= c.x; ny -= c.y; }
+    if (nx === inst.x && ny === inst.y) return;
+    if (!scnDrag.moved) { snapshot(); scnDrag.moved = true; }
+    inst.x = nx; inst.y = ny;
+    drawScene();
+  } else if (scnDrag.kind === 'camera') {
+    var cam = project.camera;
+    var x = intIn(scnDrag.x + Math.round(w.x - scnDrag.wx), 0, project.scene.w - cam.w, cam.x);
+    var y = intIn(scnDrag.y + Math.round(w.y - scnDrag.wy), 0, project.scene.h - cam.h, cam.y);
+    if (x === cam.x && y === cam.y) return;
+    if (!scnDrag.moved) { snapshot(); scnDrag.moved = true; }
+    cam.x = x; cam.y = y;
+    renderSceneFields();
+    drawScene();
+  }
+});
+
+function endScnDrag() {
+  if (!scnDrag) return;
+  var d = scnDrag;
+  scnDrag = null;
+  sceneCv.style.cursor = '';
+  if (d.moved) { changed(); renderScene(); }
+}
+sceneCv.addEventListener('pointerup', endScnDrag);
+sceneCv.addEventListener('pointercancel', endScnDrag);
+sceneCv.addEventListener('pointerleave', function () { if (!scnDrag) $('scnReadout').textContent = ''; });
+
+sceneCv.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  var gm = scnGeom(), r = sceneCv.getBoundingClientRect();
+  var mx = e.clientX - r.left, my = e.clientY - r.top, w = toWorld(gm, mx, my);
+  var next;
+  if (e.deltaY < 0) next = SCN_ZOOMS.filter(function (z) { return z > gm.k + 1e-6; })[0];
+  else next = SCN_ZOOMS.filter(function (z) { return z < gm.k - 1e-6; }).pop();
+  if (!next) return;
+  ui.scnZoom = next;
+  // The scene point under the pointer stays under the pointer.
+  scnView.cx = w.x - (mx - gm.W / 2) / next;
+  scnView.cy = w.y - (my - gm.H / 2) / next;
+  saveUi(); syncScnZoom(); drawScene();
+}, { passive: false });
+
+sceneCv.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+sceneCv.addEventListener('drop', function (e) {
+  e.preventDefault();
+  var m = /^canvas-obj:(.+)$/.exec(e.dataTransfer.getData('text/plain') || '');
+  var o = m && findObject(m[1]);
+  if (!o) return;
+  var gm = scnGeom(), r = sceneCv.getBoundingClientRect();
+  var w = toWorld(gm, e.clientX - r.left, e.clientY - r.top);
+  placeInstance(o, Math.round(w.x - o.w / 2), Math.round(w.y - o.h / 2));
+});
+
+// Keys while the scene tab is showing; returns true when it used the key.
+function sceneKey(e) {
+  var inst = selInst(), mod = e.ctrlKey || e.metaKey;
+  if (e.key === ' ') { e.preventDefault(); $('scnPlay').click(); return true; }
+  if (e.key === 'Escape' && inst) { ui.scnSel = null; saveUi(); renderScene(); return true; }
+  if (!inst) return false;
+  var step = e.shiftKey ? 8 : 1, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (d && !mod) {
+    e.preventDefault();
+    editInst(inst, 'nudge:' + inst.id, function (x) { x.x += d[0]; x.y += d[1]; });
+    return true;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteInst(inst); return true; }
+  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateInst(inst); return true; }
+  if (!mod && e.key === ']') { setBand(inst, inst.band + 1); return true; }
+  if (!mod && e.key === '[') { setBand(inst, inst.band - 1); return true; }
+  return false;
+}
+
+/* ---- the frame fields ---- */
+$('sceneBg').oninput = function () {
+  snapshot('scene-bg');
+  project.scene.bg = normHex(this.value) || '#000000';
+  changed();
+  $('sceneBg565').textContent = hex565(panelOf(project.scene.bg).c565);
+  drawScene();
+};
+
 function sceneField(id, apply) {
   $(id).onchange = function () {
-    var before = JSON.stringify([project.camera, project.scene]);
-    var next = JSON.parse(before);
-    apply(next, this.value);
-    var askedW = next[1].w, askedH = next[1].h;
-    next[1].w = Math.max(next[0].w, next[1].w);        // the scene is never smaller than the camera
-    next[1].h = Math.max(next[0].h, next[1].h);
+    var before = JSON.stringify([project.camera, project.scene.w, project.scene.h]);
+    var cam = JSON.parse(JSON.stringify(project.camera)), sc = { w: project.scene.w, h: project.scene.h };
+    apply(cam, sc, this.value);
+    var askedW = sc.w, askedH = sc.h;
+    sc.w = Math.max(cam.w, sc.w);        // the scene is never smaller than the camera
+    sc.h = Math.max(cam.h, sc.h);
     // Say so when that rule overrides what was typed; a silent correction
     // looks like the field ignoring you.
-    if (next[1].w !== askedW || next[1].h !== askedH) {
+    if (sc.w !== askedW || sc.h !== askedH) {
       toast(/^scene/.test(id) ? 'The scene can’t be smaller than the camera'
                               : 'The scene grew to keep the camera inside it');
     }
-    if (JSON.stringify(next) === before) { renderSceneFields(); return; }
+    cam.x = intIn(cam.x, 0, sc.w - cam.w, 0);   // and the camera stays inside the scene
+    cam.y = intIn(cam.y, 0, sc.h - cam.h, 0);
+    if (JSON.stringify([cam, sc.w, sc.h]) === before) { renderSceneFields(); return; }
     snapshot();
-    project.camera = next[0];
-    project.scene = next[1];
+    project.camera = cam;
+    project.scene.w = sc.w; project.scene.h = sc.h;
     changed();
     renderSceneFields();
     drawScene();
     if (ui.tab === 'palettes') renderPalDepth();
   };
 }
-sceneField('camW', function (n, v) { n[0].w = intIn(v, 1, MAX_CAMERA, n[0].w); });
-sceneField('camH', function (n, v) { n[0].h = intIn(v, 1, MAX_CAMERA, n[0].h); });
-sceneField('sceneW', function (n, v) { n[1].w = intIn(v, 1, MAX_SCENE, n[1].w); });
-sceneField('sceneH', function (n, v) { n[1].h = intIn(v, 1, MAX_SCENE, n[1].h); });
+sceneField('camW', function (c, s, v) { c.w = intIn(v, 1, MAX_CAMERA, c.w); });
+sceneField('camH', function (c, s, v) { c.h = intIn(v, 1, MAX_CAMERA, c.h); });
+sceneField('camX', function (c, s, v) { c.x = intIn(v, 0, MAX_SCENE, c.x); });
+sceneField('camY', function (c, s, v) { c.y = intIn(v, 0, MAX_SCENE, c.y); });
+sceneField('sceneW', function (c, s, v) { s.w = intIn(v, 1, MAX_SCENE, s.w); });
+sceneField('sceneH', function (c, s, v) { s.h = intIn(v, 1, MAX_SCENE, s.h); });
 
 
 /* ==========================================================================
@@ -1926,8 +2765,11 @@ function renderObjSect() {
   var del = el('button', 'chip danger', 'Delete object');
   del.type = 'button';
   del.onclick = function () {
-    if (!confirm('Delete “' + o.name + '”? (Undo brings it back.)')) return;
+    var placed = project.scene.instances.filter(function (x) { return x.obj === o.id; }).length;
+    if (!confirm('Delete “' + o.name + '”?' + (placed ? ' It is placed ' + placed + '× in the scene; those go too.' : '')
+      + ' (Undo brings it back.)')) return;
     snapshot();
+    project.scene.instances = project.scene.instances.filter(function (x) { return x.obj !== o.id; });
     var i = project.objects.indexOf(o);
     project.objects.splice(i, 1);
     var next = project.objects[Math.min(i, project.objects.length - 1)];
@@ -2860,7 +3702,15 @@ function commitImport(an, choice, existing, jsonName) {
   if (existing && choice.target === 'update') {
     o = existing;
     if (o.w !== an.cw || o.h !== an.ch) o.box = an.box ? { x: an.box.x, y: an.box.y, w: an.box.w, h: an.box.h } : { x: 0, y: 0, w: an.cw, h: an.ch };
+    var byName = {};
+    o.states.forEach(function (st) { byName[st.id] = st.name; });
     o.w = an.cw; o.h = an.ch; o.palette = pal.id; o.states = states; o.source = jsonName;
+    // New states get new ids; a placed copy keeps its state by name.
+    project.scene.instances.forEach(function (x) {
+      if (x.obj !== o.id) return;
+      var same = states.filter(function (st) { return st.name === byName[x.state]; })[0];
+      x.state = same ? same.id : states[0].id;
+    });
   } else {
     o = { id: newId('obj', taken), name: freeObjectName(an.base), w: an.cw, h: an.ch, palette: pal.id,
           box: an.box ? { x: an.box.x, y: an.box.y, w: an.box.w, h: an.box.h } : { x: 0, y: 0, w: an.cw, h: an.ch },
@@ -2890,7 +3740,7 @@ function setTab(tab) {
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
     b.classList.toggle('on', b.getAttribute('data-tab') === tab);
   });
-  if (tab === 'scene') { renderSceneFields(); drawScene(); }
+  if (tab === 'scene') renderScene(); else scnStopLoop();
   if (tab === 'palettes') renderPalettes();
   if (tab === 'objects') renderObjects(); else stopAnim();
 }
@@ -2980,6 +3830,7 @@ document.addEventListener('keydown', function (e) {
   var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '');
   var mod = e.ctrlKey || e.metaKey;
   if (!$('modal').hidden) { if (e.key === 'Escape') closeModal(); return; }
+  if (!typing && ui.tab === 'scene' && sceneKey(e)) return;
   if (!typing && !mod && ui.tab === 'objects' && currentState()) {
     var st0 = currentState();
     if (e.key === ' ') { e.preventDefault(); $('objPlay').click(); return; }
