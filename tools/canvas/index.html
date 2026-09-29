@@ -391,7 +391,7 @@ h4.mh:first-child { margin-top: 0; }
           <option value="4">4&times;</option><option value="8">8&times;</option><option value="16">16&times;</option>
           <option value="32">32&times;</option></select></label>
         <label title="Pixels the sprite leaves empty. On the LED panel an unlit pixel is black.">Empty
-          <select id="objBg"><option value="black">black (panel off)</option><option value="checker">checker</option></select></label>
+          <select id="objBg"><option value="grey">dark grey</option><option value="black">black (panel off)</option><option value="checker">checker</option></select></label>
         <label><input type="checkbox" id="objBox"> Collision box</label>
         <label><input type="checkbox" id="objGrid"> Pixel grid</label>
         <span id="objReadout"></span>
@@ -680,7 +680,12 @@ ui.tab = ['scene', 'objects', 'palettes'].indexOf(ui.tab) >= 0 ? ui.tab : 'palet
 ui.col = typeof ui.col === 'number' ? ui.col : -1;
 ui.playing = ui.playing !== false;
 ui.zoom = [0, 1, 2, 4, 8, 16, 32].indexOf(ui.zoom) >= 0 ? ui.zoom : 0;
-ui.bg = ui.bg === 'checker' ? 'checker' : 'black';
+// What empty pixels look like. Dark grey by default: black is what an unlit
+// LED is, but black is also the usual outline colour, and an outline drawn
+// on black disappears exactly where it matters. A new key rather than the
+// old `bg`, so a browser that stored the old default does not keep it.
+ui.empty = ['grey', 'black', 'checker'].indexOf(ui.empty) >= 0 ? ui.empty : 'grey';
+delete ui.bg;
 ui.showBox = ui.showBox !== false;
 ui.grid = !!ui.grid;
 ui.hold = -1;
@@ -1734,7 +1739,7 @@ function drawObj() {
   var k = ui.zoom > 0 ? ui.zoom : fit;
   var x0 = Math.round((W - o.w * k) / 2), y0 = Math.round((H - o.h * k) / 2);
 
-  if (ui.bg === 'checker') {
+  if (ui.empty === 'checker') {
     var q = k >= 6 ? k : Math.max(2, 6 - (6 % k || 0));
     for (var yy = 0; yy < o.h * k; yy += q) {
       for (var xx = 0; xx < o.w * k; xx += q) {
@@ -1743,7 +1748,7 @@ function drawObj() {
       }
     }
   } else {
-    g.fillStyle = '#000000';
+    g.fillStyle = emptyColour();
     g.fillRect(x0, y0, o.w * k, o.h * k);
   }
 
@@ -1800,7 +1805,7 @@ function renderStrip() {
     var c = document.createElement('canvas');
     c.width = o.w * k; c.height = o.h * k;
     var g = c.getContext('2d');
-    g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = emptyColour(); g.fillRect(0, 0, c.width, c.height);
     drawFrameTo(g, o, decodeFrame(f), 0, 0, k);
     t.appendChild(c);
     t.appendChild(el('span', null, String(i)));
@@ -2056,7 +2061,7 @@ function renderObjects() {
   renderObjList();
   if (!has) { stopAnim(); return; }
   $('objZoom').value = String(ui.zoom);
-  $('objBg').value = ui.bg;
+  $('objBg').value = ui.empty;
   $('objBox').checked = ui.showBox;
   $('objGrid').checked = ui.grid;
   renderObjSect();
@@ -2073,7 +2078,10 @@ $('objPlay').onclick = function () {
   saveUi(); syncPlay(); drawObj();
 };
 $('objZoom').onchange = function () { ui.zoom = +this.value; saveUi(); drawObj(); };
-$('objBg').onchange = function () { ui.bg = this.value; saveUi(); drawObj(); };
+$('objBg').onchange = function () { ui.empty = this.value; saveUi(); drawObj(); renderStrip(); };
+
+// The strip's thumbnails are too small for a checkerboard; they use the grey.
+function emptyColour() { return ui.empty === 'black' ? '#000000' : '#3a3a40'; }
 $('objBox').onchange = function () { ui.showBox = this.checked; saveUi(); drawObj(); };
 $('objGrid').onchange = function () { ui.grid = this.checked; saveUi(); drawObj(); };
 
@@ -2134,7 +2142,9 @@ function parseAse(json, jsonName) {
              direction: DIRECTIONS.indexOf(dir) >= 0 ? dir : 'forward', repeat: intIn(t.repeat, 0, 65535, 0) };
   });
   return { frames: frames, tags: tags, hasTagList: hasTagList, cw: cw, ch: ch, image: json.meta.image,
-           slices: Array.isArray(json.meta.slices) ? json.meta.slices : [] };
+           slices: Array.isArray(json.meta.slices) ? json.meta.slices : [],
+           // Only listed when "Layers" is ticked under Meta; absent says nothing.
+           layers: Array.isArray(json.meta.layers) ? json.meta.layers.filter(isObj).map(function (l) { return String(l.name || ''); }) : [] };
 }
 
 // Everything the dialog shows, worked out before anything is changed.
@@ -2179,6 +2189,16 @@ function analyseImport(ase, sheet, base) {
       + vals.slice(0, 4).map(function (a) { return semiA[a] + ' at alpha ' + a; }).join(', ') + (vals.length > 4 ? ', …' : '')
       + '). The engine has no blending, so ' + (opaque ? opaque + ' become fully opaque' : '') + (opaque && clear ? ' and ' : '')
       + (clear ? clear + ' fully transparent' : '') + ' (the line is alpha 128). Usually a brush or layer set just under 100% opacity.' });
+  }
+
+  // Export Sprite Sheet merges every visible layer into each frame. Right
+  // for parts of one picture (outline, body, eyes); wrong if the layers were
+  // meant as separate animations or separate sprites. Worth a line either way.
+  if (ase.layers.length > 1) {
+    notes.push({ cls: 'info', text: 'This file has ' + ase.layers.length + ' layers ('
+      + ase.layers.slice(0, 5).join(', ') + (ase.layers.length > 5 ? ', …' : '') + '), and the export merged them into '
+      + 'each frame. That is right when they are parts of one picture. If they were separate animations, put each on '
+      + 'its own frames and tag it; if separate sprites, give each its own file.' });
   }
 
   var states = [];
