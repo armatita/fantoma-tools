@@ -456,10 +456,37 @@ Pixel Studio is the phone tool. English only, being Pedro's own.
 - **Camera and scene size are per project**, never hardcoded; 64 × 64 is only
   the default.
 
-Next: phase 2 (objects, states and frames by Aseprite import, the animated
-preview on the engine's 16 ms tick, the byte budget), then phase 3 (the export,
-checked by decoding against `build_hero.py`'s headers), then the scene, paths,
-and a built-in editor.
+**Phase 2 is built**: objects, states and frames, imported from Aseprite.
+
+- **Import reads Export Sprite Sheet output** -- the PNG and its JSON, Array or
+  Hash. The JSON says where every frame is; a grid is never guessed from the
+  sheet's size (the hero sheet divides evenly both ways and was once read wrong).
+  Tags become states; a file with no tags is one state named after the file.
+  Trimmed frames are put back in their cell; packed/rotated sheets are refused.
+  Pixels are read with colour management off, so an embedded profile cannot
+  shift a colour off its palette entry.
+- **Colours match exactly or not at all.** Missing colours can be appended to
+  the palette (nothing moves) or a new palette made from the art; a "nearest"
+  colour is never substituted.
+- **Art is stored as palette indices**, as the engine stores it. Editing a
+  colour recolours every sprite drawn with it; pointing an object at another
+  palette previews a swap; reordering or inserting colours rewrites the art so
+  it looks unchanged; deleting a colour or palette in use is refused, with
+  where it is used.
+- **Transparency is read from the art** (alpha below 128, the spec's rule), and
+  is the whole object's, because its states share one palette.
+- **The preview is the device's arithmetic**: `image_frame_at()`'s divide and
+  modulo, on elapsed time floored to the 16 ms display tick. Reverse and
+  ping-pong are expanded the way the export will expand them. Empty pixels
+  are black by default, because an unlit LED is.
+- **The flash budget** counts expanded frames, byte-aligned rows, the palette,
+  and a 24-byte `Image` plus a 4-byte table entry per state (ESP32 pointers).
+- **Names are C symbols**, made valid on import (`Loop` becomes `loop`) and
+  refused where they would collide with the header's own (`palette`, `states`,
+  `state_count`, the cell and box defines, anything ending `_data`).
+
+Next: phase 3 (the export, checked by decoding against `build_hero.py`'s
+headers), then the scene, paths, and a built-in editor.
 
 ---
 

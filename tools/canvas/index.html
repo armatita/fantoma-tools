@@ -208,6 +208,90 @@ ul.warns li.info { color: var(--ink-dim); }
 .placeholder h2 { color: var(--ink); font-size: 16px; margin: 0 0 8px; }
 .placeholder ul { padding-left: 18px; }
 
+/* ---- objects ---- */
+.orow {
+  padding: 7px 12px; cursor: pointer; border-left: 2px solid transparent;
+  display: flex; align-items: center; gap: 8px;
+}
+.orow:hover { background: var(--panel-2); }
+.orow.sel { background: var(--panel-2); border-left-color: var(--accent); }
+.orow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px var(--mono); }
+.orow .tag, .srow .tag { font: 10px var(--mono); color: var(--ink-faint); white-space: nowrap; }
+.srow {
+  padding: 4px 12px 4px 28px; cursor: pointer; display: flex; gap: 8px; align-items: center;
+  border-left: 2px solid transparent; font-size: 12px;
+}
+.srow:hover { background: var(--panel-2); }
+.srow.sel { background: var(--panel-3); border-left-color: var(--accent); }
+.srow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.srow .flag { color: var(--warn); font-size: 11px; }
+.objstage { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.objbar {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px; flex: none; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+.objbar label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-dim); cursor: pointer; }
+.objbar select, select.sel2 {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
+}
+select.sel2 { width: 100%; padding: 6px 8px; }
+#objReadout { font: 11px var(--mono); color: var(--ink-dim); margin-left: auto; }
+#objCanvasWrap { flex: 1; position: relative; min-height: 0; }
+#objCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#objStrip {
+  flex: none; display: flex; gap: 6px; padding: 10px 14px; overflow-x: auto;
+  border-top: 1px solid var(--line); align-items: flex-end;
+}
+.fthumb {
+  flex: none; border: 1px solid var(--line); border-radius: 5px; padding: 3px; cursor: pointer;
+  background: var(--panel); text-align: center;
+}
+.fthumb.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.fthumb canvas { display: block; image-rendering: pixelated; margin: 0 auto; }
+.fthumb span { font: 10px var(--mono); color: var(--ink-faint); }
+#objStrip .order { font: 11px var(--mono); color: var(--ink-faint); margin-left: 8px; white-space: nowrap; align-self: center; }
+.boxgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.boxgrid label { display: block; font-size: 10px; color: var(--ink-faint); margin-bottom: 2px; }
+.boxgrid input { width: 100%; }
+.enum { font: 11px var(--mono); color: var(--ink-dim); }
+label.check { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 10px; cursor: pointer; }
+input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+.lbl { display: block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); margin: 10px 0 4px; }
+input.wide { width: 100%; font-family: var(--mono); }
+
+/* ---- import dialog ---- */
+#modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+}
+#modalBox {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  width: min(760px, 92vw); max-height: 88vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+#modalBox > h2 { margin: 0; font-size: 15px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+#modalBody { padding: 12px 18px 16px; overflow-y: auto; }
+#modalFoot {
+  padding: 12px 18px; border-top: 1px solid var(--line);
+  display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+}
+#modalFoot .why { margin-right: auto; font-size: 12px; color: var(--warn); }
+.chip.primary { background: var(--accent); color: #14141a; border-color: var(--accent); font-weight: 600; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 10px; }
+table.grid th { text-align: left; font-weight: 400; color: var(--ink-faint); padding: 3px 6px; border-bottom: 1px solid var(--line); }
+table.grid td { padding: 3px 6px; border-bottom: 1px solid rgba(255,255,255,.04); font-family: var(--mono); }
+table.grid td.w { color: var(--warn); font-family: inherit; }
+.swrow { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0 8px; }
+.swrow span { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(255,255,255,.15); }
+.swrow span.miss { outline: 2px solid var(--bad); outline-offset: 1px; }
+.opt { display: flex; align-items: flex-start; gap: 8px; margin: 6px 0; font-size: 12px; cursor: pointer; }
+.opt input { margin-top: 3px; }
+h4.mh {
+  margin: 14px 0 4px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim);
+}
+h4.mh:first-child { margin-top: 0; }
+
 #toast {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
   background: var(--panel-3); border: 1px solid var(--line); border-radius: 999px;
@@ -273,21 +357,56 @@ ul.warns li.info { color: var(--ink-dim); }
 
   <!-- ================= OBJECTS ================= -->
   <section class="view" id="view-objects" hidden>
-    <div class="placeholder"><div>
-      <h2>Objects arrive in phase 2</h2>
-      <p>A tree of objects &rarr; states &rarr; frames, filled by importing an
-        Aseprite sprite sheet and its JSON: tags become states, and frames are
-        read from the file rather than guessed from the sheet's size.</p>
-      <ul>
-        <li>One cell size, one palette and one bit depth per object.</li>
-        <li>One duration per state, as the engine stores it.</li>
-        <li>Any pixel not in the object's palette reported, with where it is.</li>
-        <li>An animated preview on the engine's 16&nbsp;ms tick, in panel colours.</li>
-        <li>The byte budget, live.</li>
-      </ul>
-      <p>Start with a palette: export it as <b>.gpl</b> and load it into Aseprite,
-        and the art drawn there will match it exactly.</p>
+    <aside class="side">
+      <div class="sidehead">Objects</div>
+      <div class="scroll" id="objList"></div>
+      <div class="sidefoot">
+        <button type="button" class="chip" id="objImport" title="Select an Aseprite sprite sheet: its .png and .json together">Import Aseprite&hellip;</button>
+      </div>
+    </aside>
+
+    <div class="placeholder" id="objEmpty" hidden><div>
+      <h2>No objects yet</h2>
+      <p>Objects come from Aseprite. The route that keeps colours exact:</p>
+      <ol>
+        <li>Make a palette in the <b>Palettes</b> tab, <b>Export .gpl</b>, and in
+          Aseprite load it with <b>&equiv;</b> (above the palette) &rarr; <b>Load Palette&hellip;</b></li>
+        <li>Draw, and tag each animation (<b>Frame &rarr; Tags</b>). Each tag becomes a
+          state; a file with no tags becomes one state named after the file.</li>
+        <li><b>File &rarr; Export Sprite Sheet</b>: on <b>Output</b>, tick <b>JSON Data</b>
+          (Hash or Array both work) and, under Meta, <b>Tags</b>. Leave Trim off and
+          choose any layout except Packed.</li>
+        <li><b>Import Aseprite&hellip;</b> here, and select the <b>.png</b> and the
+          <b>.json</b> together.</li>
+      </ol>
+      <p>Colours must match a palette exactly; if some do not, the import says which
+        and offers to add them &mdash; it never guesses a nearest colour.</p>
     </div></div>
+
+    <div class="objstage" id="objStage" hidden>
+      <div class="objbar">
+        <button type="button" class="chip" id="objPlay"></button>
+        <label>Zoom <select id="objZoom">
+          <option value="0">fit</option><option value="1">1&times;</option><option value="2">2&times;</option>
+          <option value="4">4&times;</option><option value="8">8&times;</option><option value="16">16&times;</option>
+          <option value="32">32&times;</option></select></label>
+        <label title="Pixels the sprite leaves empty. On the LED panel an unlit pixel is black.">Empty
+          <select id="objBg"><option value="black">black (panel off)</option><option value="checker">checker</option></select></label>
+        <label><input type="checkbox" id="objBox"> Collision box</label>
+        <label><input type="checkbox" id="objGrid"> Pixel grid</label>
+        <span id="objReadout"></span>
+      </div>
+      <div id="objCanvasWrap"><canvas id="objCanvas"></canvas></div>
+      <div id="objStrip"></div>
+    </div>
+
+    <aside class="side right" id="objInspector" hidden>
+      <div class="scroll">
+        <div class="sect" id="objSect"></div>
+        <div class="sect" id="stateSect"></div>
+        <div class="sect" id="budgetSect"></div>
+      </div>
+    </aside>
   </section>
 
   <!-- ================= PALETTES ================= -->
@@ -334,6 +453,12 @@ ul.warns li.info { color: var(--ink-dim); }
 
 </main>
 
+<div id="modal" hidden><div id="modalBox">
+  <h2 id="modalTitle"></h2>
+  <div id="modalBody"></div>
+  <div id="modalFoot"></div>
+</div></div>
+
 <div id="toast"></div>
 
 <script src="../../shared/storage.js"></script>
@@ -350,7 +475,9 @@ ul.warns li.info { color: var(--ink-dim); }
    lives only in this tool's own project file, so it can change without
    touching the engine.
 
-   PHASE 1 (this build): the tool shell, the project file, and palettes.
+   PHASE 1: the tool shell, the project file, and palettes.
+   PHASE 2: objects, states and frames, imported from Aseprite; the animated
+            preview on the engine's tick; the byte budget.
    ========================================================================== */
 
 var TOOL_ID = 'canvas';
@@ -510,7 +637,18 @@ function normProject(raw) {
     return out;
   });
 
-  p.objects = Array.isArray(raw.objects) ? p.objects : [];
+  var palIds = {};
+  p.palettes.forEach(function (q) { palIds[q.id] = true; });
+  var objNames = {};
+  p.objects = (Array.isArray(raw.objects) ? raw.objects : []).filter(function (o) {
+    return o && typeof o === 'object';
+  }).map(function (o) {
+    var obj = normObject(o, taken, palIds);
+    var base = obj.name, k = 2;
+    while (objNames[obj.name]) obj.name = base + '_' + (k++);
+    objNames[obj.name] = true;
+    return obj;
+  });
   return p;
 }
 
@@ -523,15 +661,16 @@ function newId(prefix, taken) {
 function allIds() {
   var t = {};
   project.palettes.forEach(function (q) { t[q.id] = true; });
+  project.objects.forEach(function (o) {
+    t[o.id] = true;
+    o.states.forEach(function (st) { t[st.id] = true; });
+  });
   return t;
 }
 
-var project;
-try {
-  project = normProject(store.get('project'));
-} catch (e) {
-  project = blankProject();
-}
+/* Replaced by the saved project at boot (bottom of this script), once every
+   helper normProject relies on has been defined. */
+var project = blankProject();
 
 /* UI state is a preference, not part of the document: kept apart from the
    project, so opening a file does not drag someone else's tab choice in. */
@@ -539,6 +678,12 @@ var ui = store.get('ui', {});
 if (!ui || typeof ui !== 'object') ui = {};
 ui.tab = ['scene', 'objects', 'palettes'].indexOf(ui.tab) >= 0 ? ui.tab : 'palettes';
 ui.col = typeof ui.col === 'number' ? ui.col : -1;
+ui.playing = ui.playing !== false;
+ui.zoom = [0, 1, 2, 4, 8, 16, 32].indexOf(ui.zoom) >= 0 ? ui.zoom : 0;
+ui.bg = ui.bg === 'checker' ? 'checker' : 'black';
+ui.showBox = ui.showBox !== false;
+ui.grid = !!ui.grid;
+ui.hold = -1;
 
 
 /* --------------------------------------------------------------------------
@@ -583,6 +728,7 @@ function redo() {
 
 function afterHistory(msg) {
   if (!findPalette(ui.pal)) ui.pal = project.palettes.length ? project.palettes[0].id : null;
+  if (!findObject(ui.obj)) { ui.obj = null; ui.state = null; }
   clampCol();
   changed();
   renderAll();
@@ -725,6 +871,12 @@ function addPalette(name, colors) {
 }
 
 function deletePalette(pal) {
+  var users = objectsUsing(pal.id);
+  if (users.length) {
+    toast('\u201c' + pal.name + '\u201d is used by ' + users.map(function (o) { return o.name; }).join(', ')
+      + '. Give ' + (users.length === 1 ? 'it' : 'them') + ' another palette first.');
+    return;
+  }
   if (!confirm('Delete the palette “' + pal.name + '”? (Undo brings it back.)')) return;
   snapshot();
   var i = project.palettes.indexOf(pal);
@@ -743,8 +895,12 @@ function addColour(pal) {
   // A new colour starts as a copy of the selected one, which is usually the
   // one you are about to make a shade of.
   var src = pal.colors[ui.col] || pal.colors[pal.colors.length - 1] || '#ffffff';
-  pal.colors.splice(ui.col >= 0 ? ui.col + 1 : pal.colors.length, 0, src);
-  ui.col = ui.col >= 0 ? ui.col + 1 : pal.colors.length - 1;
+  var at = ui.col >= 0 ? ui.col + 1 : pal.colors.length;
+  // Inserting shifts every later index up by one; the art follows, so it
+  // still shows the same colours.
+  remapPalette(pal.id, pal.colors.map(function (_, i) { return i < at ? i : i + 1; }));
+  pal.colors.splice(at, 0, src);
+  ui.col = at;
   saveUi();
   changed();
   renderPalettes();
@@ -752,7 +908,15 @@ function addColour(pal) {
 
 function deleteColour(pal, i) {
   if (i < 0 || i >= pal.colors.length) return;
+  var use = colourUse(pal.id, i);
+  if (use.length) {
+    toast('Colour ' + i + ' is drawn in ' + use.slice(0, 3).map(function (u) {
+      return u.obj.name + '/' + u.st.name + ' (' + u.n + ' px)';
+    }).join(', ') + (use.length > 3 ? ' and more' : '') + '. Recolour it instead, or remove it from the art.');
+    return;
+  }
   snapshot();
+  remapPalette(pal.id, pal.colors.map(function (_, j) { return j < i ? j : j === i ? -1 : j - 1; }));
   pal.colors.splice(i, 1);
   ui.col = Math.min(i, pal.colors.length - 1);
   saveUi();
@@ -763,6 +927,13 @@ function deleteColour(pal, i) {
 function moveColour(pal, from, to) {
   if (to < 0 || to >= pal.colors.length || from === to) return;
   snapshot();
+  // Reordering changes which index each colour has; the art is rewritten to
+  // match, so dragging a swatch never repaints a sprite.
+  var order = pal.colors.map(function (_, i) { return i; });
+  order.splice(to, 0, order.splice(from, 1)[0]);
+  var oldToNew = [];
+  order.forEach(function (oldIdx, newIdx) { oldToNew[oldIdx] = newIdx; });
+  remapPalette(pal.id, oldToNew);
   var c = pal.colors.splice(from, 1)[0];
   pal.colors.splice(to, 0, c);
   ui.col = to;
@@ -1113,7 +1284,7 @@ function renderPalActions() {
   var r2 = el('div', 'btnrow');
   r2.appendChild(btn('Export .gpl', function () {
     downloadText(slug(pal.name) + '.gpl', gplText(pal));
-    toast('Saved — load it in Aseprite from the palette menu');
+    toast('Saved \u2014 in Aseprite: \u2261 above the palette \u2192 Load Palette\u2026');
   }, null, !pal.colors.length, 'GIMP palette: Aseprite loads it directly'));
   r2.appendChild(btn('Export .hex', function () {
     downloadText(slug(pal.name) + '.hex', hexText(pal));
@@ -1124,8 +1295,14 @@ function renderPalActions() {
   r3.appendChild(btn('Delete palette', function () { deletePalette(pal); }, 'danger'));
   box.appendChild(r3);
 
-  box.appendChild(el('p', 'note', 'Exports write colours as stored. Draw in Aseprite with this '
-    + 'palette and phase 2’s import will match every pixel to its index.'));
+  var users = objectsUsing(pal.id);
+  if (users.length) {
+    box.appendChild(el('p', 'note', 'Used by ' + users.map(function (o) { return o.name; }).join(', ')
+      + '. Editing a colour recolours them; reordering or inserting keeps them looking the same.'));
+  }
+  box.appendChild(el('p', 'note', 'Exports write colours as stored. Load the .gpl in Aseprite '
+    + '(\u2261 above the palette \u2192 Load Palette\u2026), draw with it, and the import matches every '
+    + 'pixel to its index.'));
 }
 
 function slug(s) {
@@ -1236,6 +1413,1078 @@ sceneField('sceneW', function (n, v) { n[1].w = intIn(v, 1, MAX_SCENE, n[1].w); 
 sceneField('sceneH', function (n, v) { n[1].h = intIn(v, 1, MAX_SCENE, n[1].h); });
 
 
+/* ==========================================================================
+   Objects (phase 2)
+   ==========================================================================
+   An object is one sprite: one cell size, one palette, and states that each
+   hold frames. Frames are stored as PALETTE INDICES, as the engine stores
+   them -- not as colours -- so:
+     - editing a palette colour recolours every sprite drawn with it;
+     - pointing an object at another palette previews a palette swap;
+     - the Palettes tab rewrites the art when it reorders or inserts
+       colours, so dragging a swatch never repaints anything.
+
+   Storage: one Uint16 per pixel, little-endian, base64. 0xFFFF is "no
+   pixel". Two bytes rather than one so a 256-colour palette never has to
+   give up an index to mean transparent.
+   -------------------------------------------------------------------------- */
+var TRANSPARENT = 0xFFFF;
+var TICK_MS = 16;            // the display samples on a ~16 ms tick (image-format.md)
+var DIRECTIONS = ['forward', 'reverse', 'pingpong', 'pingpong_reverse'];
+// Names a state cannot have: <obj>_<name> or <OBJ>_<NAME> would collide
+// with a symbol the header already defines.
+var RESERVED = { palette: 'the palette array', states: 'the state table',
+  state_count: 'the state count', cell_w: 'the cell width', cell_h: 'the cell height',
+  box_w: 'the box width', box_h: 'the box height' };
+// sizeof(Image) on the ESP32 (32-bit pointers): data 4 + palette 4 + four
+// uint16 fields 8 + three uint8 3 + 1 padding + frame_ms 2 = 22, rounded up
+// to 4-byte alignment = 24. Plus one pointer per state in <obj>_states[].
+var IMAGE_STRUCT_BYTES = 24;
+var TABLE_ENTRY_BYTES = 4;
+
+function isObj(v) { return v && typeof v === 'object'; }
+
+function encodeFrame(px) {
+  var bytes = new Uint8Array(px.length * 2);
+  for (var i = 0; i < px.length; i++) { bytes[2 * i] = px[i] & 255; bytes[2 * i + 1] = px[i] >> 8; }
+  var s = '';
+  for (var j = 0; j < bytes.length; j += 0x8000) {
+    s += String.fromCharCode.apply(null, bytes.subarray(j, j + 0x8000));
+  }
+  return btoa(s);
+}
+
+// Decoded frames are cached by their string. Callers must not modify the
+// array they get back -- anything that changes pixels builds a new one.
+var frameCache = new Map();
+function decodeFrame(str) {
+  var hit = frameCache.get(str);
+  if (hit) return hit;
+  var s = atob(str), px = new Uint16Array(s.length >> 1);
+  for (var i = 0; i < px.length; i++) px[i] = s.charCodeAt(2 * i) | (s.charCodeAt(2 * i + 1) << 8);
+  if (frameCache.size > 500) frameCache.clear();
+  frameCache.set(str, px);
+  return px;
+}
+
+/* ---- names: every one becomes part of a C symbol ---- */
+function cName(v) {
+  var n = String(v == null ? '' : v).trim().toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  if (!n) n = 'unnamed';
+  if (/^[0-9]/.test(n)) n = 'n' + n;
+  return n.slice(0, 40);
+}
+
+function stateNameProblem(obj, st, name) {
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) return 'Lower-case letters, digits and _ only.';
+  if (RESERVED[name]) return '“' + name + '” would collide with ' + RESERVED[name] + ' in the header.';
+  if (/_data$/.test(name)) return 'A name ending in _data collides with a state’s pixel array.';
+  if (obj.states.some(function (x) { return x !== st && x.name === name; })) return 'Another state already has this name.';
+  return null;
+}
+
+function objectNameProblem(obj, name) {
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) return 'Lower-case letters, digits and _ only.';
+  if (project.objects.some(function (o) { return o !== obj && o.name === name; })) return 'Another object already has this name.';
+  return null;
+}
+
+function freeStateName(obj, want) {
+  var base = cName(want);
+  if (RESERVED[base] || /_data$/.test(base)) base = base + '_state';
+  var name = base, k = 2;
+  while (obj.states.some(function (x) { return x.name === name; })) name = base + '_' + (k++);
+  return name;
+}
+
+function freeObjectName(want, except) {
+  var base = cName(want), name = base, k = 2;
+  while (project.objects.some(function (o) { return o !== except && o.name === name; })) name = base + '_' + (k++);
+  return name;
+}
+
+function normObject(raw, taken, palIds) {
+  var o = JSON.parse(JSON.stringify(raw));
+  o.id = (typeof raw.id === 'string' && raw.id && !taken[raw.id]) ? raw.id : newId('obj', taken);
+  taken[o.id] = true;
+  o.name = cName(raw.name);
+  o.w = intIn(raw.w, 1, MAX_CAMERA, 8);
+  o.h = intIn(raw.h, 1, MAX_CAMERA, 8);
+  o.palette = (typeof raw.palette === 'string' && palIds[raw.palette]) ? raw.palette : null;
+  var b = isObj(raw.box) ? raw.box : {};
+  o.box = { x: intIn(b.x, -MAX_CAMERA, MAX_CAMERA, 0), y: intIn(b.y, -MAX_CAMERA, MAX_CAMERA, 0),
+            w: intIn(b.w, 0, MAX_CAMERA, o.w), h: intIn(b.h, 0, MAX_CAMERA, o.h) };
+  var need = o.w * o.h, names = {};
+  o.states = (Array.isArray(raw.states) ? raw.states : []).filter(isObj).map(function (r) {
+    var st = JSON.parse(JSON.stringify(r));
+    st.id = (typeof r.id === 'string' && r.id && !taken[r.id]) ? r.id : newId('st', taken);
+    taken[st.id] = true;
+    var nm = cName(r.name), base = nm, k = 2;
+    while (names[nm]) nm = base + '_' + (k++);
+    names[nm] = true;
+    st.name = nm;
+    st.ms = intIn(r.ms, 0, 65535, 100);
+    st.loop = r.loop !== false;
+    st.direction = DIRECTIONS.indexOf(r.direction) >= 0 ? r.direction : 'forward';
+    st.frames = (Array.isArray(r.frames) ? r.frames : []).filter(function (f) {
+      try { return typeof f === 'string' && decodeFrame(f).length === need; } catch (e) { return false; }
+    });
+    st.frameMs = Array.isArray(r.frameMs) ? r.frameMs.map(function (v) { return intIn(v, 0, 65535, st.ms); }) : [];
+    return st;
+  }).filter(function (st) { return st.frames.length; });
+  return o;
+}
+
+/* ---- queries ---- */
+function findObject(id) {
+  for (var i = 0; i < project.objects.length; i++) if (project.objects[i].id === id) return project.objects[i];
+  return null;
+}
+function currentObject() { return findObject(ui.obj); }
+function currentState() {
+  var o = currentObject();
+  if (!o) return null;
+  for (var i = 0; i < o.states.length; i++) if (o.states[i].id === ui.state) return o.states[i];
+  return null;
+}
+function objectsUsing(palId) { return project.objects.filter(function (o) { return o.palette === palId; }); }
+
+function objTransparent(o) {
+  return o.states.some(function (st) {
+    return st.frames.some(function (f) { return decodeFrame(f).indexOf(TRANSPARENT) >= 0; });
+  });
+}
+
+function maxIndex(o) {
+  var m = -1;
+  o.states.forEach(function (st) {
+    st.frames.forEach(function (f) {
+      var px = decodeFrame(f);
+      for (var i = 0; i < px.length; i++) if (px[i] !== TRANSPARENT && px[i] > m) m = px[i];
+    });
+  });
+  return m;
+}
+
+// Which pixels use palette index idx: [{ obj, st, n }].
+function colourUse(palId, idx) {
+  var out = [];
+  objectsUsing(palId).forEach(function (o) {
+    o.states.forEach(function (st) {
+      var n = 0;
+      st.frames.forEach(function (f) {
+        var px = decodeFrame(f);
+        for (var i = 0; i < px.length; i++) if (px[i] === idx) n++;
+      });
+      if (n) out.push({ obj: o, st: st, n: n });
+    });
+  });
+  return out;
+}
+
+// Rewrite every object drawn with this palette: old index -> oldToNew[old].
+function remapPalette(palId, oldToNew) {
+  objectsUsing(palId).forEach(function (o) {
+    o.states.forEach(function (st) {
+      st.frames = st.frames.map(function (f) {
+        var px = decodeFrame(f), out = new Uint16Array(px.length);
+        for (var i = 0; i < px.length; i++) out[i] = px[i] === TRANSPARENT ? TRANSPARENT : oldToNew[px[i]];
+        return encodeFrame(out);
+      });
+    });
+  });
+}
+
+/* The engine plays frames forward only, so reverse and ping-pong tags are
+   expanded into forward frames at export (image-format.md). This is that
+   expansion, used by the preview and the budget so both show what the
+   device will do. Ping-pong visits each end once: 0 1 2 3 2 1. */
+function playOrder(st) {
+  var n = st.frames.length, out = [], i;
+  if (st.direction === 'reverse') { for (i = n - 1; i >= 0; i--) out.push(i); }
+  else if (st.direction === 'pingpong') {
+    for (i = 0; i < n; i++) out.push(i);
+    for (i = n - 2; i >= 1; i--) out.push(i);
+  } else if (st.direction === 'pingpong_reverse') {
+    for (i = n - 1; i >= 0; i--) out.push(i);
+    for (i = 1; i <= n - 2; i++) out.push(i);
+  } else { for (i = 0; i < n; i++) out.push(i); }
+  return out;
+}
+
+/* Transparency is read from the art, not switched on: any pixel an import
+   found below alpha 128 makes it an object with a transparent slot. All
+   states share one palette, so the slot is the whole object's. */
+function objDepth(o) {
+  var pal = findPalette(o.palette);
+  var n = pal ? pal.colors.length : 0, t = objTransparent(o);
+  var slots = n + (t ? 1 : 0);
+  return { n: n, t: t, slots: slots, bpp: bppFor(slots), bumps: t && bppFor(n) && bppFor(slots) > bppFor(n) };
+}
+
+function objBudget(o) {
+  var d = objDepth(o);
+  if (!d.bpp) return { d: d };
+  var perFrame = frameBytes(o.w, o.h, d.bpp);
+  var rows = o.states.map(function (st) {
+    var n = playOrder(st).length;
+    return { st: st, frames: n, bytes: perFrame * n };
+  });
+  var pixels = rows.reduce(function (a, r) { return a + r.bytes; }, 0);
+  var pal = paletteBytes(d.bpp);
+  var meta = o.states.length * (IMAGE_STRUCT_BYTES + TABLE_ENTRY_BYTES);
+  return { d: d, perFrame: perFrame, rows: rows, pixels: pixels, pal: pal, meta: meta, total: pixels + pal + meta };
+}
+
+function stateFlags(o, st) {
+  var f = [];
+  if (stateNameProblem(o, st, st.name)) f.push('name');
+  if (st.frames.length > 1 && st.ms > 0 && st.ms < 17) f.push('too fast');
+  if (!st.loop && st.frames.length > 1) f.push('play once');
+  return f;
+}
+
+
+/* ---- rendering: list ---- */
+function renderObjList() {
+  var box = $('objList');
+  box.innerHTML = '';
+  if (!project.objects.length) { box.appendChild(el('div', 'empty-note', 'No objects yet.')); return; }
+  project.objects.forEach(function (o) {
+    var d = objDepth(o);
+    var row = el('div', 'orow' + (o.id === ui.obj ? ' sel' : ''));
+    row.appendChild(el('span', 'nm', o.name));
+    row.appendChild(el('span', 'tag', o.w + '×' + o.h + ' · ' + (d.bpp ? d.bpp + ' bpp' : 'no palette')));
+    row.onclick = function () { selectObject(o, o.states[0]); };
+    box.appendChild(row);
+    o.states.forEach(function (st) {
+      var sr = el('div', 'srow' + (st.id === ui.state && o.id === ui.obj ? ' sel' : ''));
+      sr.appendChild(el('span', 'nm', st.name));
+      var flags = stateFlags(o, st);
+      if (flags.length) { var fl = el('span', 'flag', '⚠'); fl.title = flags.join(', '); sr.appendChild(fl); }
+      sr.appendChild(el('span', 'tag', st.frames.length + (st.frames.length === 1 ? ' frame' : ' frames')
+        + (st.frames.length > 1 ? ' · ' + st.ms + ' ms' : '')));
+      sr.onclick = function () { selectObject(o, st); };
+      box.appendChild(sr);
+    });
+  });
+}
+
+function selectObject(o, st) {
+  ui.obj = o ? o.id : null;
+  ui.state = st ? st.id : null;
+  ui.hold = -1;
+  animStart = performance.now();
+  saveUi();
+  renderObjects();
+}
+
+
+/* ---- rendering: the preview ---- */
+var animStart = performance.now();
+var rafId = 0;
+var scratch = document.createElement('canvas');
+
+// image_frame_at() in image.h, sampled on the display's tick: the elapsed
+// time is floored to a multiple of 16 ms before the same divide and modulo.
+function frameAt(st) {
+  var order = playOrder(st);
+  if (ui.hold >= 0 && ui.hold < st.frames.length) return ui.hold;
+  if (order.length <= 1 || !st.ms) return order[0] || 0;
+  var elapsed = Math.floor((performance.now() - animStart) / TICK_MS) * TICK_MS;
+  return order[Math.floor(elapsed / st.ms) % order.length];
+}
+
+function frameImage(o, px) {
+  var pal = findPalette(o.palette);
+  var cols = pal ? pal.colors.map(function (h) { return hexToRgb(panelOf(h).hex); }) : [];
+  var img = new ImageData(o.w, o.h), d = img.data;
+  for (var i = 0; i < px.length; i++) {
+    var v = px[i], k = i * 4;
+    if (v === TRANSPARENT) { d[k + 3] = 0; continue; }
+    var c = cols[v] || [255, 0, 255];            // an index the palette lacks: loud, not silent
+    d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2]; d[k + 3] = 255;
+  }
+  return img;
+}
+
+function drawFrameTo(g, o, px, x, y, k) {
+  scratch.width = o.w; scratch.height = o.h;
+  scratch.getContext('2d').putImageData(frameImage(o, px), 0, 0);
+  g.imageSmoothingEnabled = false;
+  g.drawImage(scratch, x, y, o.w * k, o.h * k);
+}
+
+function drawObj() {
+  if (ui.tab !== 'objects') return;
+  var o = currentObject(), st = currentState(), cv = $('objCanvas');
+  if (!o || !st) return;
+  var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  var W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  var g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#101016';
+  g.fillRect(0, 0, W, H);
+
+  // Whole screen pixels per sprite pixel, always: a fractional scale smears
+  // pixel art, and this preview exists to show it exactly.
+  var fit = Math.max(1, Math.floor(Math.min((W - 40) / o.w, (H - 40) / o.h)));
+  var k = ui.zoom > 0 ? ui.zoom : fit;
+  var x0 = Math.round((W - o.w * k) / 2), y0 = Math.round((H - o.h * k) / 2);
+
+  if (ui.bg === 'checker') {
+    var q = k >= 6 ? k : Math.max(2, 6 - (6 % k || 0));
+    for (var yy = 0; yy < o.h * k; yy += q) {
+      for (var xx = 0; xx < o.w * k; xx += q) {
+        g.fillStyle = ((xx / q + yy / q) & 1) ? '#3a3a48' : '#26262f';
+        g.fillRect(x0 + xx, y0 + yy, Math.min(q, o.w * k - xx), Math.min(q, o.h * k - yy));
+      }
+    }
+  } else {
+    g.fillStyle = '#000000';
+    g.fillRect(x0, y0, o.w * k, o.h * k);
+  }
+
+  var fi = frameAt(st);
+  drawFrameTo(g, o, decodeFrame(st.frames[fi]), x0, y0, k);
+
+  g.strokeStyle = '#33333f';
+  g.lineWidth = 1;
+  g.strokeRect(x0 - 0.5, y0 - 0.5, o.w * k + 1, o.h * k + 1);
+
+  if (ui.grid && k >= 4) {
+    g.strokeStyle = 'rgba(255,255,255,0.08)';
+    g.beginPath();
+    for (var gx = 1; gx < o.w; gx++) { g.moveTo(x0 + gx * k + 0.5, y0); g.lineTo(x0 + gx * k + 0.5, y0 + o.h * k); }
+    for (var gy = 1; gy < o.h; gy++) { g.moveTo(x0, y0 + gy * k + 0.5); g.lineTo(x0 + o.w * k, y0 + gy * k + 0.5); }
+    g.stroke();
+  }
+
+  if (ui.showBox && o.box.w > 0 && o.box.h > 0) {
+    g.strokeStyle = '#ff5e6c';
+    g.lineWidth = Math.max(1, Math.min(2, k / 4));
+    g.setLineDash([Math.max(3, k / 2), Math.max(2, k / 3)]);
+    var inset = g.lineWidth / 2;
+    g.strokeRect(x0 + o.box.x * k + inset, y0 + o.box.y * k + inset, o.box.w * k - inset * 2, o.box.h * k - inset * 2);
+    g.setLineDash([]);
+  }
+
+  $('objReadout').textContent = st.name + ' · frame ' + fi + ' of ' + st.frames.length
+    + ' · ' + k + '×' + (ui.hold >= 0 ? ' · held' : '');
+  Array.prototype.forEach.call(document.querySelectorAll('#objStrip .fthumb'), function (t) {
+    t.classList.toggle('on', +t.getAttribute('data-i') === fi);
+  });
+}
+
+function animLoop() {
+  rafId = 0;
+  if (ui.tab !== 'objects' || !ui.playing) return;
+  drawObj();
+  rafId = requestAnimationFrame(animLoop);
+}
+function startAnim() { if (!rafId && ui.playing && ui.tab === 'objects') rafId = requestAnimationFrame(animLoop); }
+function stopAnim() { if (rafId) cancelAnimationFrame(rafId); rafId = 0; }
+
+if (window.ResizeObserver) new ResizeObserver(function () { drawObj(); }).observe($('objCanvasWrap'));
+
+function renderStrip() {
+  var box = $('objStrip'), o = currentObject(), st = currentState();
+  box.innerHTML = '';
+  if (!o || !st) return;
+  var k = Math.max(1, Math.floor(48 / Math.max(o.w, o.h)));
+  st.frames.forEach(function (f, i) {
+    var t = el('div', 'fthumb');
+    t.setAttribute('data-i', String(i));
+    var c = document.createElement('canvas');
+    c.width = o.w * k; c.height = o.h * k;
+    var g = c.getContext('2d');
+    g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+    drawFrameTo(g, o, decodeFrame(f), 0, 0, k);
+    t.appendChild(c);
+    t.appendChild(el('span', null, String(i)));
+    t.title = 'Frame ' + i + (st.frameMs[i] != null ? ' · ' + st.frameMs[i] + ' ms in Aseprite' : '') + ' — click to hold';
+    t.onclick = function () { ui.hold = i; ui.playing = false; syncPlay(); drawObj(); };
+    box.appendChild(t);
+  });
+  var order = playOrder(st);
+  if (st.direction !== 'forward' && st.frames.length > 1) {
+    box.appendChild(el('span', 'order', 'plays ' + order.join(' ') + ' → ' + order.length + ' frames exported'));
+  }
+}
+
+function syncPlay() {
+  $('objPlay').innerHTML = ui.playing ? '&#10074;&#10074; Pause' : '&#9654; Play';
+  if (ui.playing) startAnim(); else stopAnim();
+}
+
+
+/* ---- rendering: the inspector ---- */
+function numInput(value, min, max, onset) {
+  var i = document.createElement('input');
+  i.type = 'number'; i.className = 'num'; i.value = value; i.min = min; i.max = max; i.step = 1;
+  i.onchange = function () { onset(i); };
+  i.onkeydown = function (e) { if (e.key === 'Enter') i.blur(); };
+  return i;
+}
+
+function renderObjSect() {
+  var box = $('objSect'), o = currentObject();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Object'));
+  if (!o) return;
+
+  var name = document.createElement('input');
+  name.type = 'text'; name.className = 'text wide'; name.value = o.name; name.spellcheck = false; name.maxLength = 40;
+  name.onchange = function () {
+    var v = cName(name.value), why = objectNameProblem(o, v);
+    if (why) { toast(why); name.value = o.name; return; }
+    if (v === o.name) { name.value = v; return; }
+    snapshot(); o.name = v; changed(); renderObjects();
+  };
+  name.onkeydown = function (e) { if (e.key === 'Enter') name.blur(); };
+  box.appendChild(name);
+  box.appendChild(el('p', 'note', 'Every symbol in the header starts with this: '
+    + o.name + '_palette, ' + o.name.toUpperCase() + '_STATE_COUNT…'));
+
+  var t = el('table', 'kv');
+  function kv(a, b) { var tr = el('tr'); tr.appendChild(el('td', null, a)); tr.appendChild(el('td', null, b)); t.appendChild(tr); }
+  kv('Cell', o.w + ' × ' + o.h + ' px');
+  if (o.source) kv('Imported from', o.source);
+  box.appendChild(t);
+
+  // Palette: switching recolours by index -- a palette swap, previewed.
+  box.appendChild(el('span', 'lbl', 'Palette'));
+  var need = maxIndex(o) + 1;
+  var sel = document.createElement('select');
+  sel.className = 'sel2';
+  if (!o.palette) { var none = el('option', null, '— choose —'); none.value = ''; sel.appendChild(none); }
+  project.palettes.forEach(function (pal) {
+    var op = el('option', null, pal.name + ' (' + pal.colors.length + ')');
+    op.value = pal.id;
+    if (pal.colors.length < need) { op.disabled = true; op.textContent += ' — needs ' + need; }
+    sel.appendChild(op);
+  });
+  sel.value = o.palette || '';
+  sel.onchange = function () {
+    if (!sel.value || sel.value === o.palette) return;
+    snapshot(); o.palette = sel.value; changed(); renderObjects();
+  };
+  box.appendChild(sel);
+  box.appendChild(el('p', 'note', 'The art stores indices, so another palette with the same order '
+    + 'recolours it — exactly what a palette swap will do.'));
+
+  var d = objDepth(o);
+  box.appendChild(el('span', 'lbl', 'Bit depth'));
+  box.appendChild(el('p', 'note', d.n + ' colour' + (d.n === 1 ? '' : 's')
+    + (d.t ? ' + transparent = ' + d.slots + ' slots' : ', no transparent pixels')
+    + (d.bpp ? ' → ' + d.bpp + ' bpp' : '')));
+  if (d.bumps) box.appendChild(el('p', 'note warn', 'Transparency pushes this sprite from ' + bppFor(d.n)
+    + ' to ' + d.bpp + ' bpp — ' + (d.bpp / bppFor(d.n)) + '× the size.'));
+  if (!d.bpp && o.palette) box.appendChild(el('p', 'note bad', 'Too many colours: 256 slots is the most an image has.'));
+
+  // The collision box: exported as <OBJ>_BOX_W/H, anchored at the cell's top-left.
+  box.appendChild(el('span', 'lbl', 'Collision box'));
+  var grid = el('div', 'boxgrid');
+  ['x', 'y', 'w', 'h'].forEach(function (key) {
+    var cell = el('div');
+    cell.appendChild(el('label', null, key));
+    cell.appendChild(numInput(o.box[key], key === 'x' || key === 'y' ? -MAX_CAMERA : 0, MAX_CAMERA, function (inp) {
+      var v = intIn(inp.value, key === 'x' || key === 'y' ? -MAX_CAMERA : 0, MAX_CAMERA, o.box[key]);
+      if (v === o.box[key]) { inp.value = v; return; }
+      snapshot(); o.box[key] = v; changed(); renderObjSect(); drawObj();
+    }));
+    grid.appendChild(cell);
+  });
+  box.appendChild(grid);
+  if (o.box.x || o.box.y) {
+    box.appendChild(el('p', 'note warn', 'The engine has no box offset yet: it will use ' + o.box.w + '×'
+      + o.box.h + ' at the cell’s top-left, not where it is drawn here.'));
+  }
+  if (!o.box.w || !o.box.h) box.appendChild(el('p', 'note warn', 'A box with no width or height collides with nothing.'));
+  if (o.box.x < 0 || o.box.y < 0 || o.box.x + o.box.w > o.w || o.box.y + o.box.h > o.h) {
+    box.appendChild(el('p', 'note', 'The box reaches outside the cell.'));
+  }
+  var br = el('div', 'btnrow');
+  var reset = el('button', 'chip', 'Box = whole cell');
+  reset.type = 'button';
+  reset.disabled = o.box.x === 0 && o.box.y === 0 && o.box.w === o.w && o.box.h === o.h;
+  reset.onclick = function () { snapshot(); o.box = { x: 0, y: 0, w: o.w, h: o.h }; changed(); renderObjSect(); drawObj(); };
+  var del = el('button', 'chip danger', 'Delete object');
+  del.type = 'button';
+  del.onclick = function () {
+    if (!confirm('Delete “' + o.name + '”? (Undo brings it back.)')) return;
+    snapshot();
+    var i = project.objects.indexOf(o);
+    project.objects.splice(i, 1);
+    var next = project.objects[Math.min(i, project.objects.length - 1)];
+    changed();
+    selectObject(next || null, next ? next.states[0] : null);
+  };
+  br.appendChild(reset); br.appendChild(del);
+  box.appendChild(br);
+}
+
+function renderStateSect() {
+  var box = $('stateSect'), o = currentObject(), st = currentState();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'State'));
+  if (!o || !st) return;
+  var idx = o.states.indexOf(st);
+
+  var name = document.createElement('input');
+  name.type = 'text'; name.className = 'text wide'; name.value = st.name; name.spellcheck = false; name.maxLength = 40;
+  name.onchange = function () {
+    var v = cName(name.value), why = stateNameProblem(o, st, v);
+    if (why) { toast(why); name.value = st.name; return; }
+    if (v === st.name) { name.value = v; return; }
+    snapshot(); st.name = v; changed(); renderObjects();
+  };
+  name.onkeydown = function (e) { if (e.key === 'Enter') name.blur(); };
+  box.appendChild(name);
+  var why = stateNameProblem(o, st, st.name);
+  if (why) box.appendChild(el('p', 'note bad', why));
+
+  // The enum follows this order, so moving a state renumbers it.
+  var er = el('div', 'btnrow');
+  er.appendChild(el('span', 'enum', o.name.toUpperCase() + '_' + st.name.toUpperCase() + ' = ' + idx));
+  var up = el('button', 'chip', '▲'); up.type = 'button'; up.disabled = idx === 0; up.title = 'Earlier in the enum';
+  var dn = el('button', 'chip', '▼'); dn.type = 'button'; dn.disabled = idx === o.states.length - 1; dn.title = 'Later in the enum';
+  up.style.flex = dn.style.flex = '0 0 34px';
+  up.onclick = function () { snapshot(); o.states.splice(idx - 1, 0, o.states.splice(idx, 1)[0]); changed(); renderObjects(); };
+  dn.onclick = function () { snapshot(); o.states.splice(idx + 1, 0, o.states.splice(idx, 1)[0]); changed(); renderObjects(); };
+  er.appendChild(up); er.appendChild(dn);
+  box.appendChild(er);
+  box.appendChild(el('p', 'note', 'The enum follows this order; code should name states, never number them.'));
+
+  var multi = st.frames.length > 1;
+  box.appendChild(el('span', 'lbl', 'Duration per frame'));
+  var row = el('div', 'pickrow');
+  row.appendChild(numInput(st.ms, 1, 65535, function (inp) {
+    var v = intIn(inp.value, 1, 65535, st.ms);
+    if (v === st.ms) { inp.value = v; return; }
+    snapshot(); st.ms = v; changed(); animStart = performance.now(); renderObjList(); renderStateSect();
+  }));
+  row.appendChild(el('span', 'small', 'ms'));
+  box.appendChild(row);
+  if (!multi) box.appendChild(el('p', 'note', 'One frame: exported as a still image (frame_ms = 0).'));
+  if (multi && st.ms < 17) box.appendChild(el('p', 'note warn', 'Under the ~16 ms display tick: some frames may never be seen.'));
+  var distinct = st.frameMs.filter(function (v, i, a) { return a.indexOf(v) === i; });
+  if (distinct.length > 1) {
+    box.appendChild(el('p', 'note warn', 'Aseprite gave these frames different durations (' + distinct.join(', ')
+      + ' ms). The engine stores one per state, so every frame uses ' + st.ms + ' ms.'));
+  }
+
+  if (multi) {
+    box.appendChild(el('span', 'lbl', 'Playback'));
+    var dir = document.createElement('select');
+    dir.className = 'sel2';
+    [['forward', 'Forward'], ['reverse', 'Reverse'], ['pingpong', 'Ping-pong'], ['pingpong_reverse', 'Ping-pong, reverse']]
+      .forEach(function (p) { var op = el('option', null, p[1]); op.value = p[0]; dir.appendChild(op); });
+    dir.value = st.direction;
+    dir.onchange = function () { snapshot(); st.direction = dir.value; changed(); animStart = performance.now(); renderObjects(); };
+    box.appendChild(dir);
+    var order = playOrder(st);
+    if (st.direction !== 'forward') {
+      box.appendChild(el('p', 'note', 'The engine plays forward only, so this is exported as '
+        + order.length + ' frames: ' + order.join(' ') + '. It costs flash, not code.'));
+    }
+    var lp = el('label', 'check');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = st.loop;
+    cb.onchange = function () { snapshot(); st.loop = cb.checked; changed(); renderObjList(); renderStateSect(); };
+    lp.appendChild(cb); lp.appendChild(document.createTextNode('Loop'));
+    box.appendChild(lp);
+    if (!st.loop) {
+      box.appendChild(el('p', 'note warn', 'The engine has no play-once yet (no ANIM_ONCE), so on the '
+        + 'device this loops — and so does this preview. Kept so the export can follow when it lands.'));
+    }
+  }
+
+  if (o.states.length > 1) {
+    var dr = el('div', 'btnrow');
+    var del = el('button', 'chip danger', 'Delete state');
+    del.type = 'button';
+    del.onclick = function () {
+      if (!confirm('Delete the state “' + st.name + '”? (Undo brings it back.)')) return;
+      snapshot();
+      o.states.splice(idx, 1);
+      changed();
+      selectObject(o, o.states[Math.min(idx, o.states.length - 1)]);
+    };
+    dr.appendChild(del);
+    box.appendChild(dr);
+  }
+}
+
+function renderBudget() {
+  var box = $('budgetSect'), o = currentObject();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Flash budget'));
+  if (!o) return;
+  var b = objBudget(o);
+  if (!b.d.bpp) { box.appendChild(el('p', 'note', o.palette ? 'Too many colours to store.' : 'Choose a palette to see the cost.')); return; }
+  var t = el('table', 'cost');
+  var hr = el('tr');
+  ['state', 'frames', 'bytes'].forEach(function (x) { hr.appendChild(el('th', null, x)); });
+  t.appendChild(hr);
+  b.rows.forEach(function (r) {
+    var tr = el('tr');
+    tr.appendChild(el('td', null, r.st.name));
+    tr.appendChild(el('td', null, String(r.frames)));
+    tr.appendChild(el('td', null, bytesLabel(r.bytes)));
+    t.appendChild(tr);
+  });
+  function line(a, v, cls) { var tr = el('tr'); tr.appendChild(el('td', cls || null, a)); tr.appendChild(el('td')); tr.appendChild(el('td', cls || null, v)); t.appendChild(tr); }
+  line('palette (' + (1 << b.d.bpp) + ' × 2 B)', bytesLabel(b.pal));
+  line(o.states.length + ' Image + table', bytesLabel(b.meta));
+  line('total', bytesLabel(b.total), 'up');
+  box.appendChild(t);
+  box.appendChild(el('p', 'note', b.perFrame + ' B per frame at ' + b.d.bpp + ' bpp: each row is rounded up to whole bytes, '
+    + 'as the engine stores it. Descriptors assume the ESP32’s 32-bit pointers (24 B per Image, 4 B per table entry).'));
+}
+
+function renderObjects() {
+  var has = project.objects.length > 0;
+  if (has && !currentObject()) { ui.obj = project.objects[0].id; ui.state = null; }
+  var o = currentObject();
+  if (o && !currentState()) ui.state = o.states.length ? o.states[0].id : null;
+  $('objEmpty').hidden = has;
+  $('objStage').hidden = !has;
+  $('objInspector').hidden = !has;
+  renderObjList();
+  if (!has) { stopAnim(); return; }
+  $('objZoom').value = String(ui.zoom);
+  $('objBg').value = ui.bg;
+  $('objBox').checked = ui.showBox;
+  $('objGrid').checked = ui.grid;
+  renderObjSect();
+  renderStateSect();
+  renderBudget();
+  renderStrip();
+  syncPlay();
+  drawObj();
+}
+
+$('objPlay').onclick = function () {
+  ui.playing = !ui.playing;
+  if (ui.playing) { ui.hold = -1; animStart = performance.now(); }
+  saveUi(); syncPlay(); drawObj();
+};
+$('objZoom').onchange = function () { ui.zoom = +this.value; saveUi(); drawObj(); };
+$('objBg').onchange = function () { ui.bg = this.value; saveUi(); drawObj(); };
+$('objBox').onchange = function () { ui.showBox = this.checked; saveUi(); drawObj(); };
+$('objGrid').onchange = function () { ui.grid = this.checked; saveUi(); drawObj(); };
+
+
+/* --------------------------------------------------------------------------
+   Aseprite import
+   --------------------------------------------------------------------------
+   Reads File -> Export Sprite Sheet output: the PNG and its JSON, in either
+   JSON layout (Array or Hash). The JSON is the authority on where every frame
+   is -- a grid is never guessed from the sheet's size, because the hero
+   sheet divides evenly both ways and was once read 8 wide instead of 4.
+
+   Pixels are read with colour management OFF. A PNG can carry a colour
+   profile, and a browser applying it would shift every colour by a little --
+   enough that none would match the palette exactly.
+   -------------------------------------------------------------------------- */
+function readPixels(file) {
+  return createImageBitmap(file, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }).then(function (bmp) {
+    var c = document.createElement('canvas');
+    c.width = bmp.width; c.height = bmp.height;
+    var g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0);
+    return { w: bmp.width, h: bmp.height, data: g.getImageData(0, 0, bmp.width, bmp.height).data };
+  });
+}
+
+function parseAse(json, jsonName) {
+  if (!isObj(json) || !json.frames || !isObj(json.meta)) {
+    throw new Error(jsonName + ' is not an Aseprite sprite-sheet JSON (it has no frames and meta).');
+  }
+  var list = Array.isArray(json.frames) ? json.frames : Object.keys(json.frames).map(function (k) {
+    var f = json.frames[k], c = {};
+    for (var key in f) c[key] = f[key];
+    c.filename = k;
+    return c;
+  });
+  if (!list.length) throw new Error(jsonName + ' lists no frames.');
+  var frames = list.map(function (f, i) {
+    if (!isObj(f) || !isObj(f.frame)) throw new Error('Frame ' + i + ' in ' + jsonName + ' has no rectangle.');
+    if (f.rotated) {
+      throw new Error('This sheet has rotated frames, which only a Packed sheet produces. '
+        + 'Export again with another sheet type (By Rows, Horizontal…).');
+    }
+    var fr = f.frame;
+    var sss = isObj(f.spriteSourceSize) ? f.spriteSourceSize : { x: 0, y: 0 };
+    var src = isObj(f.sourceSize) ? f.sourceSize : { w: fr.w, h: fr.h };
+    return { x: fr.x | 0, y: fr.y | 0, w: fr.w | 0, h: fr.h | 0, ox: sss.x | 0, oy: sss.y | 0,
+             cw: src.w | 0, ch: src.h | 0, ms: intIn(f.duration, 0, 65535, 100) };
+  });
+  var cw = frames[0].cw, ch = frames[0].ch;
+  if (frames.some(function (f) { return f.cw !== cw || f.ch !== ch; })) {
+    throw new Error('The frames are different sizes. Every state of an object shares one cell size, as the engine requires.');
+  }
+  var hasTagList = Array.isArray(json.meta.frameTags);
+  var tags = (hasTagList ? json.meta.frameTags : []).filter(isObj).map(function (t) {
+    var dir = String(t.direction || 'forward').toLowerCase().replace(/[^a-z_]/g, '');
+    return { name: String(t.name || ''), from: intIn(t.from, 0, frames.length - 1, 0), to: intIn(t.to, 0, frames.length - 1, 0),
+             direction: DIRECTIONS.indexOf(dir) >= 0 ? dir : 'forward', repeat: intIn(t.repeat, 0, 65535, 0) };
+  });
+  return { frames: frames, tags: tags, hasTagList: hasTagList, cw: cw, ch: ch, image: json.meta.image,
+           slices: Array.isArray(json.meta.slices) ? json.meta.slices : [] };
+}
+
+// Everything the dialog shows, worked out before anything is changed.
+function analyseImport(ase, sheet, base) {
+  var notes = [];
+  var cells = ase.frames.map(function (f, i) {
+    if (f.x < 0 || f.y < 0 || f.x + f.w > sheet.w || f.y + f.h > sheet.h) {
+      throw new Error('Frame ' + i + ' lies outside the PNG (' + sheet.w + '×' + sheet.h
+        + '). Is this the PNG that goes with this JSON?');
+    }
+    // A trimmed frame is only its opaque part; put it back where it sat in
+    // the cell, or the sprite would jump between frames.
+    var rgba = new Uint8ClampedArray(ase.cw * ase.ch * 4);
+    for (var y = 0; y < f.h; y++) {
+      for (var x = 0; x < f.w; x++) {
+        var dx = f.ox + x, dy = f.oy + y;
+        if (dx < 0 || dy < 0 || dx >= ase.cw || dy >= ase.ch) continue;
+        var s = ((f.y + y) * sheet.w + (f.x + x)) * 4, d = (dy * ase.cw + dx) * 4;
+        rgba[d] = sheet.data[s]; rgba[d + 1] = sheet.data[s + 1]; rgba[d + 2] = sheet.data[s + 2]; rgba[d + 3] = sheet.data[s + 3];
+      }
+    }
+    return rgba;
+  });
+
+  var colours = [], seen = {}, semi = 0, semiA = {}, transparent = 0;
+  cells.forEach(function (c) {
+    for (var k = 0; k < c.length; k += 4) {
+      var a = c[k + 3];
+      if (a > 0 && a < 255) { semi++; semiA[a] = (semiA[a] || 0) + 1; }
+      if (a < 128) { transparent++; continue; }
+      var hex = rgbToHex(c[k], c[k + 1], c[k + 2]);
+      if (!seen[hex]) { seen[hex] = true; colours.push(hex); }
+    }
+  });
+  // Say which alpha values, and what each becomes: "36 at alpha 254" is a
+  // brush or layer left at 99% opacity, which is worth knowing about.
+  if (semi) {
+    var vals = Object.keys(semiA).map(Number).sort(function (a, b) { return a - b; });
+    var opaque = vals.filter(function (a) { return a >= 128; }).reduce(function (n, a) { return n + semiA[a]; }, 0);
+    var clear = semi - opaque;
+    notes.push({ cls: 'warn', text: semi + ' pixel' + (semi === 1 ? ' is' : 's are') + ' partly transparent ('
+      + vals.slice(0, 4).map(function (a) { return semiA[a] + ' at alpha ' + a; }).join(', ') + (vals.length > 4 ? ', …' : '')
+      + '). The engine has no blending, so ' + (opaque ? opaque + ' become fully opaque' : '') + (opaque && clear ? ' and ' : '')
+      + (clear ? clear + ' fully transparent' : '') + ' (the line is alpha 128). Usually a brush or layer set just under 100% opacity.' });
+  }
+
+  var states = [];
+  if (ase.tags.length) {
+    var covered = [];
+    ase.tags.forEach(function (t) {
+      var from = Math.min(t.from, t.to), to = Math.max(t.from, t.to), idx = [];
+      for (var i = from; i <= to; i++) { idx.push(i); covered[i] = true; }
+      states.push({ want: t.name, idx: idx, direction: t.direction, loop: !(t.repeat > 0), repeat: t.repeat });
+    });
+    var loose = [];
+    for (var i = 0; i < ase.frames.length; i++) if (!covered[i]) loose.push(i);
+    if (loose.length) notes.push({ cls: 'warn', text: 'Frame' + (loose.length === 1 ? ' ' : 's ') + loose.join(', ')
+      + (loose.length === 1 ? ' is' : ' are') + ' in no tag, so ' + (loose.length === 1 ? 'it is' : 'they are') + ' left out.' });
+  } else {
+    var all = ase.frames.map(function (_, j) { return j; });
+    states.push({ want: base, idx: all, direction: 'forward', loop: true, repeat: 0 });
+    if (!ase.hasTagList) {
+      notes.push({ cls: 'info', text: 'This JSON has no tag list at all, so it is one state. If the Aseprite file has tags, '
+        + 'tick “Tags” under Output → Meta in Export Sprite Sheet and export again.' });
+    }
+  }
+
+  var taken = { states: [] };
+  states.forEach(function (st) {
+    st.name = freeStateName(taken, st.want);
+    taken.states.push({ name: st.name });
+    st.renamed = st.name !== st.want;
+    st.frameMs = st.idx.map(function (i) { return ase.frames[i].ms; });
+    st.ms = st.frameMs[0] || 100;
+    st.varied = st.frameMs.some(function (v) { return v !== st.ms; });
+    st.cells = st.idx.map(function (i) { return cells[i]; });
+  });
+
+  // A slice is Aseprite's own way to mark a region; if there is one, it is
+  // the obvious starting box. The first key is taken: boxes do not animate.
+  var box = null;
+  var slice = ase.slices.filter(function (sl) { return /box|hit|coll/i.test(sl.name || ''); })[0] || ase.slices[0];
+  if (slice && Array.isArray(slice.keys) && slice.keys[0] && isObj(slice.keys[0].bounds)) {
+    var bb = slice.keys[0].bounds;
+    box = { x: bb.x | 0, y: bb.y | 0, w: bb.w | 0, h: bb.h | 0, from: slice.name };
+  }
+
+  return { base: base, cw: ase.cw, ch: ase.ch, frames: ase.frames.length, colours: colours,
+           transparent: transparent > 0, states: states, notes: notes, box: box };
+}
+
+function paletteMissing(pal, colours) {
+  var have = {};
+  pal.colors.forEach(function (h) { have[h] = true; });
+  return colours.filter(function (h) { return !have[h]; });
+}
+
+// The palette an import most likely means: one holding every colour (the
+// smallest such), else the one holding most of them.
+function bestPalette(colours) {
+  var best = null, bestMiss = Infinity;
+  project.palettes.forEach(function (pal) {
+    var miss = paletteMissing(pal, colours).length;
+    if (miss < bestMiss || (miss === bestMiss && best && pal.colors.length < best.colors.length)) { best = pal; bestMiss = miss; }
+  });
+  return best;
+}
+
+function importAseprite() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.accept = '.json,.png,application/json,image/png';
+  input.onchange = function () {
+    var files = Array.prototype.slice.call(input.files || []);
+    var jsonFile = files.filter(function (f) { return /\.json$/i.test(f.name); })[0];
+    if (!jsonFile) { toast('Select the .json too — both files together'); return; }
+    var json;
+    jsonFile.text().then(function (text) {
+      try { json = JSON.parse(text); } catch (e) { throw new Error(jsonFile.name + ' is not valid JSON.'); }
+      var ase = parseAse(json, jsonFile.name);
+      var pngs = files.filter(function (f) { return /\.png$/i.test(f.name); });
+      var png = pngs.filter(function (f) { return ase.image && f.name === String(ase.image).split(/[\\/]/).pop(); })[0]
+        || (pngs.length === 1 ? pngs[0] : null);
+      if (!png) {
+        throw new Error('Select the PNG together with the JSON' + (ase.image ? ' (it expects ' + ase.image + ')' : '') + '.');
+      }
+      return readPixels(png).then(function (sheet) {
+        var base = cName(jsonFile.name.replace(/\.json$/i, ''));
+        showImport(analyseImport(ase, sheet, base), jsonFile.name, png.name);
+      });
+    }).catch(function (err) { toast(err && err.message ? err.message : 'Could not read those files'); });
+  };
+  input.click();
+}
+
+function openModal(title) {
+  $('modalTitle').textContent = title;
+  $('modalBody').innerHTML = '';
+  $('modalFoot').innerHTML = '';
+  $('modal').hidden = false;
+}
+function closeModal() { $('modal').hidden = true; }
+
+function showImport(an, jsonName, pngName) {
+  openModal('Import ' + jsonName);
+  var body = $('modalBody'), foot = $('modalFoot');
+  var choice = { pal: null, target: 'new' };
+
+  body.appendChild(el('p', 'note', pngName + ' · ' + an.frames + ' frame' + (an.frames === 1 ? '' : 's') + ' of '
+    + an.cw + '×' + an.ch + ' · ' + an.colours.length + ' colour' + (an.colours.length === 1 ? '' : 's')
+    + (an.transparent ? ' + transparent pixels' : ', no transparency')));
+
+  body.appendChild(el('h4', 'mh', 'States'));
+  var t = el('table', 'grid');
+  var hr = el('tr');
+  ['state', 'frames', 'ms', 'playback', ''].forEach(function (x) { hr.appendChild(el('th', null, x)); });
+  t.appendChild(hr);
+  an.states.forEach(function (st) {
+    var tr = el('tr');
+    tr.appendChild(el('td', null, st.name));
+    tr.appendChild(el('td', null, String(st.idx.length)));
+    tr.appendChild(el('td', null, st.idx.length > 1 ? String(st.ms) : '—'));
+    tr.appendChild(el('td', null, st.direction + (st.loop ? '' : ' · repeat ' + st.repeat)));
+    var n = [];
+    if (st.renamed) n.push('was “' + st.want + '”');
+    if (st.varied) n.push('durations differ; uses ' + st.ms + ' ms');
+    if (!st.loop && st.idx.length > 1) n.push('engine will loop it');
+    if (st.idx.length > 1 && st.ms < 17) n.push('under the 16 ms tick');
+    tr.appendChild(el('td', 'w', n.join('; ')));
+    t.appendChild(tr);
+  });
+  body.appendChild(t);
+  an.notes.forEach(function (nt) { body.appendChild(el('p', 'note ' + (nt.cls === 'info' ? '' : nt.cls), nt.text)); });
+
+  // ---- which object ----
+  var existing = project.objects.filter(function (o) { return o.name === an.base; })[0];
+  body.appendChild(el('h4', 'mh', 'Object'));
+  if (existing) {
+    choice.target = 'update';
+    [['update', 'Update “' + existing.name + '” — replaces its states, keeps its box'
+      + (existing.w !== an.cw || existing.h !== an.ch ? ' (cell size changes, so the box resets)' : '')],
+     ['new', 'Import as a new object, “' + freeObjectName(an.base) + '”']].forEach(function (p) {
+      var lab = el('label', 'opt');
+      var r = document.createElement('input');
+      r.type = 'radio'; r.name = 'imptarget'; r.value = p[0]; r.checked = choice.target === p[0];
+      r.onchange = function () { choice.target = r.value; };
+      lab.appendChild(r); lab.appendChild(el('span', null, p[1]));
+      body.appendChild(lab);
+    });
+  } else {
+    body.appendChild(el('p', 'note', 'A new object, “' + an.base + '”. Its box starts as '
+      + (an.box ? 'the slice “' + an.box.from + '” (' + an.box.x + ',' + an.box.y + ' ' + an.box.w + '×' + an.box.h + ')'
+                : 'the whole cell') + '.'));
+  }
+
+  // ---- which palette ----
+  body.appendChild(el('h4', 'mh', 'Palette'));
+  // Only a palette that already holds every colour is chosen for you.
+  // Adding colours to a palette changes every object drawn with it -- it can
+  // push one to the next bit depth and double its size -- so that is never
+  // the default; it has to be picked. (Updating an object keeps its own
+  // palette: the same art, grown.)
+  var best = bestPalette(an.colours);
+  choice.pal = best && paletteMissing(best, an.colours).length === 0 ? best.id
+    : (existing && findPalette(existing.palette) ? existing.palette : 'new');
+  var sel = document.createElement('select');
+  sel.className = 'sel2';
+  project.palettes.forEach(function (pal) {
+    var miss = paletteMissing(pal, an.colours).length;
+    var op = el('option', null, pal.name + ' — ' + (miss ? miss + ' colour' + (miss === 1 ? '' : 's') + ' missing' : 'has every colour'));
+    op.value = pal.id;
+    sel.appendChild(op);
+  });
+  var nw = el('option', null, 'New palette from this art (' + an.colours.length + ' colours)');
+  nw.value = 'new';
+  sel.appendChild(nw);
+  sel.value = choice.pal;
+  body.appendChild(sel);
+  var palInfo = el('div');
+  body.appendChild(palInfo);
+
+  var go = el('button', 'chip primary', 'Import');
+  go.type = 'button';
+  var why = el('span', 'why');
+  var cancel = el('button', 'chip', 'Cancel');
+  cancel.type = 'button';
+  cancel.onclick = closeModal;
+  foot.appendChild(why); foot.appendChild(cancel); foot.appendChild(go);
+
+  function refresh() {
+    palInfo.innerHTML = '';
+    why.textContent = '';
+    go.disabled = false;
+    var colours = an.colours;
+    if (choice.pal === 'new') {
+      palInfo.appendChild(el('p', 'note', 'Colours in the order they first appear. Check the order in the Palettes tab '
+        + 'before making swap palettes from it.'));
+      var sw = el('div', 'swrow');
+      colours.forEach(function (h) { var x = el('span'); x.style.background = panelOf(h).hex; x.title = h; sw.appendChild(x); });
+      palInfo.appendChild(sw);
+      var total = colours.length + (an.transparent ? 1 : 0);
+      if (!bppFor(total)) { go.disabled = true; why.textContent = total + ' slots will not fit 8 bpp.'; }
+      else palInfo.appendChild(el('p', 'note', total + ' slots → ' + bppFor(total) + ' bpp'));
+      go.textContent = 'Import and create palette';
+      return;
+    }
+    var pal = findPalette(choice.pal), miss = paletteMissing(pal, colours);
+    var sw2 = el('div', 'swrow');
+    colours.forEach(function (h) {
+      var x = el('span' + '');
+      x.style.background = panelOf(h).hex;
+      x.title = h + (miss.indexOf(h) >= 0 ? ' — not in ' + pal.name : '');
+      if (miss.indexOf(h) >= 0) x.className = 'miss';
+      sw2.appendChild(x);
+    });
+    palInfo.appendChild(sw2);
+    var slots = pal.colors.length + miss.length + (an.transparent ? 1 : 0);
+    if (miss.length) {
+      palInfo.appendChild(el('p', 'note warn', miss.length + ' colour' + (miss.length === 1 ? ' is' : 's are') + ' not in “'
+        + pal.name + '” (outlined). They will be added to its end; nothing already in it moves. '
+        + 'No colour is ever matched to a “nearest” one.'));
+      go.textContent = 'Import and add ' + miss.length + ' colour' + (miss.length === 1 ? '' : 's');
+      // Say exactly what growing this palette does to everything else on it.
+      var others = objectsUsing(pal.id).filter(function (o) { return !(existing && choice.target === 'update' && o === existing); });
+      var grown = others.map(function (o) {
+        var was = objDepth(o).bpp, now = bppFor(pal.colors.length + miss.length + (objTransparent(o) ? 1 : 0));
+        return { o: o, was: was, now: now };
+      });
+      var bumped = grown.filter(function (g) { return g.now !== g.was; });
+      if (bumped.length) {
+        palInfo.appendChild(el('p', 'note bad', 'This also changes ' + bumped.map(function (g) {
+          return g.o.name + ' from ' + g.was + ' to ' + (g.now || '?') + ' bpp';
+        }).join(', ') + ' — ' + (bumped.length === 1 ? 'it shares' : 'they share') + ' this palette. '
+          + 'A new palette would leave ' + (bumped.length === 1 ? 'it' : 'them') + ' alone.'));
+      } else if (others.length) {
+        palInfo.appendChild(el('p', 'note', others.map(function (o) { return o.name; }).join(', ')
+          + (others.length === 1 ? ' shares' : ' share') + ' this palette and keep' + (others.length === 1 ? 's' : '')
+          + ' ' + (others.length === 1 ? 'its' : 'their') + ' bit depth.'));
+      }
+    } else {
+      palInfo.appendChild(el('p', 'note', 'Every colour matches exactly.'));
+      go.textContent = 'Import';
+    }
+    if (!bppFor(slots)) { go.disabled = true; why.textContent = slots + ' slots will not fit 8 bpp.'; }
+    else {
+      var before = bppFor(pal.colors.length + (an.transparent ? 1 : 0));
+      palInfo.appendChild(el('p', 'note' + (bppFor(slots) > (before || 0) && miss.length ? ' warn' : ''), slots + ' slots'
+        + (an.transparent ? ' (with transparency)' : '') + ' → ' + bppFor(slots) + ' bpp'));
+    }
+  }
+  sel.onchange = function () { choice.pal = sel.value; refresh(); };
+  refresh();
+
+  go.onclick = function () { commitImport(an, choice, existing, jsonName); closeModal(); };
+}
+
+function commitImport(an, choice, existing, jsonName) {
+  snapshot();
+  var pal;
+  if (choice.pal === 'new') {
+    pal = { id: newId('pal', allIds()), name: uniqueName(an.base), colors: an.colours.slice() };
+    project.palettes.push(pal);
+  } else {
+    pal = findPalette(choice.pal);
+    paletteMissing(pal, an.colours).forEach(function (h) { pal.colors.push(h); });
+  }
+  // First occurrence wins if a palette holds the same colour twice.
+  var index = {};
+  pal.colors.forEach(function (h, i) { if (!(h in index)) index[h] = i; });
+
+  var taken = allIds();
+  var states = an.states.map(function (st) {
+    var id = newId('st', taken);
+    taken[id] = true;
+    return {
+      id: id, name: st.name, ms: st.ms, loop: st.loop, direction: st.direction, frameMs: st.frameMs,
+      frames: st.cells.map(function (c) {
+        var px = new Uint16Array(an.cw * an.ch);
+        for (var i = 0; i < px.length; i++) {
+          var k = i * 4;
+          px[i] = c[k + 3] < 128 ? TRANSPARENT : index[rgbToHex(c[k], c[k + 1], c[k + 2])];
+        }
+        return encodeFrame(px);
+      })
+    };
+  });
+
+  var o;
+  if (existing && choice.target === 'update') {
+    o = existing;
+    if (o.w !== an.cw || o.h !== an.ch) o.box = an.box ? { x: an.box.x, y: an.box.y, w: an.box.w, h: an.box.h } : { x: 0, y: 0, w: an.cw, h: an.ch };
+    o.w = an.cw; o.h = an.ch; o.palette = pal.id; o.states = states; o.source = jsonName;
+  } else {
+    o = { id: newId('obj', taken), name: freeObjectName(an.base), w: an.cw, h: an.ch, palette: pal.id,
+          box: an.box ? { x: an.box.x, y: an.box.y, w: an.box.w, h: an.box.h } : { x: 0, y: 0, w: an.cw, h: an.ch },
+          source: jsonName, states: states };
+    project.objects.push(o);
+  }
+  changed();
+  ui.tab = 'objects';
+  selectObject(o, o.states[0]);
+  setTab('objects');
+  toast('Imported ' + o.name + ': ' + o.states.length + ' state' + (o.states.length === 1 ? '' : 's'));
+}
+
+$('objImport').onclick = importAseprite;
+$('modal').onclick = function (e) { if (e.target === $('modal')) closeModal(); };
+
+
 /* --------------------------------------------------------------------------
    Shell: tabs, header, keys
    -------------------------------------------------------------------------- */
@@ -1250,6 +2499,7 @@ function setTab(tab) {
   });
   if (tab === 'scene') { renderSceneFields(); drawScene(); }
   if (tab === 'palettes') renderPalettes();
+  if (tab === 'objects') renderObjects(); else stopAnim();
 }
 
 Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
@@ -1292,7 +2542,7 @@ $('redoBtn').onclick = redo;
 $('newBtn').onclick = function () {
   snapshot();
   project = blankProject();
-  ui.pal = null; ui.col = -1;
+  ui.pal = null; ui.col = -1; ui.obj = null; ui.state = null;
   saveUi(); changed(); renderAll();
   toast('New project — Undo brings the old one back');
 };
@@ -1309,7 +2559,7 @@ $('openBtn').onclick = function () {
     snapshot();
     project = next;
     ui.pal = project.palettes.length ? project.palettes[0].id : null;
-    ui.col = -1;
+    ui.col = -1; ui.obj = null; ui.state = null;
     saveUi(); changed(); renderAll();
     toast('Opened “' + project.name + '” — Undo goes back');
   }).catch(function (err) {
@@ -1336,6 +2586,18 @@ $('palImport').onclick = function () {
 document.addEventListener('keydown', function (e) {
   var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '');
   var mod = e.ctrlKey || e.metaKey;
+  if (!$('modal').hidden) { if (e.key === 'Escape') closeModal(); return; }
+  if (!typing && !mod && ui.tab === 'objects' && currentState()) {
+    var st0 = currentState();
+    if (e.key === ' ') { e.preventDefault(); $('objPlay').click(); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      var cur = ui.hold >= 0 ? ui.hold : frameAt(st0), n = st0.frames.length;
+      ui.hold = (cur + (e.key === 'ArrowLeft' ? n - 1 : 1)) % n;
+      ui.playing = false; syncPlay(); drawObj();
+      return;
+    }
+  }
   if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') {
     if (typing && e.target.type !== 'color') return;     // let a text box undo its own typing
     e.preventDefault(); undo();
@@ -1379,7 +2641,23 @@ function toast(msg) {
 /* --------------------------------------------------------------------------
    Boot
    -------------------------------------------------------------------------- */
+/* A saved project that cannot be read is KEPT, never replaced: falling back
+   to an empty project would let the next autosave overwrite the only copy.
+   It goes to its own key -- still inside Export backup -- and says so. */
+var savedProject = store.get('project');
+if (savedProject) {
+  try {
+    project = normProject(savedProject);
+  } catch (e) {
+    console.error('[canvas] the saved project could not be read', e);
+    store.set('unreadable-' + Fantoma.stamp(), savedProject);
+    setTimeout(function () {
+      toast('The saved project could not be read. It is kept (Backup \u2192 Export backup); starting empty.');
+    }, 300);
+  }
+}
 if (!findPalette(ui.pal)) ui.pal = project.palettes.length ? project.palettes[0].id : null;
+if (!findObject(ui.obj)) { ui.obj = null; ui.state = null; }
 checkWidth();
 renderAll();
 
