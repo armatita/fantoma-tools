@@ -1,5 +1,5 @@
 {
-  "id": "./",
+  "id": "/fantoma-tools/tools/sfx-forge/",
   "name": "SFX Forge",
   "short_name": "SFX",
   "description": "Compose buzzer melodies and sound effects, export as C arrays.",

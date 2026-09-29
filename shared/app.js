@@ -125,7 +125,9 @@
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol === 'file:') return;   // service workers need http(s)
     global.addEventListener('load', function () {
-      navigator.serviceWorker.register('./sw.js', { scope: './' })
+      // updateViaCache 'none': check sw.js and sw-core.js against the server
+      // itself, not the browser's ten-minute copy. See sw-core.js.
+      navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
         .catch(function (err) { console.warn('[fantoma] sw registration failed', err); });
     });
   }

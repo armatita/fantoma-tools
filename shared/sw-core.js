@@ -19,6 +19,23 @@
  *     deleted on activate.
  *   - skipWaiting + clients.claim mean a new worker takes over immediately
  *     rather than waiting for every tab to close.
+ *
+ * THE SECOND TRAP: THE BROWSER'S OWN CACHE
+ * ----------------------------------------
+ * Underneath the service worker sits the ordinary HTTP cache, and GitHub
+ * Pages serves every file with `Cache-Control: max-age=600` -- "reuse this
+ * for ten minutes without asking". A plain fetch() from here honours that.
+ * So "network-first" could quietly mean "the copy from nine minutes ago",
+ * and worse, a NEW worker's install could precache the OLD files and then
+ * serve them from its brand-new cache. Found when the installed hub kept its
+ * pre-update page after a push.
+ *
+ * Hence every fetch below states its cache mode:
+ *   - install uses cache: 'reload'   -- always straight from the server;
+ *   - everything else uses 'no-cache' -- always CHECK with the server, which
+ *     costs a tiny 304 Not Modified when nothing changed (Pages sends ETags).
+ * And the page registers this worker with updateViaCache: 'none', so the
+ * update check on sw.js and on this file skips the HTTP cache too.
  */
 /* global SW_CACHE, SW_ASSETS */
 (function () {
@@ -40,7 +57,9 @@
       caches.open(CACHE).then(function (cache) {
         // addAll() is atomic: one 404 and the whole install fails, which is
         // the behaviour we want -- a half-cached app is worse than none.
-        return cache.addAll(ASSETS);
+        return cache.addAll(ASSETS.map(function (url) {
+          return new Request(url, { cache: 'reload' });
+        }));
       }).then(function () {
         return self.skipWaiting();
       })
@@ -102,16 +121,28 @@
     event.respondWith(staleWhileRevalidate(request));
   });
 
+  // Passing an init turns a navigation into a same-origin request, which is
+  // allowed; its 'manual' redirect mode is kept, so a redirect still comes
+  // back as something a navigation can use.
+  function fromNetwork(request) {
+    return fetch(request, { cache: 'no-cache' });
+  }
+
   function networkFirst(request) {
-    return fetch(request).then(function (response) {
+    return fromNetwork(request).then(function (response) {
       if (response && response.ok) {
         var copy = response.clone();
         caches.open(CACHE).then(function (cache) { cache.put(request, copy); });
       }
       return response;
     }).catch(function () {
+      // caches.match() returns a Promise, which is always truthy, so these
+      // fallbacks have to be chained -- an `a || b || c` of them never
+      // reaches c.
       return caches.match(request).then(function (cached) {
-        return cached || caches.match('./index.html') || caches.match('./');
+        return cached || caches.match('./index.html');
+      }).then(function (cached) {
+        return cached || caches.match('./');
       });
     });
   }
@@ -119,7 +150,7 @@
   function staleWhileRevalidate(request) {
     return caches.open(CACHE).then(function (cache) {
       return cache.match(request).then(function (cached) {
-        var network = fetch(request).then(function (response) {
+        var network = fromNetwork(request).then(function (response) {
           if (response && response.ok) cache.put(request, response.clone());
           return response;
         }).catch(function () {

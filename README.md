@@ -189,6 +189,29 @@ Open the tool's own page first — not the hub — then:
 Each tool declares its own manifest with its own `id` and `scope`, which is why
 they install as separate apps with separate icons rather than one bookmark.
 
+### The `id` is an identity: absolute, unique, never changed
+
+Chrome recognises an installed app by its manifest `id` — not by its name, and
+not by its URL. Every manifest here spells it out as an absolute path:
+
+| App | `id` |
+| --- | --- |
+| hub | `/fantoma-tools/` |
+| each tool | `/fantoma-tools/tools/<tool-id>/` |
+
+**Never write a relative `id`.** It is resolved against the *origin* of
+`start_url`, not against the manifest's folder, so `"id": "./"` in every
+manifest gave the hub and every tool the same identity,
+`https://armatita.github.io/`. That is how it was originally shipped, and the
+symptom was Chrome offering to rename the installed hub "Pixel Studio" whenever
+the hub's window opened that tool: it read Pixel Studio's manifest as an update
+to the hub. Anything installed before the fix (September 2026) had that shared
+identity and needed one reinstall.
+
+**Never change an `id` once published** — not even if the repo is renamed.
+Changing it orphans every existing install: the app keeps running but no
+longer receives manifest updates, and has to be reinstalled.
+
 ### Getting back to the hub
 
 You can also install just the hub and open everything from it. The hub's scope
@@ -397,7 +420,9 @@ for the origin will force a clean install.
 
 1. `mkdir tools/<tool-id>` and drop `index.html` in it.
 2. Copy `manifest.webmanifest` and `sw.js` from an existing tool; change the
-   `name`, `short_name`, `description`, `theme_color`, and `SW_CACHE`.
+   **`id`** (to `/fantoma-tools/tools/<tool-id>/` — a copied `id` makes Chrome
+   think the new tool *is* the old one), `name`, `short_name`, `description`,
+   `theme_color`, and `SW_CACHE`.
 3. Add an icon builder to `scripts/make_icons.py`, register it in the `ICONS`
    dict, and run `python scripts/make_icons.py`.
 4. In the page, before your own script:
