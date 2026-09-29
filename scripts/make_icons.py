@@ -217,8 +217,39 @@ def protoplaca_icon():
     return g
 
 
+def canvas_icon():
+    """Canvas: a framed scene -- sky, sun, ground and a small figure.
+
+    The tool composes sprites into a scene, so its icon is one: a character
+    standing in a picture frame, which is what the Scene tab will look like.
+    """
+    sprite = [
+        '################',
+        '#ssssssssssssss#',
+        '#ssssssssssyyss#',
+        '#ssssssssssyyss#',
+        '#ssssssssssssss#',
+        '#ssssssssssssss#',
+        '#ssssrrssssssss#',
+        '#ssssrrssssssss#',
+        '#sssrrrrsssssss#',
+        '#ssssrrssssssss#',
+        '#ssssrsrsssssss#',
+        '#gggggggggggggg#',
+        '#gggggggggggggg#',
+        '#gggggggggggggg#',
+        '#gggggggggggggg#',
+        '################',
+    ]
+    g = Grid('#0d0d12')
+    g.art(sprite, {'#': '#c8c6c9', 's': '#23305a', 'y': '#ffe94d',
+                   'r': '#ff4d5e', 'g': '#428d38'})
+    return g
+
+
 ICONS = {
     'icons': hub_icon,
+    'tools/canvas/icons': canvas_icon,
     'tools/pixel-studio/icons': pixel_studio_icon,
     'tools/sfx-forge/icons': sfx_forge_icon,
     'tools/model-viewer/icons': model_viewer_icon,

@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas</title>
+<meta name="description" content="Palettes, sprites and scenes for the arcade engine, previewed as the panel will show them.">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>
+/* Chrome colours only. Nothing here is a palette colour: those are the
+   user's, and always drawn exactly as the panel would show them. */
+:root {
+  --bg: #14141a;  --panel: #1c1c24;  --panel-2: #24242e;  --panel-3: #2c2c38;
+  --line: #33333f; --ink: #e8e6e7;  --ink-dim: #a2a2a4;  --ink-faint: #6e6e78;
+  --accent: #b98cff; --warn: #ffb648; --bad: #ff5e6c; --ok: #5ee88f;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, input, select { font: inherit; color: inherit; }
+
+/* ---- header ---- */
+header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px; background: var(--panel);
+  border-bottom: 1px solid var(--line); flex: none; position: relative;
+}
+#hubSlot:empty { display: none; }
+#hubSlot #fantoma-hub-link { margin: 0 6px 0 0; }
+header img { width: 22px; height: 22px; border-radius: 5px; }
+header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+#projName {
+  width: 180px; background: transparent; border: 1px solid transparent;
+  border-radius: 5px; padding: 3px 6px; color: var(--ink-dim);
+}
+#projName:hover, #projName:focus { border-color: var(--line); color: var(--ink); outline: none; }
+nav#tabs { display: flex; gap: 2px; margin-left: 10px; }
+nav#tabs button {
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  padding: 4px 12px; cursor: pointer; color: var(--ink-dim);
+}
+nav#tabs button:hover { color: var(--ink); }
+nav#tabs button.on { background: var(--panel-2); border-color: var(--line); color: var(--ink); }
+.spacer { flex: 1; }
+.chip {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer;
+}
+.chip:hover:not(:disabled) { border-color: var(--accent); }
+.chip:disabled { opacity: .4; cursor: default; }
+#dataFold { position: relative; }
+#dataFold > summary { list-style: none; }
+#dataFold > summary::-webkit-details-marker { display: none; }
+#dataBox {
+  position: absolute; right: 0; top: calc(100% + 8px); width: 380px; z-index: 20;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
+}
+#dataBox #fantoma-panel { margin: 0; border: 0; background: transparent; }
+
+#narrow {
+  flex: none; background: #3a2a10; color: var(--warn); font-size: 12px;
+  padding: 6px 12px; border-bottom: 1px solid var(--line);
+}
+
+/* ---- the three views ---- */
+main { flex: 1; display: flex; min-height: 0; }
+.view { flex: 1; display: flex; min-height: 0; min-width: 0; }
+aside.side {
+  width: 260px; flex: none; background: var(--panel);
+  border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0;
+}
+aside.side.right { border-right: 0; border-left: 1px solid var(--line); width: 300px; }
+.sidehead {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-dim); flex: none;
+}
+.sidehead .spacer { flex: 1; }
+.scroll { overflow-y: auto; flex: 1; min-height: 0; }
+.center { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 40px; }
+.sidefoot { padding: 10px 12px; border-top: 1px solid var(--line); flex: none; display: flex; gap: 6px; }
+.sidefoot .chip { flex: 1; text-align: center; }
+.small { font-size: 11px; color: var(--ink-dim); }
+.faint { color: var(--ink-faint); }
+
+/* ---- palette list ---- */
+.prow {
+  padding: 7px 12px; cursor: pointer; border-left: 2px solid transparent;
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; align-items: center;
+}
+.prow:hover { background: var(--panel-2); }
+.prow.sel { background: var(--panel-2); border-left-color: var(--accent); }
+.prow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .tag { font: 10px var(--mono); color: var(--ink-dim); }
+.prow .strip { grid-column: 1 / -1; display: flex; gap: 1px; height: 9px; }
+.prow .strip span { flex: 1; max-width: 14px; border-radius: 1px; }
+.prow .strip em { font: 9px var(--mono); color: var(--ink-faint); font-style: normal; line-height: 9px; margin-left: 3px; }
+.empty-note { padding: 12px; color: var(--ink-dim); font-size: 12px; line-height: 1.5; }
+
+/* ---- palette editor ---- */
+.palhead { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+#palName {
+  font-size: 18px; font-weight: 600; background: transparent; border: 1px solid transparent;
+  border-radius: 6px; padding: 3px 6px; margin-left: -7px; min-width: 0; flex: 1; max-width: 420px;
+}
+#palName:hover, #palName:focus { border-color: var(--line); outline: none; }
+.badge {
+  font: 11px var(--mono); padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--accent); color: var(--accent); white-space: nowrap;
+}
+.badge.warn { border-color: var(--warn); color: var(--warn); }
+.lede { color: var(--ink-dim); font-size: 12px; margin: 0 0 16px; max-width: 720px; }
+
+#palGrid { display: flex; flex-wrap: wrap; gap: 10px; }
+.cell {
+  width: 76px; border-radius: 7px; padding: 4px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); user-select: none;
+}
+.cell:hover { border-color: var(--ink-faint); }
+.cell.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cell.dragging { opacity: .35; }
+.cell.dropbefore { box-shadow: -4px 0 0 0 var(--accent); }
+.cell .chipc {
+  height: 58px; border-radius: 4px; position: relative;
+  border: 1px solid rgba(255,255,255,.08);
+}
+.cell .idx {
+  position: absolute; left: 4px; top: 3px; font: 700 11px var(--mono);
+}
+.cell .mark {
+  position: absolute; right: 4px; top: 2px; font: 700 12px var(--mono);
+}
+.cell .clash {
+  position: absolute; right: 0; bottom: 0; width: 0; height: 0;
+  border-left: 14px solid transparent; border-bottom: 14px solid var(--bad);
+  border-bottom-right-radius: 3px;
+}
+.cell .hx { font: 11px var(--mono); color: var(--ink-dim); text-align: center; margin-top: 4px; }
+.cell.add {
+  display: flex; align-items: center; justify-content: center; min-height: 85px;
+  color: var(--ink-dim); font-size: 26px; border-style: dashed; background: transparent;
+}
+.cell.add:hover { color: var(--accent); border-color: var(--accent); }
+.cell.add.off { opacity: .35; cursor: default; }
+
+/* ---- inspector ---- */
+.sect { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.sect h3 {
+  margin: 0 0 8px; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.pickrow { display: flex; gap: 8px; align-items: center; }
+input[type=color] {
+  width: 46px; height: 34px; padding: 0; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--panel-2); cursor: pointer;
+}
+input.text, input.num {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; min-width: 0;
+}
+input.text:focus, input.num:focus { border-color: var(--accent); outline: none; }
+input.hex { width: 96px; font-family: var(--mono); }
+input.num { width: 76px; font-family: var(--mono); }
+.panelsw { display: flex; align-items: center; gap: 8px; margin-top: 10px; font: 12px var(--mono); }
+.panelsw .sw { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,.12); flex: none; }
+.btnrow { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.btnrow .chip { flex: 1; text-align: center; white-space: nowrap; }
+.chip.danger { color: var(--bad); }
+.chip.danger:hover:not(:disabled) { border-color: var(--bad); }
+.note { font-size: 11px; color: var(--ink-dim); margin: 8px 0 0; line-height: 1.5; }
+.note.warn { color: var(--warn); }
+.note.bad { color: var(--bad); }
+
+table.kv { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.kv td { padding: 3px 0; vertical-align: top; }
+table.kv td:last-child { text-align: right; font-family: var(--mono); }
+table.cost { width: 100%; border-collapse: collapse; font: 11px var(--mono); margin-top: 6px; }
+table.cost th { font-weight: 400; color: var(--ink-faint); text-align: right; padding: 2px 0 4px; }
+table.cost th:first-child, table.cost td:first-child { text-align: left; }
+table.cost td { text-align: right; padding: 2px 0; }
+table.cost td.up { color: var(--warn); }
+ul.warns { margin: 0; padding-left: 16px; font-size: 12px; }
+ul.warns li { margin: 0 0 6px; }
+ul.warns li.bad { color: var(--bad); }
+ul.warns li.warn { color: var(--warn); }
+ul.warns li.info { color: var(--ink-dim); }
+
+/* ---- scene (phase 1: the project's frame only) ---- */
+.field { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.field label { flex: 1; color: var(--ink-dim); font-size: 12px; }
+.field .x { color: var(--ink-faint); }
+#sceneStage { flex: 1; position: relative; min-width: 0; }
+#sceneCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.placeholder {
+  flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px;
+}
+.placeholder div { max-width: 520px; color: var(--ink-dim); line-height: 1.6; }
+.placeholder h2 { color: var(--ink); font-size: 16px; margin: 0 0 8px; }
+.placeholder ul { padding-left: 18px; }
+
+#toast {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  background: var(--panel-3); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 16px; font-size: 12px; opacity: 0; transition: opacity .2s;
+  pointer-events: none; z-index: 50; max-width: 80vw;
+}
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <span id="hubSlot"></span>
+  <img src="./icons/icon-192.png" alt="">
+  <h1>Canvas</h1>
+  <input id="projName" type="text" maxlength="60" spellcheck="false" title="Project name">
+  <nav id="tabs">
+    <button type="button" data-tab="scene">Scene</button>
+    <button type="button" data-tab="objects">Objects</button>
+    <button type="button" data-tab="palettes">Palettes</button>
+  </nav>
+  <span class="spacer"></span>
+  <button type="button" class="chip" id="undoBtn" title="Undo (Ctrl+Z)">&#8630; Undo</button>
+  <button type="button" class="chip" id="redoBtn" title="Redo (Ctrl+Y)">Redo &#8631;</button>
+  <button type="button" class="chip" id="newBtn" title="Start an empty project (undoable)">New</button>
+  <button type="button" class="chip" id="openBtn" title="Open a .canvas.json file (undoable)">Open</button>
+  <button type="button" class="chip" id="saveBtn" title="Save the project as a .canvas.json file (Ctrl+S)">Save</button>
+  <details id="dataFold">
+    <summary class="chip">Backup</summary>
+    <div id="dataBox"></div>
+  </details>
+</header>
+
+<div id="narrow" hidden>Canvas is laid out for a desktop window. It works narrower, but not well &mdash; Pixel Studio is the tool for a phone.</div>
+
+<main>
+
+  <!-- ================= SCENE ================= -->
+  <section class="view" id="view-scene" hidden>
+    <aside class="side">
+      <div class="sidehead">Project</div>
+      <div class="scroll" style="padding: 4px 12px 12px">
+        <div class="field">
+          <label for="camW">Camera</label>
+          <input class="num" id="camW" type="number" min="1" max="1024" step="1">
+          <span class="x">&times;</span>
+          <input class="num" id="camH" type="number" min="1" max="1024" step="1">
+        </div>
+        <div class="field">
+          <label for="sceneW">Scene</label>
+          <input class="num" id="sceneW" type="number" min="1" max="4096" step="1">
+          <span class="x">&times;</span>
+          <input class="num" id="sceneH" type="number" min="1" max="4096" step="1">
+        </div>
+        <p class="note">The <b>camera</b> is what the screen shows, in pixels &mdash;
+          64 &times; 64 for Fantoma, but every project sets its own. The <b>scene</b>
+          is the world the camera moves over; it is never smaller than the camera.</p>
+        <p class="note">Placing objects in the scene arrives in phase 4.</p>
+      </div>
+    </aside>
+    <div id="sceneStage"><canvas id="sceneCanvas"></canvas></div>
+  </section>
+
+  <!-- ================= OBJECTS ================= -->
+  <section class="view" id="view-objects" hidden>
+    <div class="placeholder"><div>
+      <h2>Objects arrive in phase 2</h2>
+      <p>A tree of objects &rarr; states &rarr; frames, filled by importing an
+        Aseprite sprite sheet and its JSON: tags become states, and frames are
+        read from the file rather than guessed from the sheet's size.</p>
+      <ul>
+        <li>One cell size, one palette and one bit depth per object.</li>
+        <li>One duration per state, as the engine stores it.</li>
+        <li>Any pixel not in the object's palette reported, with where it is.</li>
+        <li>An animated preview on the engine's 16&nbsp;ms tick, in panel colours.</li>
+        <li>The byte budget, live.</li>
+      </ul>
+      <p>Start with a palette: export it as <b>.gpl</b> and load it into Aseprite,
+        and the art drawn there will match it exactly.</p>
+    </div></div>
+  </section>
+
+  <!-- ================= PALETTES ================= -->
+  <section class="view" id="view-palettes" hidden>
+    <aside class="side">
+      <div class="sidehead">Palettes <span class="spacer"></span></div>
+      <div class="scroll" id="palList"></div>
+      <div class="sidefoot">
+        <button type="button" class="chip" id="palNew">+ New</button>
+        <button type="button" class="chip" id="palImport" title="GIMP .gpl, Lospec .hex, JASC .pal, or any text with #rrggbb colours">Import&hellip;</button>
+      </div>
+    </aside>
+
+    <div class="center" id="palCenter">
+      <div id="palEmpty" class="placeholder" hidden><div>
+        <h2>No palettes yet</h2>
+        <p>A palette is an ordered list of colours. The order matters: a sprite
+          stores <i>positions</i> in the palette, so index&nbsp;2 must mean the
+          same thing in every palette you might swap in.</p>
+        <p>Create one with <b>+ New</b>, or import a <b>.gpl</b>, <b>.hex</b>
+          or <b>.pal</b> file &mdash; Aseprite and Lospec both export them.</p>
+      </div></div>
+      <div id="palEditor" hidden>
+        <div class="palhead">
+          <input id="palName" type="text" maxlength="40" spellcheck="false">
+          <span class="badge" id="palBadge"></span>
+        </div>
+        <p class="lede">Each colour is shown <b>as the panel will show it</b>: cut
+          to RGB565 the way the export does, then expanded back the way the panel
+          driver does. Drag to reorder; the number is the index a sprite stores.</p>
+        <div id="palGrid"></div>
+      </div>
+    </div>
+
+    <aside class="side right" id="palInspector">
+      <div class="scroll">
+        <div class="sect" id="colEdit"></div>
+        <div class="sect" id="palDepth"></div>
+        <div class="sect" id="palWarn"></div>
+        <div class="sect" id="palActions"></div>
+      </div>
+    </aside>
+  </section>
+
+</main>
+
+<div id="toast"></div>
+
+<script src="../../shared/storage.js"></script>
+<script src="../../shared/app.js"></script>
+<script>
+'use strict';
+
+/* ==========================================================================
+   Canvas -- palettes, objects and scenes for the arcade engine.
+
+   The engine's side of the contract is fantoma/docs/image-format.md; this
+   tool exports what that file says and nothing else. Everything the engine
+   does not read -- colliders drawn for preview, paths, scene placement --
+   lives only in this tool's own project file, so it can change without
+   touching the engine.
+
+   PHASE 1 (this build): the tool shell, the project file, and palettes.
+   ========================================================================== */
+
+var TOOL_ID = 'canvas';
+var FORMAT = 'canvas';
+var VERSION = 1;
+var MAX_COLOURS = 256;     // 8 bpp: the most image.h can index
+var MAX_CAMERA = 1024;
+var MAX_SCENE = 4096;
+var HISTORY_MAX = 200;
+
+var store = Fantoma.store(TOOL_ID);
+
+
+/* --------------------------------------------------------------------------
+   Colour: exactly what image.h does
+   --------------------------------------------------------------------------
+   Two conversions, and they are the ones the device performs, not
+   approximations of them:
+
+     rgb565()  8-bit channels -> 16 bits by TRUNCATION (r>>3, g>>2, b>>3),
+               as rgb565() in image.h and img2c.py do at export;
+     expand()  16 bits -> 8-bit channels by BIT REPLICATION, as
+               rgb565_r8/g8/b8 in image.h do on the way to the panel.
+
+   So a swatch here is painted in the colour the panel driver receives. The
+   panel's own response (its CIE1931 curve, the acrylic) is not modelled:
+   image-format.md records it as unmeasured, and a guess would only look
+   authoritative.
+   -------------------------------------------------------------------------- */
+function hexToRgb(hex) {
+  var n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(function (v) { return (v < 16 ? '0' : '') + v.toString(16); }).join('');
+}
+
+function rgb565(r, g, b) {
+  return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+}
+
+function expand565(c) {
+  var r = (c >> 11) & 31, g = (c >> 5) & 63, b = c & 31;
+  return [(r << 3) | (r >> 2), (g << 2) | (g >> 4), (b << 3) | (b >> 2)];
+}
+
+function panelOf(hex) {          // { c565, hex } as the panel will show it
+  var rgb = hexToRgb(hex);
+  var c = rgb565(rgb[0], rgb[1], rgb[2]);
+  var e = expand565(c);
+  return { c565: c, hex: rgbToHex(e[0], e[1], e[2]) };
+}
+
+function hex565(c) { return '0x' + ('000' + c.toString(16).toUpperCase()).slice(-4); }
+
+function normHex(v) {
+  var m = /^#?([0-9a-f]{6})$/i.exec(String(v == null ? '' : v).trim());
+  return m ? '#' + m[1].toLowerCase() : null;
+}
+
+// Black or white text over a swatch, whichever reads.
+function inkOn(hex) {
+  var rgb = hexToRgb(hex);
+  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) > 140 ? '#111' : '#fff';
+}
+
+
+/* --------------------------------------------------------------------------
+   Bit depth and bytes: exactly what the export will produce
+   --------------------------------------------------------------------------
+   image.h supports 1, 2, 4 and 8 bpp -- nothing between -- and a palette is
+   stored with exactly 1 << bpp entries. A transparent sprite spends one of
+   them on "no pixel", so the same palette can cost a whole extra step; the
+   format asks tools to say so, and this is where it gets said.
+
+   Rows start on a byte boundary, so a row costs ceil(w * bpp / 8) bytes, not
+   w * bpp / 8: a 10 px row at 1 bpp is 2 bytes. The table uses that, because
+   the budget is only useful if it is the real one.
+   -------------------------------------------------------------------------- */
+function bppFor(n) {
+  if (n <= 0 || n > MAX_COLOURS) return null;
+  if (n <= 2) return 1;
+  if (n <= 4) return 2;
+  if (n <= 16) return 4;
+  return 8;
+}
+
+function frameBytes(w, h, bpp) { return Math.ceil(w * bpp / 8) * h; }
+function paletteBytes(bpp) { return 2 * (1 << bpp); }
+
+function depthInfo(n) {
+  var opaque = bppFor(n), transp = bppFor(n + 1);
+  return {
+    n: n,
+    opaque: opaque, transp: transp,
+    slotsOpaque: opaque ? (1 << opaque) : 0,
+    slotsTransp: transp ? (1 << transp) : 0,
+    bumps: !!(opaque && transp && transp > opaque),
+    noTransp: n >= MAX_COLOURS
+  };
+}
+
+function bytesLabel(b) { return b >= 10240 ? (b / 1024).toFixed(1) + ' KB' : b + ' B'; }
+
+
+/* --------------------------------------------------------------------------
+   The project
+   --------------------------------------------------------------------------
+   One JSON document, autosaved here and saved to a file on demand. Phase 1
+   defines the parts it uses; `objects` is carried but not yet interpreted,
+   and any field this build does not know about is kept rather than dropped,
+   so a file from a newer Canvas survives a round trip through an older one.
+   -------------------------------------------------------------------------- */
+function blankProject() {
+  return {
+    format: FORMAT, version: VERSION, name: 'untitled',
+    camera: { w: 64, h: 64 },
+    scene: { w: 64, h: 64 },
+    palettes: [],
+    objects: []
+  };
+}
+
+function intIn(v, lo, hi, dflt) {
+  var n = Math.round(Number(v));
+  return isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+}
+
+function normProject(raw) {
+  if (!raw || typeof raw !== 'object' || raw.format !== FORMAT) {
+    throw new Error('That is not a Canvas project file.');
+  }
+  var p = JSON.parse(JSON.stringify(raw));
+  p.format = FORMAT;
+  p.version = Math.max(VERSION, intIn(raw.version, 1, 1e6, VERSION));
+  p.name = (typeof raw.name === 'string' && raw.name.trim()) ? raw.name.slice(0, 60) : 'untitled';
+
+  var cam = (raw.camera && typeof raw.camera === 'object') ? raw.camera : {};
+  p.camera = { w: intIn(cam.w, 1, MAX_CAMERA, 64), h: intIn(cam.h, 1, MAX_CAMERA, 64) };
+  var sc = (raw.scene && typeof raw.scene === 'object') ? raw.scene : {};
+  p.scene = {
+    w: Math.max(p.camera.w, intIn(sc.w, 1, MAX_SCENE, p.camera.w)),
+    h: Math.max(p.camera.h, intIn(sc.h, 1, MAX_SCENE, p.camera.h))
+  };
+
+  var taken = {};
+  p.palettes = (Array.isArray(raw.palettes) ? raw.palettes : []).filter(function (q) {
+    return q && typeof q === 'object';
+  }).map(function (q) {
+    var out = JSON.parse(JSON.stringify(q));
+    out.id = (typeof q.id === 'string' && q.id && !taken[q.id]) ? q.id : newId('pal', taken);
+    taken[out.id] = true;
+    out.name = (typeof q.name === 'string' && q.name.trim()) ? q.name.slice(0, 40) : 'palette';
+    out.colors = (Array.isArray(q.colors) ? q.colors : []).map(normHex)
+      .filter(Boolean).slice(0, MAX_COLOURS);
+    return out;
+  });
+
+  p.objects = Array.isArray(raw.objects) ? p.objects : [];
+  return p;
+}
+
+function newId(prefix, taken) {
+  var i = 1;
+  while (taken[prefix + i]) i++;
+  return prefix + i;
+}
+
+function allIds() {
+  var t = {};
+  project.palettes.forEach(function (q) { t[q.id] = true; });
+  return t;
+}
+
+var project;
+try {
+  project = normProject(store.get('project'));
+} catch (e) {
+  project = blankProject();
+}
+
+/* UI state is a preference, not part of the document: kept apart from the
+   project, so opening a file does not drag someone else's tab choice in. */
+var ui = store.get('ui', {});
+if (!ui || typeof ui !== 'object') ui = {};
+ui.tab = ['scene', 'objects', 'palettes'].indexOf(ui.tab) >= 0 ? ui.tab : 'palettes';
+ui.col = typeof ui.col === 'number' ? ui.col : -1;
+
+
+/* --------------------------------------------------------------------------
+   Undo
+   --------------------------------------------------------------------------
+   Whole-document snapshots. A project is a few kilobytes of JSON, so copying
+   it per edit costs nothing measurable, and it means no edit can forget to
+   describe its own inverse -- which is how undo systems usually break.
+
+   A colour picker fires dozens of input events per drag. Those coalesce into
+   one step: the same key within 1.5 s extends the step rather than starting
+   a new one.
+   -------------------------------------------------------------------------- */
+var past = [], future = [];
+var lastKey = null, lastAt = 0;
+
+function snapshot(key) {
+  var now = Date.now();
+  if (key && key === lastKey && now - lastAt < 1500) { lastAt = now; return; }
+  past.push(JSON.stringify(project));
+  if (past.length > HISTORY_MAX) past.shift();
+  future = [];
+  lastKey = key || null;
+  lastAt = now;
+}
+
+function undo() {
+  if (!past.length) return;
+  future.push(JSON.stringify(project));
+  project = JSON.parse(past.pop());
+  lastKey = null;
+  afterHistory('Undone');
+}
+
+function redo() {
+  if (!future.length) return;
+  past.push(JSON.stringify(project));
+  project = JSON.parse(future.pop());
+  lastKey = null;
+  afterHistory('Redone');
+}
+
+function afterHistory(msg) {
+  if (!findPalette(ui.pal)) ui.pal = project.palettes.length ? project.palettes[0].id : null;
+  clampCol();
+  changed();
+  renderAll();
+  toast(msg);
+}
+
+
+/* --------------------------------------------------------------------------
+   Saving
+   -------------------------------------------------------------------------- */
+var saveTimer = null;
+function changed() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function () {
+    if (!store.set('project', project)) toast('Could not autosave: browser storage is full');
+  }, 250);
+  syncUndoButtons();
+}
+
+function saveUi() { store.set('ui', ui); }
+
+function fileBase() {
+  var base = String(project.name || 'untitled').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return base || 'canvas';
+}
+
+function downloadText(filename, text, type) {
+  var blob = new Blob([text], { type: type || 'text/plain' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function readTextFile(accept) {
+  return new Promise(function (resolve, reject) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.onchange = function () {
+      var file = input.files && input.files[0];
+      if (!file) { reject(null); return; }
+      var reader = new FileReader();
+      reader.onload = function () { resolve({ name: file.name, text: String(reader.result) }); };
+      reader.onerror = function () { reject(new Error('Could not read that file.')); };
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+}
+
+
+/* --------------------------------------------------------------------------
+   Palette files
+   --------------------------------------------------------------------------
+   Read: GIMP .gpl (Aseprite's own palette export), JASC .pal, and anything
+   else containing #rrggbb / rrggbb tokens -- which covers Lospec's .hex.
+   Write: .gpl, so a palette defined here loads straight into Aseprite and the
+   art drawn with it matches exactly; and .hex, the plainest form.
+
+   Colours are written as STORED, not as the panel shows them. The art must
+   carry the exact values this palette holds for phase 2's import to match
+   pixels to indices; "Snap to 565" exists for making the two the same.
+   -------------------------------------------------------------------------- */
+function parsePalette(text, filename) {
+  var lines = text.replace(/\r/g, '').split('\n');
+  var name = (filename || 'imported').replace(/\.[^.]+$/, '');
+  var colors = [];
+
+  if (/^GIMP Palette/i.test(lines[0] || '')) {
+    lines.slice(1).forEach(function (l) {
+      var nm = /^Name:\s*(.+)$/i.exec(l);
+      if (nm) { name = nm[1].trim(); return; }
+      var m = /^\s*(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})/.exec(l);
+      if (m) colors.push(rgbToHex(+m[1] & 255, +m[2] & 255, +m[3] & 255));
+    });
+  } else if (/^JASC-PAL/i.test(lines[0] || '')) {
+    lines.slice(3).forEach(function (l) {
+      var m = /^\s*(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})\s*$/.exec(l);
+      if (m) colors.push(rgbToHex(+m[1] & 255, +m[2] & 255, +m[3] & 255));
+    });
+  } else {
+    var re = /#?\b([0-9a-f]{6})\b/gi, m2;
+    while ((m2 = re.exec(text))) colors.push('#' + m2[1].toLowerCase());
+  }
+  return { name: name.slice(0, 40) || 'imported', colors: colors };
+}
+
+function gplText(pal) {
+  var out = ['GIMP Palette', 'Name: ' + pal.name, 'Columns: 8', '#'];
+  pal.colors.forEach(function (hex, i) {
+    var c = hexToRgb(hex);
+    out.push(pad3(c[0]) + ' ' + pad3(c[1]) + ' ' + pad3(c[2]) + '\tIndex ' + i);
+  });
+  return out.join('\n') + '\n';
+}
+function pad3(v) { return ('  ' + v).slice(-3); }
+
+function hexText(pal) {
+  return pal.colors.map(function (h) { return h.slice(1); }).join('\n') + '\n';
+}
+
+
+/* --------------------------------------------------------------------------
+   Palette operations
+   -------------------------------------------------------------------------- */
+function findPalette(id) {
+  for (var i = 0; i < project.palettes.length; i++) if (project.palettes[i].id === id) return project.palettes[i];
+  return null;
+}
+function currentPalette() { return findPalette(ui.pal); }
+
+function clampCol() {
+  var pal = currentPalette();
+  if (!pal || !pal.colors.length) ui.col = -1;
+  else if (ui.col >= pal.colors.length) ui.col = pal.colors.length - 1;
+}
+
+function uniqueName(base) {
+  var names = {};
+  project.palettes.forEach(function (q) { names[q.name] = true; });
+  if (!names[base]) return base;
+  var i = 2;
+  while (names[base + ' ' + i]) i++;
+  return base + ' ' + i;
+}
+
+function addPalette(name, colors) {
+  snapshot();
+  var pal = { id: newId('pal', allIds()), name: uniqueName(name), colors: colors.slice(0, MAX_COLOURS) };
+  project.palettes.push(pal);
+  ui.pal = pal.id;
+  ui.col = pal.colors.length ? 0 : -1;
+  saveUi();
+  changed();
+  renderAll();
+  return pal;
+}
+
+function deletePalette(pal) {
+  if (!confirm('Delete the palette “' + pal.name + '”? (Undo brings it back.)')) return;
+  snapshot();
+  var i = project.palettes.indexOf(pal);
+  project.palettes.splice(i, 1);
+  var next = project.palettes[Math.min(i, project.palettes.length - 1)];
+  ui.pal = next ? next.id : null;
+  ui.col = -1;
+  saveUi();
+  changed();
+  renderAll();
+}
+
+function addColour(pal) {
+  if (pal.colors.length >= MAX_COLOURS) return;
+  snapshot();
+  // A new colour starts as a copy of the selected one, which is usually the
+  // one you are about to make a shade of.
+  var src = pal.colors[ui.col] || pal.colors[pal.colors.length - 1] || '#ffffff';
+  pal.colors.splice(ui.col >= 0 ? ui.col + 1 : pal.colors.length, 0, src);
+  ui.col = ui.col >= 0 ? ui.col + 1 : pal.colors.length - 1;
+  saveUi();
+  changed();
+  renderPalettes();
+}
+
+function deleteColour(pal, i) {
+  if (i < 0 || i >= pal.colors.length) return;
+  snapshot();
+  pal.colors.splice(i, 1);
+  ui.col = Math.min(i, pal.colors.length - 1);
+  saveUi();
+  changed();
+  renderPalettes();
+}
+
+function moveColour(pal, from, to) {
+  if (to < 0 || to >= pal.colors.length || from === to) return;
+  snapshot();
+  var c = pal.colors.splice(from, 1)[0];
+  pal.colors.splice(to, 0, c);
+  ui.col = to;
+  saveUi();
+  changed();
+  renderPalettes();
+}
+
+function setColour(pal, i, hex, key) {
+  if (pal.colors[i] === hex) return;
+  snapshot(key);
+  pal.colors[i] = hex;
+  changed();
+}
+
+/* Which colours the panel cannot tell apart: groups of indices sharing one
+   RGB565 value. Exact duplicates are the same problem, reported the same way. */
+function clashes(pal) {
+  var by = {}, groups = [];
+  pal.colors.forEach(function (hex, i) {
+    var c = panelOf(hex).c565;
+    (by[c] = by[c] || []).push(i);
+  });
+  Object.keys(by).forEach(function (k) { if (by[k].length > 1) groups.push({ c565: +k, idx: by[k] }); });
+  return groups;
+}
+
+
+/* --------------------------------------------------------------------------
+   Rendering: palettes
+   --------------------------------------------------------------------------
+   Rebuilt from the model on every change -- a palette is at most 256 cells --
+   except the colour picker, which is never rebuilt while it is in use:
+   replacing an <input type=color> closes the picker under the user's cursor.
+   -------------------------------------------------------------------------- */
+var $ = function (id) { return document.getElementById(id); };
+
+function el(tag, cls, text) {
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+function typeLabel(bpp) { return bpp ? bpp + '-bit' : '—'; }
+
+function renderPalList() {
+  var box = $('palList');
+  box.innerHTML = '';
+  if (!project.palettes.length) {
+    box.appendChild(el('div', 'empty-note', 'No palettes yet.'));
+    return;
+  }
+  project.palettes.forEach(function (pal) {
+    var row = el('div', 'prow' + (pal.id === ui.pal ? ' sel' : ''));
+    row.appendChild(el('span', 'nm', pal.name));
+    row.appendChild(el('span', 'tag', pal.colors.length + ' · ' + typeLabel(bppFor(pal.colors.length))));
+    var strip = el('div', 'strip');
+    pal.colors.slice(0, 16).forEach(function (hex) {
+      var s = el('span');
+      s.style.background = panelOf(hex).hex;
+      strip.appendChild(s);
+    });
+    if (pal.colors.length > 16) strip.appendChild(el('em', null, '+' + (pal.colors.length - 16)));
+    row.appendChild(strip);
+    row.onclick = function () {
+      ui.pal = pal.id;
+      ui.col = pal.colors.length ? 0 : -1;
+      saveUi();
+      renderPalettes();
+    };
+    box.appendChild(row);
+  });
+}
+
+var dragFrom = -1;
+
+function renderPalGrid() {
+  var pal = currentPalette();
+  var grid = $('palGrid');
+  grid.innerHTML = '';
+  if (!pal) return;
+  var clashed = {};
+  clashes(pal).forEach(function (g) { g.idx.forEach(function (i) { clashed[i] = true; }); });
+
+  pal.colors.forEach(function (hex, i) {
+    var shown = panelOf(hex);
+    var cell = el('div', 'cell' + (i === ui.col ? ' sel' : ''));
+    cell.draggable = true;
+    var chip = el('div', 'chipc');
+    chip.style.background = shown.hex;
+    var ink = inkOn(shown.hex);
+    var idx = el('span', 'idx', String(i));
+    idx.style.color = ink;
+    chip.appendChild(idx);
+    if (shown.hex !== hex) {
+      var mark = el('span', 'mark', '≈');
+      mark.style.color = ink;
+      mark.title = 'Stored as ' + hex + '; the panel shows ' + shown.hex;
+      chip.appendChild(mark);
+    }
+    if (clashed[i]) {
+      var cl = el('span', 'clash');
+      cl.title = 'Another colour becomes the same on the panel';
+      chip.appendChild(cl);
+    }
+    cell.appendChild(chip);
+    cell.appendChild(el('div', 'hx', hex));
+    cell.title = 'Index ' + i + ' · ' + hex + ' → panel ' + shown.hex + ' (' + hex565(shown.c565) + ')';
+
+    cell.onclick = function () { ui.col = i; saveUi(); renderPalGrid(); renderColEdit(); };
+
+    // Drag to reorder. The drop goes BEFORE the cell it lands on; dropping
+    // on the "+" cell puts it last.
+    cell.ondragstart = function (e) {
+      dragFrom = i;
+      cell.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+    };
+    cell.ondragend = function () { dragFrom = -1; cell.classList.remove('dragging'); };
+    cell.ondragover = function (e) {
+      if (dragFrom < 0) return;
+      e.preventDefault();
+      cell.classList.add('dropbefore');
+    };
+    cell.ondragleave = function () { cell.classList.remove('dropbefore'); };
+    cell.ondrop = function (e) {
+      e.preventDefault();
+      cell.classList.remove('dropbefore');
+      if (dragFrom < 0) return;
+      var to = dragFrom < i ? i - 1 : i;
+      moveColour(pal, dragFrom, to);
+    };
+    grid.appendChild(cell);
+  });
+
+  var full = pal.colors.length >= MAX_COLOURS;
+  var add = el('div', 'cell add' + (full ? ' off' : ''), '+');
+  add.title = full ? '256 colours is the most an 8-bit image can index' : 'Add a colour after the selected one';
+  add.onclick = function () { if (!full) addColour(pal); };
+  add.ondragover = function (e) { if (dragFrom >= 0) e.preventDefault(); };
+  add.ondrop = function (e) { e.preventDefault(); if (dragFrom >= 0) moveColour(pal, dragFrom, pal.colors.length - 1); };
+  grid.appendChild(add);
+}
+
+function renderPalHead() {
+  var pal = currentPalette();
+  if (!pal) return;
+  if (document.activeElement !== $('palName')) $('palName').value = pal.name;
+  var d = depthInfo(pal.colors.length);
+  var badge = $('palBadge');
+  badge.textContent = pal.colors.length
+    ? pal.colors.length + ' colour' + (pal.colors.length === 1 ? '' : 's') + ' · ' + typeLabel(d.opaque) + ' palette'
+    : 'empty';
+  badge.className = 'badge' + (pal.colors.length ? '' : ' warn');
+}
+
+function renderColEdit() {
+  var box = $('colEdit');
+  var pal = currentPalette();
+  box.innerHTML = '';
+  var h = el('h3', null, 'Colour');
+  box.appendChild(h);
+  if (!pal || ui.col < 0 || ui.col >= pal.colors.length) {
+    box.appendChild(el('p', 'note', pal ? 'Select a colour to edit it.' : 'No palette selected.'));
+    return;
+  }
+  var i = ui.col, hex = pal.colors[i];
+  h.textContent = 'Colour ' + i;
+
+  var row = el('div', 'pickrow');
+  var pick = document.createElement('input');
+  pick.type = 'color';
+  pick.id = 'colPick';
+  pick.value = hex;
+  var txt = document.createElement('input');
+  txt.type = 'text';
+  txt.className = 'text hex';
+  txt.value = hex;
+  txt.spellcheck = false;
+  txt.maxLength = 7;
+  row.appendChild(pick);
+  row.appendChild(txt);
+  box.appendChild(row);
+
+  var shownBox = el('div', 'panelsw');
+  box.appendChild(shownBox);
+  var off = el('p', 'note');
+  box.appendChild(off);
+
+  function paintShown(cur) {
+    var s = panelOf(cur);
+    shownBox.innerHTML = '';
+    var sw = el('span', 'sw');
+    sw.style.background = s.hex;
+    shownBox.appendChild(sw);
+    shownBox.appendChild(el('span', null, 'panel ' + s.hex + ' · ' + hex565(s.c565)));
+    off.innerHTML = '';
+    if (s.hex !== cur) {
+      off.textContent = 'The panel cannot show ' + cur + ' exactly. ';
+      var snap = el('button', 'chip', 'Snap to 565');
+      snap.type = 'button';
+      snap.style.marginTop = '6px';
+      snap.onclick = function () {
+        setColour(pal, i, s.hex);
+        renderPalettes();
+      };
+      off.appendChild(el('br'));
+      off.appendChild(snap);
+    } else {
+      off.textContent = 'Exact: the panel shows this colour as stored.';
+    }
+  }
+  paintShown(hex);
+
+  // Live while dragging: model, grid and panel readout update, but THIS
+  // editor is left alone, or the picker would close mid-drag.
+  pick.oninput = function () {
+    setColour(pal, i, pick.value, 'pick:' + pal.id + ':' + i);
+    txt.value = pick.value;
+    paintShown(pick.value);
+    renderPalGrid(); renderPalList(); renderPalHead(); renderPalDepth(); renderPalWarn(); renderPalActions();
+  };
+  pick.onchange = function () { lastKey = null; };
+
+  txt.onchange = function () {
+    var v = normHex(txt.value);
+    if (!v) { txt.value = pal.colors[i]; toast('Colours are six hex digits, like #ff8800'); return; }
+    setColour(pal, i, v);
+    renderPalettes();
+  };
+  txt.onkeydown = function (e) { if (e.key === 'Enter') txt.blur(); };
+
+  var btns = el('div', 'btnrow');
+  var left = el('button', 'chip', '◀ Move');
+  left.type = 'button'; left.disabled = i === 0;
+  left.onclick = function () { moveColour(pal, i, i - 1); };
+  var right = el('button', 'chip', 'Move ▶');
+  right.type = 'button'; right.disabled = i === pal.colors.length - 1;
+  right.onclick = function () { moveColour(pal, i, i + 1); };
+  var del = el('button', 'chip danger', 'Delete');
+  del.type = 'button';
+  del.onclick = function () { deleteColour(pal, i); };
+  btns.appendChild(left); btns.appendChild(right); btns.appendChild(del);
+  box.appendChild(btns);
+}
+
+function renderPalDepth() {
+  var box = $('palDepth');
+  var pal = currentPalette();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Bit depth'));
+  if (!pal) return;
+  var d = depthInfo(pal.colors.length);
+  if (!d.n) { box.appendChild(el('p', 'note', 'Add colours to see what this palette costs.')); return; }
+
+  var t = el('table', 'kv');
+  function kv(a, b, cls) {
+    var tr = el('tr'); tr.appendChild(el('td', null, a));
+    var td = el('td', cls || null, b); tr.appendChild(td); t.appendChild(tr);
+  }
+  kv('Opaque sprites', typeLabel(d.opaque) + ' · ' + d.n + ' of ' + d.slotsOpaque + ' slots');
+  if (d.noTransp) kv('With transparency', 'impossible');
+  else kv('With transparency', typeLabel(d.transp) + ' · ' + (d.n + 1) + ' of ' + d.slotsTransp + ' slots');
+  kv('Palette in flash', bytesLabel(paletteBytes(d.opaque)) + (d.bumps ? ' / ' + bytesLabel(paletteBytes(d.transp)) : ''));
+  box.appendChild(t);
+
+  if (d.bumps) {
+    box.appendChild(el('p', 'note warn', 'The transparent slot pushes a sprite from ' + d.opaque
+      + ' to ' + d.transp + ' bpp: ' + (d.transp / d.opaque) + '× the size. One colour fewer '
+      + 'would keep transparent sprites at ' + d.opaque + ' bpp.'));
+  }
+
+  // What one frame costs, at a few sizes and at the camera's.
+  var sizes = [[8, 8], [16, 16], [32, 32]];
+  var cw = project.camera.w, ch = project.camera.h;
+  if (!sizes.some(function (s) { return s[0] === cw && s[1] === ch; })) sizes.push([cw, ch]);
+  var tab = el('table', 'cost');
+  var hr = el('tr');
+  ['one frame', 'opaque', d.noTransp ? '' : 'transparent'].forEach(function (x) { hr.appendChild(el('th', null, x)); });
+  tab.appendChild(hr);
+  sizes.forEach(function (s) {
+    var tr = el('tr');
+    var cam = s[0] === cw && s[1] === ch && !(s[0] === 8 || s[0] === 16 || s[0] === 32) ? ' (camera)' : '';
+    tr.appendChild(el('td', null, s[0] + '×' + s[1] + cam));
+    tr.appendChild(el('td', null, bytesLabel(frameBytes(s[0], s[1], d.opaque))));
+    tr.appendChild(el('td', d.bumps ? 'up' : null, d.noTransp ? '' : bytesLabel(frameBytes(s[0], s[1], d.transp))));
+    tab.appendChild(tr);
+  });
+  box.appendChild(tab);
+  box.appendChild(el('p', 'note', 'Per frame of pixel data; each row rounds up to whole bytes, '
+    + 'as the engine stores it. Multiply by frames, add the palette once per sprite.'));
+}
+
+function renderPalWarn() {
+  var box = $('palWarn');
+  var pal = currentPalette();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Checks'));
+  if (!pal) return;
+  var ul = el('ul', 'warns');
+  function li(cls, text) { ul.appendChild(el('li', cls, text)); }
+
+  var n = pal.colors.length;
+  if (!n) li('bad', 'Empty: a sprite needs at least one colour.');
+  if (n === 1) li('info', 'One colour is still stored at 1 bpp — the engine has no 0-bit images.');
+  clashes(pal).forEach(function (g) {
+    var same = g.idx.every(function (i) { return pal.colors[i] === pal.colors[g.idx[0]]; });
+    li('bad', 'Colours ' + g.idx.join(', ') + (same ? ' are identical.' : ' become the same on the panel (' + hex565(g.c565) + ').')
+      + ' Art drawn with them will look the same on the device.');
+  });
+  var inexact = pal.colors.filter(function (h) { return panelOf(h).hex !== h; }).length;
+  if (inexact) li('info', inexact + ' colour' + (inexact === 1 ? ' is' : 's are') + ' not exactly '
+    + 'representable (≈). Harmless — the export truncates them — but snapping makes what you '
+    + 'store the same as what you see.');
+  if (depthInfo(n).noTransp) li('warn', '256 colours fill 8 bpp: a sprite using this palette cannot have transparency.');
+  if (!ul.children.length) li('info', 'Nothing to report.');
+  box.appendChild(ul);
+}
+
+function renderPalActions() {
+  var box = $('palActions');
+  var pal = currentPalette();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Palette'));
+  if (!pal) return;
+
+  function btn(label, fn, cls, disabled, title) {
+    var b = el('button', 'chip' + (cls ? ' ' + cls : ''), label);
+    b.type = 'button'; b.disabled = !!disabled; if (title) b.title = title;
+    b.onclick = fn;
+    return b;
+  }
+  var r1 = el('div', 'btnrow');
+  var inexact = pal.colors.some(function (h) { return panelOf(h).hex !== h; });
+  r1.appendChild(btn('Snap all to 565', function () {
+    snapshot();
+    pal.colors = pal.colors.map(function (h) { return panelOf(h).hex; });
+    changed(); renderPalettes(); toast('Every colour now stores exactly what the panel shows');
+  }, null, !inexact, 'Replace each colour with the one the panel will actually show'));
+  r1.appendChild(btn('Duplicate', function () {
+    addPalette(pal.name + ' copy', pal.colors);
+    toast('Duplicated — same order, so it works as a swap palette');
+  }, null, false, 'A copy in the same order: recolour it for a palette swap'));
+  box.appendChild(r1);
+
+  var r2 = el('div', 'btnrow');
+  r2.appendChild(btn('Export .gpl', function () {
+    downloadText(slug(pal.name) + '.gpl', gplText(pal));
+    toast('Saved — load it in Aseprite from the palette menu');
+  }, null, !pal.colors.length, 'GIMP palette: Aseprite loads it directly'));
+  r2.appendChild(btn('Export .hex', function () {
+    downloadText(slug(pal.name) + '.hex', hexText(pal));
+  }, null, !pal.colors.length, 'One RRGGBB per line, as Lospec uses'));
+  box.appendChild(r2);
+
+  var r3 = el('div', 'btnrow');
+  r3.appendChild(btn('Delete palette', function () { deletePalette(pal); }, 'danger'));
+  box.appendChild(r3);
+
+  box.appendChild(el('p', 'note', 'Exports write colours as stored. Draw in Aseprite with this '
+    + 'palette and phase 2’s import will match every pixel to its index.'));
+}
+
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'palette';
+}
+
+function renderPalettes() {
+  var pal = currentPalette();
+  if (!pal && project.palettes.length) { ui.pal = project.palettes[0].id; pal = currentPalette(); }
+  clampCol();
+  $('palEmpty').hidden = !!pal;
+  $('palEditor').hidden = !pal;
+  $('palInspector').hidden = !pal;
+  renderPalList();
+  if (!pal) return;
+  renderPalHead();
+  renderPalGrid();
+  renderColEdit();
+  renderPalDepth();
+  renderPalWarn();
+  renderPalActions();
+}
+
+
+/* --------------------------------------------------------------------------
+   Rendering: scene (phase 1 -- the frame the scene will fill)
+   -------------------------------------------------------------------------- */
+var sceneCv = $('sceneCanvas');
+
+function renderSceneFields() {
+  [['camW', project.camera.w], ['camH', project.camera.h], ['sceneW', project.scene.w], ['sceneH', project.scene.h]]
+    .forEach(function (p) { if (document.activeElement !== $(p[0])) $(p[0]).value = p[1]; });
+}
+
+function drawScene() {
+  if (ui.tab !== 'scene') return;
+  var r = sceneCv.getBoundingClientRect();
+  var dpr = window.devicePixelRatio || 1;
+  var W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
+  sceneCv.width = W * dpr; sceneCv.height = H * dpr;
+  var g = sceneCv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#14141a';
+  g.fillRect(0, 0, W, H);
+
+  var sw = project.scene.w, sh = project.scene.h, cw = project.camera.w, ch = project.camera.h;
+  // Whole pixels per scene pixel where it fits, so a pixel-art scene is
+  // never shown at a blurry fractional scale.
+  var fit = Math.min((W - 60) / sw, (H - 60) / sh);
+  var k = fit >= 1 ? Math.floor(fit) : fit;
+  var x0 = Math.round((W - sw * k) / 2), y0 = Math.round((H - sh * k) / 2);
+
+  g.fillStyle = '#1c1c24';
+  g.fillRect(x0, y0, sw * k, sh * k);
+  if (k >= 6) {                         // a pixel grid, once pixels are big enough to see
+    g.strokeStyle = 'rgba(255,255,255,0.04)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (var x = 1; x < sw; x++) { g.moveTo(x0 + x * k + 0.5, y0); g.lineTo(x0 + x * k + 0.5, y0 + sh * k); }
+    for (var y = 1; y < sh; y++) { g.moveTo(x0, y0 + y * k + 0.5); g.lineTo(x0 + sw * k, y0 + y * k + 0.5); }
+    g.stroke();
+  }
+  g.strokeStyle = '#33333f';
+  g.strokeRect(x0 + 0.5, y0 + 0.5, sw * k - 1, sh * k - 1);
+
+  g.strokeStyle = '#b98cff';
+  g.lineWidth = 2;
+  g.strokeRect(x0 + 1, y0 + 1, cw * k - 2, ch * k - 2);
+
+  g.fillStyle = '#a2a2a4';
+  g.font = '11px ui-monospace, Menlo, Consolas, monospace';
+  g.textBaseline = 'bottom';
+  g.fillText('scene ' + sw + '×' + sh + (k >= 1 ? '  ·  ' + k + '× zoom' : ''), x0, y0 - 6);
+  g.fillStyle = '#b98cff';
+  g.textBaseline = 'top';
+  g.fillText('camera ' + cw + '×' + ch, x0 + 6, y0 + 6);
+}
+
+if (window.ResizeObserver) new ResizeObserver(function () { drawScene(); }).observe($('sceneStage'));
+
+function sceneField(id, apply) {
+  $(id).onchange = function () {
+    var before = JSON.stringify([project.camera, project.scene]);
+    var next = JSON.parse(before);
+    apply(next, this.value);
+    var askedW = next[1].w, askedH = next[1].h;
+    next[1].w = Math.max(next[0].w, next[1].w);        // the scene is never smaller than the camera
+    next[1].h = Math.max(next[0].h, next[1].h);
+    // Say so when that rule overrides what was typed; a silent correction
+    // looks like the field ignoring you.
+    if (next[1].w !== askedW || next[1].h !== askedH) {
+      toast(/^scene/.test(id) ? 'The scene can’t be smaller than the camera'
+                              : 'The scene grew to keep the camera inside it');
+    }
+    if (JSON.stringify(next) === before) { renderSceneFields(); return; }
+    snapshot();
+    project.camera = next[0];
+    project.scene = next[1];
+    changed();
+    renderSceneFields();
+    drawScene();
+    if (ui.tab === 'palettes') renderPalDepth();
+  };
+}
+sceneField('camW', function (n, v) { n[0].w = intIn(v, 1, MAX_CAMERA, n[0].w); });
+sceneField('camH', function (n, v) { n[0].h = intIn(v, 1, MAX_CAMERA, n[0].h); });
+sceneField('sceneW', function (n, v) { n[1].w = intIn(v, 1, MAX_SCENE, n[1].w); });
+sceneField('sceneH', function (n, v) { n[1].h = intIn(v, 1, MAX_SCENE, n[1].h); });
+
+
+/* --------------------------------------------------------------------------
+   Shell: tabs, header, keys
+   -------------------------------------------------------------------------- */
+function setTab(tab) {
+  ui.tab = tab;
+  saveUi();
+  ['scene', 'objects', 'palettes'].forEach(function (t) {
+    $('view-' + t).hidden = t !== tab;
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-tab') === tab);
+  });
+  if (tab === 'scene') { renderSceneFields(); drawScene(); }
+  if (tab === 'palettes') renderPalettes();
+}
+
+Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
+  b.onclick = function () { setTab(b.getAttribute('data-tab')); };
+});
+
+function syncUndoButtons() {
+  $('undoBtn').disabled = !past.length;
+  $('redoBtn').disabled = !future.length;
+}
+
+function renderAll() {
+  if (document.activeElement !== $('projName')) $('projName').value = project.name;
+  document.title = project.name && project.name !== 'untitled' ? project.name + ' — Canvas' : 'Canvas';
+  syncUndoButtons();
+  setTab(ui.tab);
+}
+
+$('projName').oninput = function () {
+  snapshot('name');
+  project.name = this.value.slice(0, 60) || 'untitled';
+  changed();
+  document.title = project.name + ' — Canvas';
+};
+$('projName').onkeydown = function (e) { if (e.key === 'Enter') this.blur(); };
+
+$('palName').oninput = function () {
+  var pal = currentPalette();
+  if (!pal) return;
+  snapshot('palname:' + pal.id);
+  pal.name = this.value.slice(0, 40) || 'palette';
+  changed();
+  renderPalList();
+};
+$('palName').onkeydown = function (e) { if (e.key === 'Enter') this.blur(); };
+
+$('undoBtn').onclick = undo;
+$('redoBtn').onclick = redo;
+
+$('newBtn').onclick = function () {
+  snapshot();
+  project = blankProject();
+  ui.pal = null; ui.col = -1;
+  saveUi(); changed(); renderAll();
+  toast('New project — Undo brings the old one back');
+};
+
+$('saveBtn').onclick = saveFile;
+function saveFile() {
+  Fantoma.downloadJSON(fileBase() + '.canvas.json', project);
+  toast('Saved ' + fileBase() + '.canvas.json');
+}
+
+$('openBtn').onclick = function () {
+  Fantoma.readJSONFile().then(function (raw) {
+    var next = normProject(raw);
+    snapshot();
+    project = next;
+    ui.pal = project.palettes.length ? project.palettes[0].id : null;
+    ui.col = -1;
+    saveUi(); changed(); renderAll();
+    toast('Opened “' + project.name + '” — Undo goes back');
+  }).catch(function (err) {
+    if (err && err.message && err.message !== 'No file chosen.') toast(err.message);
+  });
+};
+
+$('palNew').onclick = function () {
+  addPalette('palette', ['#000000', '#ffffff']);
+  setTab('palettes');
+};
+
+$('palImport').onclick = function () {
+  readTextFile('.gpl,.hex,.pal,.txt,text/plain').then(function (f) {
+    var got = parsePalette(f.text, f.name);
+    if (!got.colors.length) { toast('No colours found in ' + f.name); return; }
+    var cut = got.colors.length > MAX_COLOURS;
+    addPalette(got.name, got.colors);
+    toast('Imported ' + Math.min(got.colors.length, MAX_COLOURS) + ' colours'
+      + (cut ? ' — cut to 256, the most an image can index' : ''));
+  }).catch(function (err) { if (err) toast(err.message); });
+};
+
+document.addEventListener('keydown', function (e) {
+  var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '');
+  var mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    if (typing && e.target.type !== 'color') return;     // let a text box undo its own typing
+    e.preventDefault(); undo();
+  } else if (mod && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+    if (typing && e.target.type !== 'color') return;
+    e.preventDefault(); redo();
+  } else if (mod && e.key.toLowerCase() === 's') {
+    e.preventDefault(); saveFile();
+  } else if (!typing && (e.key === 'Delete' || e.key === 'Backspace') && ui.tab === 'palettes') {
+    var pal = currentPalette();
+    if (pal && ui.col >= 0) { e.preventDefault(); deleteColour(pal, ui.col); }
+  } else if (!typing && ui.tab === 'palettes' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    var p2 = currentPalette();
+    if (!p2 || !p2.colors.length) return;
+    var d = e.key === 'ArrowLeft' ? -1 : 1;
+    if (e.altKey) { e.preventDefault(); moveColour(p2, ui.col, ui.col + d); return; }
+    ui.col = Math.max(0, Math.min(p2.colors.length - 1, (ui.col < 0 ? 0 : ui.col + d)));
+    saveUi(); renderPalGrid(); renderColEdit();
+  }
+});
+
+// Close the backup dropdown when clicking elsewhere.
+document.addEventListener('click', function (e) {
+  var fold = $('dataFold');
+  if (fold.open && !fold.contains(e.target)) fold.open = false;
+});
+
+function checkWidth() { $('narrow').hidden = window.innerWidth >= 900; }
+window.addEventListener('resize', checkWidth);
+
+var toastTimer = null;
+function toast(msg) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+}
+
+
+/* --------------------------------------------------------------------------
+   Boot
+   -------------------------------------------------------------------------- */
+if (!findPalette(ui.pal)) ui.pal = project.palettes.length ? project.palettes[0].id : null;
+checkWidth();
+renderAll();
+
+FantomaApp.init({
+  toolId: TOOL_ID,
+  store: store,
+  accent: '#b98cff',
+  mountInto: $('dataBox'),
+  hubLinkInto: $('hubSlot'),
+  onImport: function () {
+    try { project = normProject(store.get('project')); } catch (e) { project = blankProject(); }
+    ui = store.get('ui', ui) || ui;
+    past = []; future = [];
+    renderAll();
+    toast('Backup imported');
+  }
+});
+</script>
+</body>
+</html>

@@ -19,6 +19,7 @@ Live at: `https://<your-github-username>.github.io/fantoma-tools/`
 | [SFX Forge](tools/sfx-forge/) | Compose buzzer melodies and frequency sweeps, export a `SoundStep[]` C array for `cpp/fantoma/sound.h` |
 | [Model Viewer](tools/model-viewer/) | The case parts shown assembled. Pick between printed versions, colour them, download any part — or several on one plate — ready to slice |
 | [Protoplaca](tools/protoplaca/) | Replace a breadboard with a printed plate. Draw the components and the wires between them; get bosses and wire tunnels to print, and a 3D tab that says whether it all fits. English and European Portuguese |
+| [Canvas](tools/canvas/) | Palettes, sprites and scenes for the arcade engine, shown as the panel will show them; exports what `fantoma/docs/image-format.md` specifies. Desktop only. Being built in phases |
 
 ---
 
@@ -416,6 +417,49 @@ why:
 - **The smallest ISO page that fits**, A4 first, turned landscape if that is
   what fits; past A4 the message says so, since most home printers stop there.
   Big pages lower the dpi to stay under 12 megapixels, for phones.
+
+---
+
+## Canvas: art for the arcade engine, built in phases
+
+Composes palettes, sprites and scenes and previews them the way the LED panel
+will show them. Its contract with the engine is **`fantoma/docs/image-format.md`**:
+the export follows that file and nothing else. What the engine does not read
+-- preview colliders, paths, scene placement -- lives only in Canvas's own
+`.canvas.json`, so it can change without touching the engine. Desktop only;
+Pixel Studio is the phone tool. English only, being Pedro's own.
+
+**Phase 1 is built**: the shell, the project file, and palettes.
+
+- **Colour is shown as the panel receives it.** Every swatch is cut to RGB565 by
+  truncation, exactly as `rgb565()` in `image.h` and `img2c.py` do, then
+  expanded back by bit replication, as `rgb565_r8/g8/b8` do on the way to the
+  panel. The panel's own response (its CIE1931 curve, the acrylic) is not
+  modelled: the spec records it as unmeasured, and a guessed curve would only
+  look authoritative. A `≈` marks a colour the panel cannot show exactly;
+  "Snap to 565" makes what is stored equal what is seen.
+- **The palette type is computed, never typed**: 1, 2, 4 or 8 bpp, because those
+  are the only depths `image.h` has. Beside it, the same palette with a
+  transparent slot, flagged when that slot doubles every sprite's size, as the
+  spec asks tools to say.
+- **Byte costs are the engine's**: rows round up to whole bytes
+  (`stride = ceil(w * bpp / 8)`), so a 10 px row at 1 bpp costs 2 bytes.
+- **Order is identity.** A sprite stores palette *positions*, and a palette
+  swap only works if index 2 means the same thing in every palette; so indices
+  are shown on every swatch and reordering is deliberate (drag, or Alt+arrows).
+- **Aseprite round trip**: export a palette as `.gpl` and load it in Aseprite;
+  art drawn with it carries the exact stored colours, which is what phase 2's
+  import will match pixels to indices by. Import reads `.gpl`, JASC `.pal` and
+  Lospec `.hex`.
+- **Undo from the start**: whole-document snapshots, because a project is a few
+  kilobytes and a snapshot cannot forget to describe its own inverse.
+- **Camera and scene size are per project**, never hardcoded; 64 × 64 is only
+  the default.
+
+Next: phase 2 (objects, states and frames by Aseprite import, the animated
+preview on the engine's 16 ms tick, the byte budget), then phase 3 (the export,
+checked by decoding against `build_hero.py`'s headers), then the scene, paths,
+and a built-in editor.
 
 ---
 
