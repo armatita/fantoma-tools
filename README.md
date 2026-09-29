@@ -280,6 +280,7 @@ fantoma-tools/
     theme.css                 hub styling only; tools keep their own look
   scripts/
     make_icons.py             regenerates every icon (no dependencies)
+    check_header.py           proves a Canvas export by decoding it (see Canvas)
   tools/
     pixel-studio/
       index.html  manifest.webmanifest  sw.js  icons/
@@ -294,6 +295,8 @@ fantoma-tools/
     protoplaca/
       index.html  manifest.webmanifest  sw.js  icons/
       DESIGN.md               what it is for, and why each decision went the way it did
+    canvas/
+      index.html  manifest.webmanifest  sw.js  icons/
 ```
 
 ---
@@ -478,52 +481,74 @@ Pixel Studio is the phone tool. English only, being Pedro's own.
 - **The preview is the device's arithmetic**: `image_frame_at()`'s divide and
   modulo, on elapsed time floored to the 16 ms display tick. Reverse and
   ping-pong are expanded the way the export will expand them. Empty pixels
-  are black by default, because an unlit LED is.
+  are dark grey by default: black is what an unlit LED is, but it is also the
+  usual outline colour, and an outline on black disappears.
 - **The flash budget** counts expanded frames, byte-aligned rows, the palette,
   and a 24-byte `Image` plus a 4-byte table entry per state (ESP32 pointers).
 - **Names are C symbols**, made valid on import (`Loop` becomes `loop`) and
   refused where they would collide with the header's own (`palette`, `states`,
   `state_count`, the cell and box defines, anything ending `_data`).
 
-### Phase 3 plan: the export (not built yet)
+**Phase 3 is built**: the export, one C header per object, from the Export
+section under the flash budget (**Download `<obj>.h`**, or **Copy**).
 
-The contract is `fantoma/docs/image-format.md`, which already shows the full
-header shape. Split in two, so each half ends somewhere finished:
+- **The header is the one `image-format.md` shows**: one shared
+  `<obj>_palette[1 << bpp]` (RGB565 by truncation, padded with `0x0000`); per
+  state a `<obj>_<state>_data[]` and an `Image` with every field in
+  declaration order, `frame_ms = 0` for a still; then
+  `enum { <OBJ>_<STATE> = 0, ..., <OBJ>_STATE_COUNT }`,
+  `<obj>_states[<OBJ>_STATE_COUNT]`, and `<OBJ>_CELL_W/H`, `<OBJ>_BOX_W/H`.
+- **Transparency is slot 0**, and every stored index `k` is written as `k + 1`,
+  as `img2c.py --transparent` does. Reverse and ping-pong are expanded into
+  forward frames (`playOrder()`, the preview's own order).
+- **The include guard is `CANVAS_<OBJ>_H`**, not `<OBJ>_H`: a state named `h`
+  would make that an enum value as well, and the header would not compile.
+- **The `#include` path is per project**, with the two known answers offered:
+  `../engine/image.h` for `cpp/fantoma/assets/`, `../../fantoma/engine/image.h`
+  for the `cpp/refactor/` workbench.
+- **Refused**: no palette, more than 256 slots, an index past the palette, a
+  name problem, a symbol defined twice, a symbol `image.h` already defines
+  (object `image` + state `row` is `image_row()`), and a clash with another
+  object in the project (`hero` + `idle_x` vs `hero_idle` + `x`).
+- **Warned**, in the panel and in the header's opening comment so the note
+  travels with the file: transparency bumping the bpp, colours that are one
+  RGB565 value, durations under the 16 ms tick or of 0, play-once (exported as
+  a loop: no `ANIM_ONCE` yet), per-frame durations flattened, a box offset
+  the engine ignores, an empty box, a clash with `build_hero.py`'s headers,
+  and for `hero`, the unrelated `games/platformer/hero.h`.
+- **A self-check on every export**: the packed bytes are read back the way
+  `image_pixel()` reads them and compared with the art, pixel by pixel. A
+  packing bug stops the export instead of reaching the panel looking like an
+  art problem.
 
-**3a: generate.** One header per object, downloaded as `<obj>.h`:
+**How it was proven** (2026-09-29), with `scripts/check_header.py`: a decoder
+written from `image.h`, not from Canvas's JavaScript, that compares headers
+image by image -- the same fields, and the same RGB565 colour or transparency at
+every pixel of every frame. Not a byte diff: `img2c.py`'s palette order is
+Pillow's choice, Canvas's is the author's.
 
-- One `<obj>_palette[1 << bpp]` of RGB565 (truncation, `rgb565()` in
-  `image.h`), padded with `0x0000`. **With transparency, slot 0 is the
-  transparent entry (`0x0000`) and every stored index `k` is exported as
-  `k + 1`**, exactly as `img2c.py --transparent` does; `.flags =
-  IMAGE_HAS_TRANSPARENT, .transparent = 0`. Without it, indices export as
-  stored and `.flags = 0, .transparent = 0`.
-- Per state: `<obj>_<state>_data[]`, frames in `playOrder()` (reverse and
-  ping-pong expanded), MSB-first, rows padded to `stride = (w*bpp + 7) / 8`;
-  then `static const Image <obj>_<state>` with **every field in declaration
-  order** (C++ under `-Werror`), `frame_ms = 0` for a single frame.
-- `enum { <OBJ>_<STATE> = 0, ..., <OBJ>_STATE_COUNT };`,
-  `static const Image *const <obj>_states[<OBJ>_STATE_COUNT]`,
-  `<OBJ>_CELL_W/H`, `<OBJ>_BOX_W/H` (the box's size; an offset is warned,
-  not exported).
-- The `#include` path is an option: `../engine/image.h` for
-  `cpp/fantoma/assets/`, `../../fantoma/engine/image.h` for the
-  `cpp/refactor/` workbench.
-- Refuse to export on a name problem (`stateNameProblem()` already exists)
-  or a symbol clash across objects (`hero` + `idle_x` vs `hero_idle` + `x`).
-  Warn, as the spec asks, on: the transparency bpp bump, durations under
-  17 ms, play-once, a box offset, and a clash with a `build_hero.py` header
-  (`hero_idle`...), since one build must not include both.
+- `hero.h`, imported from the hero sheet by `build_hero.py`'s rules (4x8
+  cells, eleven tags), against the eleven `cpp/refactor/assets/hero_*.h`:
+  **all 11 states, 38 frames, identical.**
+- Six synthetic sprites against `img2c.py` on the same pixels, for what the
+  hero does not exercise: 1 bpp (opaque, and one colour + transparent),
+  2 bpp, 4 bpp and 8 bpp, rows ending mid-byte, reverse, ping-pong, a still.
+  **All identical.**
+- The checker was shown to fail: a flipped pixel, a changed `frame_ms`, two
+  swapped fields, a short palette and a reordered enum are each caught.
+- Every export compiles as C99 and C++20 under
+  `-Wall -Wextra -Werror -pedantic` (MSYS2 gcc 15), and a dump through
+  `image.h`'s own `image_decode_row_idx()` matches the Python decoder row for
+  row.
 
-**3b: prove.** A test page or script that decodes headers the way
-`image_decode_row_idx()` does, and compares Canvas's `hero.h` against the
-eleven `cpp/refactor/assets/hero_*.h`: the same RGB565 colour or
-transparency at every pixel of every frame, and the same width, height,
-frames, stride, bpp, flags and `frame_ms` per state. Byte-for-byte
-equality is **not** the test, because `img2c.py`'s palette order is
-Pillow's choice. The hero's import JSON is built with `build_hero.py`'s own
-rules (4x8 cells, frames counted from the alpha channel; see that script).
-Then Pedro compiles it in the sketch (`.\flash build`, compile only).
+```bash
+python scripts/check_header.py hero.h --against ../fantoma/cpp/refactor/assets/hero_*.h
+```
+
+The glob also matches the hand-written `hero_sprites.h`, which has no `Image`
+of its own and only adds a line to the listing. **Still to do: compile it in
+the sketch** (`.\flash build`, compile only), which is the one check that uses
+the real ESP32 toolchain and the sketch's own flags.
 
 After phase 3: the scene, paths, and a built-in editor.
 

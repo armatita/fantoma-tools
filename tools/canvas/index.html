@@ -405,6 +405,7 @@ h4.mh:first-child { margin-top: 0; }
         <div class="sect" id="objSect"></div>
         <div class="sect" id="stateSect"></div>
         <div class="sect" id="budgetSect"></div>
+        <div class="sect" id="exportSect"></div>
       </div>
     </aside>
   </section>
@@ -483,6 +484,8 @@ h4.mh:first-child { margin-top: 0; }
 var TOOL_ID = 'canvas';
 var FORMAT = 'canvas';
 var VERSION = 1;
+// Where the exported header will #include image.h from; see renderExport().
+var DEFAULT_INCLUDE = '../engine/image.h';
 var MAX_COLOURS = 256;     // 8 bpp: the most image.h can index
 var MAX_CAMERA = 1024;
 var MAX_SCENE = 4096;
@@ -597,6 +600,7 @@ function blankProject() {
     format: FORMAT, version: VERSION, name: 'untitled',
     camera: { w: 64, h: 64 },
     scene: { w: 64, h: 64 },
+    include: DEFAULT_INCLUDE,
     palettes: [],
     objects: []
   };
@@ -623,6 +627,9 @@ function normProject(raw) {
     w: Math.max(p.camera.w, intIn(sc.w, 1, MAX_SCENE, p.camera.w)),
     h: Math.max(p.camera.h, intIn(sc.h, 1, MAX_SCENE, p.camera.h))
   };
+
+  p.include = (typeof raw.include === 'string' && !includeProblem(raw.include.trim()))
+    ? raw.include.trim() : DEFAULT_INCLUDE;
 
   var taken = {};
   p.palettes = (Array.isArray(raw.palettes) ? raw.palettes : []).filter(function (q) {
@@ -2050,6 +2057,371 @@ function renderBudget() {
     + 'as the engine stores it. Descriptors assume the ESP32’s 32-bit pointers (24 B per Image, 4 B per table entry).'));
 }
 
+/* --------------------------------------------------------------------------
+   Export: one C header per object (fantoma/docs/image-format.md)
+   --------------------------------------------------------------------------
+   The header is the contract with the engine, so this follows image.h to
+   the letter:
+     - one <obj>_palette[1 << bpp] of RGB565 by truncation, padded with 0;
+     - with transparency, slot 0 is the transparent entry and every stored
+       index k is written as k + 1, exactly as img2c.py --transparent does;
+     - per state, rows packed MSB-first and padded to whole bytes, frames
+       back-to-back in playOrder(), then an Image with EVERY field in
+       declaration order: the sketch is C++ under -Werror, where a missing
+       or reordered designated initializer is a build failure;
+     - the enum, the state table, and the cell and box defines.
+   The box offset, paths and the scene never reach the header.
+
+   Before anything is handed over, the bytes are decoded back the way
+   image_pixel() reads them and compared with the art, pixel by pixel. A
+   packing bug then stops the export here instead of drawing garbage on the
+   panel -- where it would look like an art problem.
+   -------------------------------------------------------------------------- */
+var INCLUDE_PRESETS = [
+  ['../engine/image.h', 'for cpp/fantoma/assets/'],
+  ['../../fantoma/engine/image.h', 'for cpp/refactor/assets/, the workbench']
+];
+
+// What image.h itself defines. Every exported header includes it, so a name
+// that lands on one of these breaks the build: an object "image" with a
+// state "row" would redefine image_row().
+var IMAGE_H_SYMBOLS = ['Image', 'IMAGE_H', 'IMAGE_HAS_TRANSPARENT', 'rgb565', 'rgb565_r8', 'rgb565_g8',
+  'rgb565_b8', 'image_init', 'image_set_transparent', 'image_frame_bytes', 'image_row', 'image_frame_at',
+  'image_pixel', 'image_color', 'image_pixel_transparent', 'image_decode_row_idx', 'image_decode_row'];
+
+// What build_hero.py's headers and the hand-written hero_sprites.h define in
+// cpp/refactor/assets/. A copy of that script's ROWS, so it can drift; it
+// only feeds a warning, and the compiler names any clash this misses.
+var BUILD_HERO_ROWS = ['idle', 'wall_idle', 'wall_slide', 'wall_climb', 'run', 'ceiling_idle',
+  'ceiling_move', 'jump', 'fall', 'arm_vert', 'arm_horiz'];
+
+function buildHeroSymbols() {
+  var s = ['hero_sprite_states', 'HS_COUNT', 'RF_HERO_SPRITES_H',
+           'HERO_CELL_W', 'HERO_CELL_H', 'HERO_BOX_W', 'HERO_BOX_H'];
+  BUILD_HERO_ROWS.forEach(function (r) {
+    var R = r.toUpperCase();
+    s.push('hero_' + r, 'hero_' + r + '_data', 'hero_' + r + '_palette', 'HERO_' + R + '_H', 'HS_' + R);
+  });
+  return s;
+}
+
+function includeProblem(v) {
+  if (!v) return 'The path cannot be empty.';
+  if (/["<>\\\r\n]/.test(v)) return 'Use forward slashes, and no quotes or angle brackets.';
+  return null;
+}
+
+// Not <OBJ>_H: a state called "h" would make that an enum value too, and
+// `enum { HERO_H = 0 }` after `#define HERO_H` does not compile.
+function headerGuard(o) { return 'CANVAS_' + o.name.toUpperCase() + '_H'; }
+
+// Every name the object's header defines. C is case-sensitive, so
+// hero_idle and HERO_IDLE are different names.
+function objSymbols(o) {
+  var N = o.name, U = N.toUpperCase();
+  var s = [headerGuard(o), N + '_palette', N + '_states', U + '_STATE_COUNT',
+           U + '_CELL_W', U + '_CELL_H', U + '_BOX_W', U + '_BOX_H'];
+  o.states.forEach(function (st) {
+    s.push(N + '_' + st.name, N + '_' + st.name + '_data', U + '_' + st.name.toUpperCase());
+  });
+  return s;
+}
+
+function someNames(a) {
+  return a.slice(0, 3).join(', ') + (a.length > 3 ? ' and ' + (a.length - 3) + ' more' : '');
+}
+
+// { errors, warns }: errors stop the export, warnings go into the header too.
+function exportChecks(o) {
+  var errors = [], warns = [];
+  var pal = findPalette(o.palette), d = objDepth(o);
+  if (!pal) errors.push('Choose a palette.');
+  else if (!d.bpp) errors.push(d.slots + ' palette slots: 256 is the most an image has.');
+  if (!o.states.length) errors.push('There are no states to export.');
+  var top = maxIndex(o);
+  if (pal && top >= pal.colors.length) {
+    errors.push('The art uses colour ' + top + ', which “' + pal.name + '” does not have.');
+  }
+  var oWhy = objectNameProblem(o, o.name);
+  if (oWhy) errors.push('Object name: ' + oWhy);
+  o.states.forEach(function (st) {
+    var why = stateNameProblem(o, st, st.name);
+    if (why) errors.push('State “' + st.name + '”: ' + why);
+  });
+
+  var mine = objSymbols(o), seen = {}, twice = [];
+  mine.forEach(function (s) { if (seen[s]) twice.push(s); seen[s] = true; });
+  if (twice.length) errors.push('The header would define ' + someNames(twice) + ' twice.');
+  var eng = IMAGE_H_SYMBOLS.filter(function (s) { return seen[s]; });
+  if (eng.length) {
+    errors.push(someNames(eng) + ' already ' + (eng.length === 1 ? 'exists' : 'exist')
+      + ' in image.h, which the header includes. Rename the object or the state.');
+  }
+  project.objects.forEach(function (other) {
+    if (other === o || other.name === o.name) return;   // same name: reported above
+    var hit = objSymbols(other).filter(function (s) { return seen[s]; });
+    if (hit.length) {
+      errors.push('This and “' + other.name + '” would both define ' + someNames(hit)
+        + ', so no build could include both. Rename one of them.');
+    }
+  });
+
+  if (d.bumps) {
+    warns.push('Transparency takes a palette slot and pushes this sprite from ' + bppFor(d.n)
+      + ' to ' + d.bpp + ' bpp: ' + (d.bpp / bppFor(d.n)) + 'x the pixel bytes.');
+  }
+  if (pal) {
+    clashes(pal).forEach(function (g) {
+      warns.push('Colours ' + g.idx.join(', ') + ' are the same RGB565 value (' + hex565(g.c565)
+        + '): the panel cannot tell them apart.');
+    });
+  }
+  o.states.forEach(function (st) {
+    var n = playOrder(st).length;
+    if (n > 1 && st.ms === 0) warns.push(st.name + ': frame_ms 0 means a still image; only the first frame shows.');
+    else if (n > 1 && st.ms < 17) warns.push(st.name + ': ' + st.ms + ' ms is under the ~16 ms display tick, so some frames may never be seen.');
+    if (n > 1 && !st.loop) warns.push(st.name + ': tagged to play once, but the engine has no ANIM_ONCE yet, so it loops.');
+    var distinct = st.frameMs.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    if (distinct.length > 1) warns.push(st.name + ': frames had different durations (' + distinct.join(', ') + ' ms); every frame uses ' + st.ms + ' ms.');
+  });
+  if (o.box.x || o.box.y) {
+    warns.push('The box is drawn at (' + o.box.x + ', ' + o.box.y + '), but the engine has no box offset: it uses '
+      + o.box.w + 'x' + o.box.h + ' at the cell’s top-left.');
+  }
+  if (!o.box.w || !o.box.h) warns.push('The collision box has no area, so it collides with nothing.');
+
+  var hero = buildHeroSymbols().filter(function (s) { return seen[s]; });
+  if (hero.length) {
+    warns.push('build_hero.py’s headers in cpp/refactor/assets/ also define ' + someNames(hero)
+      + '. A build must include this header or those, never both.');
+  }
+  if (o.name === 'hero') {
+    warns.push('cpp/refactor/games/platformer/ already has a hero.h (the game code). '
+      + 'Keep this one with the assets, not beside it.');
+  }
+  return { errors: errors, warns: warns };
+}
+
+// One frame of stored values into packed bytes. `map` turns a stored value
+// (palette index, or TRANSPARENT) into the index the engine will read.
+function packFrame(px, w, h, bpp, map) {
+  var stride = (w * bpp + 7) >> 3, out = new Uint8Array(stride * h), top = 1 << bpp;
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var v = map(px[y * w + x]), bit = x * bpp;
+      if (!(v >= 0 && v < top)) throw new Error('index ' + v + ' does not fit ' + bpp + ' bpp');
+      out[y * stride + (bit >> 3)] |= v << (8 - bpp - (bit & 7));
+    }
+  }
+  return out;
+}
+
+// image_pixel(), transcribed: the reader the self-check trusts.
+function readIndex(data, stride, h, l2, f, x, y) {
+  var bit = x << l2, bpp = 1 << l2;
+  var byte = data[f * stride * h + y * stride + (bit >> 3)];
+  return (byte >> (8 - bpp - (bit & 7))) & ((1 << bpp) - 1);
+}
+
+function cArray(values, digits, perLine) {
+  var lines = [];
+  for (var i = 0; i < values.length; i += perLine) {
+    var row = [];
+    for (var j = i; j < Math.min(i + perLine, values.length); j++) {
+      row.push('0x' + ('0000' + values[j].toString(16).toUpperCase()).slice(-digits));
+    }
+    lines.push('    ' + row.join(', ') + ',');
+  }
+  return lines.join('\n');
+}
+
+// Header comments stay ASCII: a UTF-8 dash in img2c's comments already
+// shows up mangled on Windows.
+// And a free-text name holding */ or /* must not end the comment early or
+// trip -Wcomment, which -Werror makes a build failure.
+function asciiOnly(s) {
+  return s.replace(/\*\//g, '* /').replace(/\/\*/g, '/ *').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[—–]/g, '-')
+    .replace(/×/g, 'x').replace(/…/g, '...').replace(/[^\x20-\x7e]/g, '?');
+}
+
+function commentLines(text, width) {
+  var words = asciiOnly(text).split(/\s+/), lines = [], cur = '';
+  words.forEach(function (wd) {
+    if (cur && (cur + ' ' + wd).length > width) { lines.push(cur); cur = wd; }
+    else cur = cur ? cur + ' ' + wd : wd;
+  });
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// { text, bytes } or { errors }. Throws only if the self-check fails.
+function buildHeader(o) {
+  var chk = exportChecks(o);
+  var include = project.include;
+  if (includeProblem(include)) chk.errors.push('#include path: ' + includeProblem(include));
+  if (chk.errors.length) return { errors: chk.errors };
+
+  var pal = findPalette(o.palette), d = objDepth(o);
+  var bpp = d.bpp, l2 = [1, 2, 4, 8].indexOf(bpp), shift = d.t ? 1 : 0;
+  var N = o.name, U = N.toUpperCase(), w = o.w, h = o.h;
+  var stride = (w * bpp + 7) >> 3;
+
+  var palette = [];
+  for (var i = 0; i < (1 << bpp); i++) palette.push(0);
+  var c565 = pal.colors.map(function (hex) { return panelOf(hex).c565; });
+  c565.forEach(function (c, k) { palette[k + shift] = c; });
+  function map(v) { return v === TRANSPARENT ? 0 : v + shift; }
+
+  var blocks = [], totalPixels = 0, totalFrames = 0;
+  o.states.forEach(function (st) {
+    var order = playOrder(st), n = order.length, fb = stride * h;
+    var data = new Uint8Array(fb * n);
+    order.forEach(function (fi, k) { data.set(packFrame(decodeFrame(st.frames[fi]), w, h, bpp, map), k * fb); });
+
+    // The self-check: every pixel of every frame, read back as the engine
+    // reads it, must be the art's colour -- or transparent where the art is.
+    order.forEach(function (fi, k) {
+      var px = decodeFrame(st.frames[fi]);
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var idx = readIndex(data, stride, h, l2, k, x, y), src = px[y * w + x];
+          var ok = src === TRANSPARENT ? (d.t && idx === 0) : (!(d.t && idx === 0) && palette[idx] === c565[src]);
+          if (!ok) throw new Error('Self-check failed: ' + st.name + ' frame ' + k + ' pixel (' + x + ', ' + y + ').');
+        }
+      }
+    });
+
+    var ms = n > 1 ? st.ms : 0;
+    var what = n === 1 ? '1 frame, still (frame_ms = 0)'
+      : n + ' frames at ' + ms + ' ms' + (n !== st.frames.length ? ', ' + st.direction + ' expanded from ' + st.frames.length : '');
+    blocks.push(
+      '/* ' + asciiOnly(st.name + ': ' + what) + ' */\n' +
+      'static const uint8_t ' + N + '_' + st.name + '_data[' + data.length + '] = {\n' +
+      cArray(data, 2, 12) + '\n};\n\n' +
+      'static const Image ' + N + '_' + st.name + ' = {\n' +
+      '    .data     = ' + N + '_' + st.name + '_data,\n' +
+      '    .palette  = ' + N + '_palette,\n' +
+      '    .width    = ' + w + ',\n' +
+      '    .height   = ' + h + ',\n' +
+      '    .frames   = ' + n + ',\n' +
+      '    .stride   = ' + stride + ',\n' +
+      '    .log2_bpp = ' + l2 + ',\n' +
+      '    .flags    = ' + (d.t ? 'IMAGE_HAS_TRANSPARENT' : '0') + ',\n' +
+      '    .transparent = 0,\n' +
+      '    .frame_ms = ' + ms + ',\n' +
+      '};\n');
+    totalPixels += data.length;
+    totalFrames += n;
+  });
+
+  var guard = headerGuard(o);
+  var head = [
+    'Generated by Canvas (fantoma-tools) from project "' + project.name + '"'
+      + (o.source ? ', art from ' + o.source : '') + '. Re-export from Canvas rather than editing.',
+    '',
+    N + ': ' + w + 'x' + h + ' cell, ' + o.states.length + ' state' + (o.states.length === 1 ? '' : 's') + ', '
+      + totalFrames + ' frame' + (totalFrames === 1 ? '' : 's') + ', ' + bpp + ' bpp'
+      + (d.t ? ' with index 0 transparent' : ', opaque') + '. ' + totalPixels + ' B of pixels + '
+      + paletteBytes(bpp) + ' B of palette ("' + pal.name + '", ' + pal.colors.length + ' colours).',
+    '',
+    'Every Image field is written, in declaration order: the sketch is C++ under -Werror, '
+      + 'where a missing designated initializer fails the build. Refer to states by name '
+      + '(' + U + '_' + o.states[0].name.toUpperCase() + '), never by number: the enum follows '
+      + 'the state order in Canvas.'
+  ];
+  if (chk.warns.length) {
+    head.push('');
+    head.push('Export notes:');
+    chk.warns.forEach(function (x) { head.push('- ' + x); });
+  }
+  var comment = [];
+  head.forEach(function (para) {
+    if (!para) { comment.push(' *'); return; }
+    var hang = para.indexOf('- ') === 0 ? '  ' : '';
+    commentLines(para, 72).forEach(function (ln, k) { comment.push(' * ' + (k ? hang : '') + ln); });
+  });
+  comment[0] = '/*' + comment[0].slice(2);
+
+  var text =
+    comment.join('\n') + '\n */\n' +
+    '#ifndef ' + guard + '\n#define ' + guard + '\n\n' +
+    '#include "' + include + '"\n\n' +
+    'static const uint16_t ' + N + '_palette[' + palette.length + '] = {\n' + cArray(palette, 4, 8) + '\n};\n\n' +
+    blocks.join('\n') + '\n' +
+    'enum {\n' +
+    o.states.map(function (st, k) { return '    ' + U + '_' + st.name.toUpperCase() + (k ? '' : ' = 0') + ',\n'; }).join('') +
+    '    ' + U + '_STATE_COUNT\n};\n\n' +
+    'static const Image *const ' + N + '_states[' + U + '_STATE_COUNT] = {\n' +
+    o.states.map(function (st) { return '    &' + N + '_' + st.name + ',\n'; }).join('') +
+    '};\n\n' +
+    '#define ' + U + '_CELL_W ' + w + '\n' +
+    '#define ' + U + '_CELL_H ' + h + '\n' +
+    '#define ' + U + '_BOX_W  ' + o.box.w + '   /* collision box, anchored at the cell\'s top-left */\n' +
+    '#define ' + U + '_BOX_H  ' + o.box.h + '\n\n' +
+    '#endif /* ' + guard + ' */\n';
+  return { text: text, bytes: totalPixels + paletteBytes(bpp), warns: chk.warns };
+}
+
+function exportHeader(o, how) {
+  var r;
+  try { r = buildHeader(o); }
+  catch (e) { toast(e.message + ' Nothing was exported: this is a Canvas bug, please report it.'); return; }
+  if (r.errors) { toast(r.errors[0]); return; }
+  if (how === 'copy') {
+    navigator.clipboard.writeText(r.text).then(function () { toast('Copied ' + o.name + '.h'); },
+      function () { toast('The clipboard refused; use Download instead.'); });
+  } else {
+    downloadText(o.name + '.h', r.text, 'text/x-c');
+    toast('Exported ' + o.name + '.h: ' + bytesLabel(r.bytes) + ' of pixels and palette');
+  }
+}
+
+function renderExport() {
+  var box = $('exportSect'), o = currentObject();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Export'));
+  if (!o) return;
+
+  box.appendChild(el('span', 'lbl', '#include path to image.h'));
+  var inc = document.createElement('input');
+  inc.type = 'text'; inc.className = 'text wide'; inc.spellcheck = false; inc.value = project.include;
+  inc.setAttribute('list', 'incPresets');
+  var dl = document.createElement('datalist');
+  dl.id = 'incPresets';
+  INCLUDE_PRESETS.forEach(function (p) { var op = document.createElement('option'); op.value = p[0]; op.label = p[1]; dl.appendChild(op); });
+  inc.onchange = function () {
+    var v = inc.value.trim(), why = includeProblem(v);
+    if (why) { toast(why); inc.value = project.include; return; }
+    if (v === project.include) { inc.value = v; return; }
+    snapshot(); project.include = v; changed(); renderExport();
+  };
+  inc.onkeydown = function (e) { if (e.key === 'Enter') inc.blur(); };
+  box.appendChild(inc); box.appendChild(dl);
+  box.appendChild(el('p', 'note', 'Relative to where the header will sit. ' + INCLUDE_PRESETS.map(function (p) {
+    return p[0] + ' ' + p[1];
+  }).join('; ') + '. Shared by every object in this project.'));
+
+  var chk = exportChecks(o);
+  if (includeProblem(project.include)) chk.errors.push('#include path: ' + includeProblem(project.include));
+  var ul = el('ul', 'warns');
+  chk.errors.forEach(function (x) { ul.appendChild(el('li', 'bad', x)); });
+  chk.warns.forEach(function (x) { ul.appendChild(el('li', 'warn', x)); });
+  if (!ul.children.length) ul.appendChild(el('li', 'info', 'Nothing to report.'));
+  box.appendChild(ul);
+
+  var br = el('div', 'btnrow');
+  var dlb = el('button', 'chip primary', 'Download ' + o.name + '.h');
+  dlb.type = 'button'; dlb.disabled = chk.errors.length > 0;
+  dlb.onclick = function () { exportHeader(o, 'download'); };
+  var cp = el('button', 'chip', 'Copy');
+  cp.type = 'button'; cp.disabled = chk.errors.length > 0; cp.style.flex = '0 0 64px';
+  cp.onclick = function () { exportHeader(o, 'copy'); };
+  br.appendChild(dlb); br.appendChild(cp);
+  box.appendChild(br);
+  box.appendChild(el('p', 'note', 'Canvas never writes into the repo: save the header beside the other assets yourself. '
+    + 'Warnings are copied into its opening comment, so they travel with it.'));
+}
+
 function renderObjects() {
   var has = project.objects.length > 0;
   if (has && !currentObject()) { ui.obj = project.objects[0].id; ui.state = null; }
@@ -2067,6 +2439,7 @@ function renderObjects() {
   renderObjSect();
   renderStateSect();
   renderBudget();
+  renderExport();
   renderStrip();
   syncPlay();
   drawObj();
