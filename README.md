@@ -598,7 +598,46 @@ identical at 0, 16, 96, 128, 240, 768, 1008 and 5008 ms**, and changing one
 sprite's flip on the engine side alone made the test fail on exactly its
 pixels.
 
-After phase 4: paths, and a built-in editor.
+**Phase 5 is built**: paths, a preview of movement. The engine has no
+paths -- motion is game code, float positions and velocities in px/s -- so
+nothing here is exported. What is kept is the engine's arithmetic:
+
+- **Positions are floored** to whole pixels, as `rf_floor16()` does at draw,
+  and time is sampled on the 16 ms display tick.
+- **A state change restarts its animation; the same state does not**, as
+  `obj_set_state()` is a no-op for the state already showing. So a walk
+  cycle carries on across two walking segments and across the loop seam.
+- **A path belongs to an instance** and starts where it stands; points are
+  stored relative to it, so moving the instance moves its path.
+- **Each segment has a duration, a state and a flip** (as placed / flipped /
+  not flipped -- set explicitly, never guessed from the direction, since
+  Canvas cannot know which way the art faces). Each shows its **speed in
+  px/s**, the unit the game code will need. A wait is a segment that stays.
+- **Curves are quadratic, travelled at constant speed** (by arc length). With
+  equal steps of the curve parameter instead, a sprite would vary its speed
+  by roughly ±50% around a bend, which reads as a glitch; measured along the
+  curve, it stays within 1.5%.
+- **Loop or once**, after an optional start delay; all paths run on the one
+  scene clock (Pedro's choice over chaining one object's path to another's).
+  A loop that does not end where it started jumps back, drawn dashed;
+  "Back to start" walks it instead, at the path's pace.
+- **Editing**: Add a path, then click to add points (a drag still pans);
+  drag a square to move a point, a circle to bend a segment, double-click a
+  circle to straighten; Delete removes the last point, Esc finishes. A new
+  segment keeps the pace of the one before it. The toolbar has a **time
+  scrubber** (dragging it pauses) and a toggle to show every path.
+- **Checks**: segments shorter than the display tick, loops that jump,
+  paths that leave the scene.
+
+**How it was proven** (2026-09-29): the motion model against hand-worked
+values -- floored positions, waits, per-segment flip, the animation restart
+on a state change and its absence across the loop seam, the start delay,
+once-and-hold. Editing through real pointer, key and double-click events. And
+the compositor, now routed through the motion code, still matches the
+workbench's `scene_render()` on phase 4's test scene: 0 pixels different at
+all eight instants.
+
+After phase 5: a built-in editor.
 
 ---
 

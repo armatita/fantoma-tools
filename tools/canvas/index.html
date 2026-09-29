@@ -212,7 +212,26 @@ ul.warns li.info { color: var(--ink-dim); }
 .scnobj .tag { font: 10px var(--mono); color: var(--ink-faint); }
 #scnViewWrap { display: flex; justify-content: center; background: #000; border-radius: 6px; padding: 8px; }
 #scnView { display: block; image-rendering: pixelated; }
-#scnReadout { font: 11px var(--mono); color: var(--ink-dim); margin-left: auto; }
+/* Space reserved even while empty: text appearing as the pointer enters
+   would otherwise re-wrap the toolbar and shift the canvas under it. */
+#scnReadout { font: 11px var(--mono); color: var(--ink-dim); margin-left: auto; min-width: 64px; min-height: 14px; text-align: right; }
+/* Fixed sizes throughout: the time label changes every frame while playing,
+   and a toolbar that re-wraps as it does would shift the canvas under it. */
+.scrub { display: flex; align-items: center; gap: 6px; flex: none; }
+#scnPlay, #objPlay { width: 84px; text-align: center; }  /* "Play" and "Pause" differ by 10 px */
+.scrub .chip { padding: 3px 8px; }
+#scnTime { width: 150px; accent-color: #ffd166; }
+#scnTimeLbl { width: 56px; white-space: nowrap; }
+.seglist { margin-top: 8px; }
+.seg { border-top: 1px solid var(--line); padding: 6px 0; }
+.seghead { display: flex; align-items: center; gap: 6px; }
+.seghead .small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.segn { font: 700 10px var(--mono); color: #14141a; background: #ffd166; border-radius: 3px; padding: 1px 4px; }
+.segx { background: none; border: 0; color: var(--ink-faint); cursor: pointer; padding: 0 2px; }
+.segx:hover { color: var(--bad); }
+.segline { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
+.segline select { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px; font-size: 11px; }
+.segline input.num { width: 64px; padding: 4px 6px; }
 .bandrow { display: flex; align-items: center; gap: 6px; padding: 5px 0 3px; font-size: 12px; font-weight: 600; }
 .bandrow.off .nm { color: var(--ink-faint); }
 .bandrow .nm { flex: 1; }
@@ -394,6 +413,10 @@ h4.mh:first-child { margin-top: 0; }
         <label>Zoom <select id="scnZoom"></select></label>
         <label title="Collision boxes as the engine uses them: at the object&rsquo;s top-left, never mirrored"><input type="checkbox" id="scnBoxes"> Collision boxes</label>
         <label><input type="checkbox" id="scnGrid"> Pixel grid</label>
+        <label title="Show every instance's path, not only the selected one's"><input type="checkbox" id="scnPaths"> Paths</label>
+        <span class="scrub"><button type="button" class="chip" id="scnRestart" title="Back to 0 s">⟲</button>
+          <input type="range" id="scnTime" min="0" max="4000" step="16" value="0" title="Scene time: drag to scrub (pauses)">
+          <span id="scnTimeLbl" class="small mono"></span></span>
         <span id="scnReadout"></span>
       </div>
       <div id="sceneStage"><canvas id="sceneCanvas"></canvas></div>
@@ -407,6 +430,7 @@ h4.mh:first-child { margin-top: 0; }
           <p class="note" id="scnViewNote"></p>
         </div>
         <div class="sect" id="scnInstSect"></div>
+        <div class="sect" id="scnPathSect" hidden></div>
         <div class="sect" id="scnBandSect"></div>
         <div class="sect" id="scnCheckSect"></div>
       </div>
@@ -731,7 +755,7 @@ function normProject(raw) {
     return { id: id, obj: i.obj, state: typeof i.state === 'string' ? i.state : null,
              x: intIn(i.x, -MAX_SCENE, 2 * MAX_SCENE, 0), y: intIn(i.y, -MAX_SCENE, 2 * MAX_SCENE, 0),
              band: intIn(i.band, 0, BANDS.length - 1, BAND_PLAY),
-             flipX: !!i.flipX, flipY: !!i.flipY, fixed: !!i.fixed, hidden: !!i.hidden };
+             flipX: !!i.flipX, flipY: !!i.flipY, fixed: !!i.fixed, hidden: !!i.hidden, path: normPath(i.path) };
   });
   return p;
 }
@@ -781,6 +805,8 @@ ui.scnGrid = !!ui.scnGrid;
 ui.scnBand = typeof ui.scnBand === 'number' && ui.scnBand >= 0 && ui.scnBand <= 5 ? ui.scnBand : 2;
 ui.scnHide = ui.scnHide && typeof ui.scnHide === 'object' ? ui.scnHide : {};
 ui.scnSel = typeof ui.scnSel === 'string' ? ui.scnSel : null;
+ui.scnPaths = ui.scnPaths !== false;
+ui.pathEdit = null;                   // which instance's path is being edited; never restored
 
 
 /* --------------------------------------------------------------------------
@@ -1539,21 +1565,21 @@ function composite(buf, bw, bh, ox, oy, elapsed, skipBand) {
     if (inst.hidden || (skipBand && skipBand[inst.band])) return;
     var o = findObject(inst.obj);
     if (!o) return;
-    var st = instState(inst, o);
+    var at = instNow(inst, elapsed), st = at.st;
     if (!st) return;
     var cols = cache[o.id] || (cache[o.id] = objColours32(o));
     if (!cols) return;
-    var px = decodeFrame(st.frames[instFrame(st, elapsed)]);
-    var w = o.w, h = o.h, at = instWorld(inst);
+    var px = decodeFrame(st.frames[instFrame(st, elapsed - at.animStart)]);
+    var w = o.w, h = o.h;
     var sx = at.x - ox, sy = at.y - oy;
     for (var ry = 0; ry < h; ry++) {
       var py = sy + ry;
       if (py < 0 || py >= bh) continue;
-      var srow = (inst.flipY ? h - 1 - ry : ry) * w;
+      var srow = (at.flipY ? h - 1 - ry : ry) * w;
       for (var cx = 0; cx < w; cx++) {
         var pxx = sx + cx;
         if (pxx < 0 || pxx >= bw) continue;
-        var v = px[srow + (inst.flipX ? w - 1 - cx : cx)];
+        var v = px[srow + (at.flipX ? w - 1 - cx : cx)];
         if (v === TRANSPARENT) continue;
         buf[py * bw + pxx] = cols[v] !== undefined ? cols[v] : 0xffff00ff;
       }
@@ -1593,7 +1619,7 @@ function drawScene() {
   g.fillStyle = '#101015';
   g.fillRect(0, 0, W, H);
 
-  var sw = project.scene.w, sh = project.scene.h, cam = project.camera;
+  var sw = project.scene.w, sh = project.scene.h, cam = project.camera, now = scnElapsed();
   function X(x) { return gm.ox + x * k; }
   function Y(y) { return gm.oy + y * k; }
 
@@ -1602,7 +1628,7 @@ function drawScene() {
   var x0 = Math.max(0, Math.floor(-gm.ox / k)), y0 = Math.max(0, Math.floor(-gm.oy / k));
   var x1 = Math.min(sw, Math.ceil((W - gm.ox) / k)), y1 = Math.min(sh, Math.ceil((H - gm.oy) / k));
   if (x1 > x0 && y1 > y0) {
-    var skip = ui.scnHide || {}, el0 = scnElapsed();
+    var skip = ui.scnHide || {}, el0 = now;
     blit(scnOff, x1 - x0, y1 - y0, function (buf) { composite(buf, x1 - x0, y1 - y0, x0, y0, el0, skip); });
     g.imageSmoothingEnabled = false;
     g.drawImage(scnOff, X(x0), Y(y0), (x1 - x0) * k, (y1 - y0) * k);
@@ -1633,17 +1659,17 @@ function drawScene() {
   scnInstances().forEach(function (inst) {
     var o = findObject(inst.obj);
     if (!o || !inst.hidden || (ui.scnHide || {})[inst.band]) return;
-    var at = instWorld(inst);
+    var at = instNow(inst, now);
     g.strokeRect(X(at.x) + 0.5, Y(at.y) + 0.5, o.w * k - 1, o.h * k - 1);
   });
   g.setLineDash([]);
 
   if (ui.scnBoxes) {
-    var hits = playOverlaps();
+    var hits = playOverlaps(now);
     scnInstances().forEach(function (inst) {
       var o = findObject(inst.obj);
       if (!o || (ui.scnHide || {})[inst.band] || !o.box.w || !o.box.h) return;
-      var at = instWorld(inst), play = inst.band === BAND_PLAY;
+      var at = instNow(inst, now), play = inst.band === BAND_PLAY;
       if (hits[inst.id]) { g.fillStyle = 'rgba(255,90,90,0.25)'; g.fillRect(X(at.x), Y(at.y), o.box.w * k, o.box.h * k); }
       g.strokeStyle = play ? '#ff6b6b' : 'rgba(200,200,220,0.35)';
       g.setLineDash(play ? [] : [3, 3]);
@@ -1651,6 +1677,8 @@ function drawScene() {
     });
     g.setLineDash([]);
   }
+
+  drawPaths(g, gm);
 
   // The camera, and its handle.
   g.strokeStyle = '#b98cff';
@@ -1666,7 +1694,7 @@ function drawScene() {
 
   var sel = selInst(), so = sel && findObject(sel.obj);
   if (so) {
-    var sa = instWorld(sel);
+    var sa = instNow(sel, now);
     g.strokeStyle = '#ffffff';
     g.lineWidth = 1;
     g.strokeRect(X(sa.x) - 1.5, Y(sa.y) - 1.5, so.w * k + 3, so.h * k + 3);
@@ -1679,6 +1707,7 @@ function drawScene() {
   g.textBaseline = 'bottom';
   g.fillText('scene ' + sw + '×' + sh + '  ·  ' + (k >= 1 ? k : k.toFixed(2)) + '× zoom', X(0), Y(0) - 22 > 12 ? Y(0) - 22 : 14);
   drawCamView();
+  syncTime();
 }
 
 function camTab(gm) {
@@ -1708,13 +1737,14 @@ function drawCamView() {
 function scnSignature() {
   var el2 = scnElapsed();
   return scnInstances().map(function (inst) {
-    var o = findObject(inst.obj), st = o && instState(inst, o);
-    return st ? instFrame(st, el2) : 0;
+    var at = instNow(inst, el2);
+    return at.st ? [instFrame(at.st, el2 - at.animStart), at.x, at.y, at.flipX ? 1 : 0].join(':') : '';
   }).join(',');
 }
 function scnLoop() {
   scnRaf = 0;
   if (ui.tab !== 'scene' || !ui.scnPlaying) return;
+  syncTime();
   var sig = scnSignature();
   if (sig !== scnSig) { scnSig = sig; drawScene(); }
   scnRaf = requestAnimationFrame(scnLoop);
@@ -1735,11 +1765,11 @@ $('scnPlay').onclick = function () {
 function rectsOverlap(a, b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
 
 // Collision boxes overlapping in the PLAY band, where scene_collide() runs.
-function playOverlaps() {
+function playOverlaps(elapsed) {
   var hit = {}, a = scnInstances().filter(function (i) { return i.band === BAND_PLAY && findObject(i.obj); });
   for (var i = 0; i < a.length; i++) {
     for (var j = i + 1; j < a.length; j++) {
-      var oi = findObject(a[i].obj), oj = findObject(a[j].obj), pi = instWorld(a[i]), pj = instWorld(a[j]);
+      var oi = findObject(a[i].obj), oj = findObject(a[j].obj), pi = instNow(a[i], elapsed), pj = instNow(a[j], elapsed);
       if (rectsOverlap({ x: pi.x, y: pi.y, w: oi.box.w, h: oi.box.h }, { x: pj.x, y: pj.y, w: oj.box.w, h: oj.box.h })) {
         hit[a[i].id] = hit[a[j].id] = true;
       }
@@ -1775,6 +1805,25 @@ function sceneChecks() {
   if (collide.length) {
     infos.push('Collision boxes overlap in the play band: ' + pairs(collide) + '. on_hit fires every frame while they do.');
   }
+
+  list.forEach(function (inst) {
+    var o = findObject(inst.obj), path = inst.path;
+    if (!o || !path) return;
+    var nm = instLabel(inst);
+    if (!path.segs.length) { infos.push(nm + ' has a path with no points yet.'); return; }
+    var fast = path.segs.filter(function (sg) { return sg.ms < TICK_MS; }).length;
+    if (fast) warns.push(nm + ': ' + fast + ' path segment' + (fast > 1 ? 's are' : ' is') + ' shorter than the 16 ms display tick, so may never be seen.');
+    var last = path.segs[path.segs.length - 1];
+    if (path.mode === 'loop' && (last.x || last.y)) {
+      infos.push(nm + '’s path loops by jumping from its last point back to the start (the dashed line); “Back to start” walks it instead.');
+    }
+    if (!inst.fixed) {
+      var b0 = instWorld(inst);
+      if (path.segs.some(function (sg) { return !rectsOverlap({ x: b0.x + sg.x, y: b0.y + sg.y, w: o.w, h: o.h }, { x: 0, y: 0, w: project.scene.w, h: project.scene.h }); })) {
+        warns.push(nm + '’s path leaves the scene.');
+      }
+    }
+  });
 
   var used = {};
   list.forEach(function (inst) {
@@ -1844,7 +1893,7 @@ function placeInstance(o, x, y) {
   if (!o.states.length) { toast(o.name + ' has no states to show.'); return; }
   snapshot();
   var inst = { id: newId('in', allIds()), obj: o.id, state: o.states[0].id, x: Math.round(x), y: Math.round(y),
-               band: ui.scnBand, flipX: false, flipY: false, fixed: false, hidden: false };
+               band: ui.scnBand, flipX: false, flipY: false, fixed: false, hidden: false, path: null };
   scnInstances().push(inst);
   ui.scnSel = inst.id; saveUi();
   changed(); renderScene();
@@ -2059,9 +2108,12 @@ function renderScene() {
   if (ui.scnSel && !selInst()) ui.scnSel = null;
   renderSceneFields();
   renderScnObjList();
+  if (!pathEditing()) ui.pathEdit = null;
   renderScnInst();
+  renderScnPath();
   renderScnBands();
   renderScnChecks();
+  $('scnPaths').checked = ui.scnPaths;
   $('scnBoxes').checked = ui.scnBoxes;
   $('scnGrid').checked = ui.scnGrid;
   syncScnZoom();
@@ -2090,15 +2142,15 @@ function hitInstance(wx, wy) {
   for (var i = 0; i < order.length; i++) {
     var inst = order[i], o = findObject(inst.obj);
     if (!o || hide[inst.band]) continue;
-    var at = instWorld(inst);
+    var at = instNow(inst, el3);
     if (fx < at.x || fy < at.y || fx >= at.x + o.w || fy >= at.y + o.h) continue;
     if (!cellHit) cellHit = inst;
-    var st = instState(inst, o);
+    var st = at.st;
     if (!st || inst.hidden) continue;
     var cx = fx - at.x, cy = fy - at.y;
-    if (inst.flipX) cx = o.w - 1 - cx;
-    if (inst.flipY) cy = o.h - 1 - cy;
-    if (decodeFrame(st.frames[instFrame(st, el3)])[cy * o.w + cx] !== TRANSPARENT) return inst;
+    if (at.flipX) cx = o.w - 1 - cx;
+    if (at.flipY) cy = o.h - 1 - cy;
+    if (decodeFrame(st.frames[instFrame(st, el3 - at.animStart)])[cy * o.w + cx] !== TRANSPARENT) return inst;
   }
   return cellHit;
 }
@@ -2113,16 +2165,25 @@ sceneCv.addEventListener('pointerdown', function (e) {
     scnDrag = { kind: 'camera', wx: w.x, wy: w.y, x: cam.x, y: cam.y, moved: false };
     return;
   }
-  var inst = hitInstance(w.x, w.y);
-  if (inst) {
-    ui.scnSel = inst.id; saveUi();
-    var at = instWorld(inst);
-    scnDrag = { kind: 'move', inst: inst, dx: w.x - at.x, dy: w.y - at.y, moved: false };
-    renderScnInst(); renderScnBands(); drawScene();
+  if (pathEditing()) {
+    // Editing a path: handles first; anywhere else, a click adds a point
+    // and a drag still pans.
+    var hd = pathHandleAt(gm, mx, my);
+    if (hd) { scnDrag = { kind: hd.kind, k: hd.k, inst: selInst(), moved: false }; return; }
+    scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm, dist: 0, add: { x: w.x, y: w.y } };
     return;
   }
-  if (ui.scnSel) { ui.scnSel = null; saveUi(); renderScnInst(); renderScnBands(); }
-  scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm };
+  var inst = hitInstance(w.x, w.y);
+  if (inst) {
+    if (ui.scnSel !== inst.id) ui.pathEdit = null;
+    ui.scnSel = inst.id; saveUi();
+    // By delta, so a sprite caught mid-path moves its whole path with it.
+    scnDrag = { kind: 'move', inst: inst, wx: w.x, wy: w.y, x0: inst.x, y0: inst.y, moved: false };
+    renderScnInst(); renderScnPath(); renderScnBands(); drawScene();
+    return;
+  }
+  if (ui.scnSel) { ui.scnSel = null; ui.pathEdit = null; saveUi(); renderScnInst(); renderScnPath(); renderScnBands(); }
+  scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm, dist: 0 };
   drawScene();
 });
 
@@ -2133,6 +2194,7 @@ sceneCv.addEventListener('pointermove', function (e) {
   if (!scnDrag) {
     var tab = camTab(gm);
     sceneCv.style.cursor = (e.altKey || (mx >= tab.x && mx < tab.x + tab.w && my >= tab.y && my < tab.y + tab.h)) ? 'move'
+      : pathEditing() ? (pathHandleAt(gm, mx, my) ? 'move' : 'crosshair')
       : hitInstance(w.x, w.y) ? 'pointer' : 'grab';
     return;
   }
@@ -2141,17 +2203,25 @@ sceneCv.addEventListener('pointermove', function (e) {
       var c0 = toWorld(scnDrag.gm, scnDrag.gm.W / 2, scnDrag.gm.H / 2);
       ui.scnZoom = scnDrag.gm.k; scnView.cx = c0.x; scnView.cy = c0.y; syncScnZoom();
     }
+    scnDrag.dist += Math.abs(mx - scnDrag.mx) + Math.abs(my - scnDrag.my);
+    if (scnDrag.add && scnDrag.dist < 4) return;     // still a click, not yet a pan
     scnView.cx -= (mx - scnDrag.mx) / gm.k; scnView.cy -= (my - scnDrag.my) / gm.k;
     scnDrag.mx = mx; scnDrag.my = my;
     sceneCv.style.cursor = 'grabbing';
     drawScene();
   } else if (scnDrag.kind === 'move') {
-    var inst = scnDrag.inst, c = project.camera;
-    var nx = Math.round(w.x - scnDrag.dx), ny = Math.round(w.y - scnDrag.dy);
-    if (inst.fixed) { nx -= c.x; ny -= c.y; }
+    var inst = scnDrag.inst;
+    var nx = scnDrag.x0 + Math.round(w.x - scnDrag.wx), ny = scnDrag.y0 + Math.round(w.y - scnDrag.wy);
     if (nx === inst.x && ny === inst.y) return;
     if (!scnDrag.moved) { snapshot(); scnDrag.moved = true; }
     inst.x = nx; inst.y = ny;
+    drawScene();
+  } else if (scnDrag.kind === 'pt' || scnDrag.kind === 'ctl') {
+    var pi = scnDrag.inst, sg = pi.path.segs[scnDrag.k], p = pathOffset(pi, w.x, w.y, scnDrag.kind === 'ctl');
+    var fx = scnDrag.kind === 'pt' ? 'x' : 'cx', fy = scnDrag.kind === 'pt' ? 'y' : 'cy';
+    if (sg[fx] === p.x && sg[fy] === p.y) return;
+    if (!scnDrag.moved) { snapshot(); scnDrag.moved = true; }
+    sg[fx] = p.x; sg[fy] = p.y;
     drawScene();
   } else if (scnDrag.kind === 'camera') {
     var cam = project.camera;
@@ -2170,8 +2240,16 @@ function endScnDrag() {
   var d = scnDrag;
   scnDrag = null;
   sceneCv.style.cursor = '';
-  if (d.moved) { changed(); renderScene(); }
+  if (d.moved) { changed(); renderScene(); return; }
+  if (d.kind === 'pan' && d.add && d.dist < 4 && pathEditing()) addPathPoint(selInst(), d.add.x, d.add.y);
 }
+sceneCv.addEventListener('dblclick', function (e) {
+  var gm = scnGeom(), r = sceneCv.getBoundingClientRect();
+  var hd = pathHandleAt(gm, e.clientX - r.left, e.clientY - r.top);
+  if (hd && hd.kind === 'ctl') {
+    editInst(selInst(), null, function (x) { x.path.segs[hd.k].cx = null; x.path.segs[hd.k].cy = null; });
+  }
+});
 sceneCv.addEventListener('pointerup', endScnDrag);
 sceneCv.addEventListener('pointercancel', endScnDrag);
 sceneCv.addEventListener('pointerleave', function () { if (!scnDrag) $('scnReadout').textContent = ''; });
@@ -2206,6 +2284,14 @@ sceneCv.addEventListener('drop', function (e) {
 function sceneKey(e) {
   var inst = selInst(), mod = e.ctrlKey || e.metaKey;
   if (e.key === ' ') { e.preventDefault(); $('scnPlay').click(); return true; }
+  if (pathEditing()) {
+    if (e.key === 'Escape') { ui.pathEdit = null; saveUi(); renderScene(); return true; }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      if (inst.path.segs.length) editInst(inst, null, function (x) { x.path.segs.pop(); });
+      return true;
+    }
+  }
   if (e.key === 'Escape' && inst) { ui.scnSel = null; saveUi(); renderScene(); return true; }
   if (!inst) return false;
   var step = e.shiftKey ? 8 : 1, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
@@ -2262,6 +2348,381 @@ sceneField('camX', function (c, s, v) { c.x = intIn(v, 0, MAX_SCENE, c.x); });
 sceneField('camY', function (c, s, v) { c.y = intIn(v, 0, MAX_SCENE, c.y); });
 sceneField('sceneW', function (c, s, v) { s.w = intIn(v, 1, MAX_SCENE, s.w); });
 sceneField('sceneH', function (c, s, v) { s.h = intIn(v, 1, MAX_SCENE, s.h); });
+
+/* --------------------------------------------------------------------------
+   Paths (phase 5)
+   --------------------------------------------------------------------------
+   A path is a preview of movement: the engine has no paths -- motion is
+   game code, float positions with velocities in px/s -- so nothing here is
+   exported. What IS kept from the engine is its arithmetic, so the preview
+   moves the way code written from it would:
+
+   - positions are floored to whole pixels as rf_floor16() does at draw;
+   - time is sampled on the 16 ms display tick, like everything else here;
+   - a state change restarts that state's animation, and staying in the
+     same state does not -- obj_set_state() is a no-op for the same state,
+     so a walk cycle carries on across two walking segments.
+
+   A path belongs to one instance and starts where it stands; its points are
+   stored RELATIVE to the instance, so moving the instance moves the path.
+   Each segment has a duration, a state and a flip (as placed / flipped /
+   not flipped -- set, never guessed from the direction). A curve is a
+   quadratic Bezier travelled at CONSTANT speed: equal steps of the curve
+   parameter would speed up and slow down around a bend, which reads as a
+   glitch rather than as motion. Paths loop or play once, after an optional
+   start delay; all of them run on the one scene clock.
+   -------------------------------------------------------------------------- */
+var PATH_SPEED = 30;        // px/s for a first segment, before one sets a pace
+var ARC_STEPS = 32;
+
+function segFrom(path, k) { return k ? path.segs[k - 1] : { x: 0, y: 0 }; }
+function isWait(p0, s) { return s.x === p0.x && s.y === p0.y && s.cx === null; }
+function bez(a, c, b, t) { var u = 1 - t; return u * u * a + 2 * u * t * c + t * t * b; }
+
+// Cumulative length along a curved segment, for inverting length -> t.
+var arcCache = new Map();
+function arcTable(p0, s) {
+  var key = [p0.x, p0.y, s.cx, s.cy, s.x, s.y].join(',');
+  var hit = arcCache.get(key);
+  if (hit) return hit;
+  var out = [0], px = p0.x, py = p0.y, acc = 0;
+  for (var i = 1; i <= ARC_STEPS; i++) {
+    var t = i / ARC_STEPS, x = bez(p0.x, s.cx, s.x, t), y = bez(p0.y, s.cy, s.y, t);
+    acc += Math.hypot(x - px, y - py); out.push(acc); px = x; py = y;
+  }
+  if (arcCache.size > 2000) arcCache.clear();
+  arcCache.set(key, out);
+  return out;
+}
+function segLength(p0, s) {
+  if (s.cx === null) return Math.hypot(s.x - p0.x, s.y - p0.y);
+  var tb = arcTable(p0, s);
+  return tb[tb.length - 1];
+}
+// The point a fraction u of the way ALONG the segment (by length, not t).
+function segPoint(p0, s, u) {
+  if (s.cx === null) return { x: p0.x + (s.x - p0.x) * u, y: p0.y + (s.y - p0.y) * u };
+  var tb = arcTable(p0, s), want = u * tb[tb.length - 1], i = 1;
+  while (i < ARC_STEPS && tb[i] < want) i++;
+  var span = tb[i] - tb[i - 1], f = span > 0 ? (want - tb[i - 1]) / span : 0;
+  var t = (i - 1 + f) / ARC_STEPS;
+  return { x: bez(p0.x, s.cx, s.x, t), y: bez(p0.y, s.cy, s.y, t) };
+}
+function pathTotal(path) { return path.segs.reduce(function (a, s) { return a + s.ms; }, 0); }
+function segState(inst, o, s) {
+  if (s && s.state) for (var i = 0; i < o.states.length; i++) if (o.states[i].id === s.state) return o.states[i];
+  return instState(inst, o);
+}
+function segSpeed(path, k) {
+  var s = path.segs[k], p0 = segFrom(path, k);
+  return segLength(p0, s) / s.ms * 1000;
+}
+
+/* Where an instance is, what it shows and since when, at scene time
+   `elapsed`. Without a path that is simply where it was placed. */
+function instNow(inst, elapsed) {
+  var o = findObject(inst.obj), base = instWorld(inst);
+  var st0 = o ? instState(inst, o) : null;
+  var out = { x: base.x, y: base.y, st: st0, flipX: inst.flipX, flipY: inst.flipY, animStart: 0 };
+  var path = inst.path;
+  if (!o || !path || !path.segs.length) return out;
+  var n = path.segs.length, total = pathTotal(path), t = elapsed - path.delay;
+  if (t < 0) return out;                         // still waiting to start
+  var cycle = 0, tc = t;
+  if (path.mode === 'loop') { cycle = Math.floor(t / total); tc = t - cycle * total; }
+  else if (t >= total) tc = total;               // once: hold the last point
+  var starts = [], acc = 0;
+  path.segs.forEach(function (s) { starts.push(acc); acc += s.ms; });
+  var k = 0;
+  while (k < n - 1 && tc >= starts[k] + path.segs[k].ms) k++;
+  var s = path.segs[k], u = Math.min(1, (tc - starts[k]) / s.ms);
+  var p = segPoint(segFrom(path, k), s, u);
+  out.x = base.x + Math.floor(p.x);              // rf_floor16: floor, not round
+  out.y = base.y + Math.floor(p.y);
+  out.st = segState(inst, o, s);
+  out.flipX = s.flip === null ? inst.flipX : s.flip;
+
+  // When did the showing state begin? Walk back over segments in the same
+  // state -- across the loop seam too -- and, before the first cycle, into
+  // the wait before the path starts, where the instance shows its own state.
+  function same(i) { return segState(inst, o, path.segs[i]) === out.st; }
+  if (path.segs.every(function (x, i) { return same(i); })) {
+    out.animStart = st0 === out.st ? 0 : path.delay;
+    return out;
+  }
+  var j = k, c = cycle, at = path.delay + c * total + starts[k];
+  for (;;) {
+    var pj = j - 1, pc = c;
+    if (pj < 0) {
+      if (path.mode === 'loop' && c > 0) { pj = n - 1; pc = c - 1; }
+      else { if (st0 === out.st) at = 0; break; }
+    }
+    if (!same(pj)) break;
+    j = pj; c = pc; at = path.delay + c * total + starts[j];
+  }
+  out.animStart = at;
+  return out;
+}
+
+function pathEditing() {
+  var inst = selInst();
+  return !!(inst && inst.path && ui.pathEdit === inst.id);
+}
+
+// Where a path point sits on screen: through the cell's centre, since that
+// is where the eye puts "the sprite", while the numbers stay the top-left
+// offsets the engine would move by.
+function pathScreenPts(inst, gm) {
+  var o = findObject(inst.obj), base = instWorld(inst);
+  var ox = base.x + o.w / 2, oy = base.y + o.h / 2;
+  function S(x, y) { return { x: gm.ox + (ox + x) * gm.k, y: gm.oy + (oy + y) * gm.k }; }
+  var pts = [S(0, 0)], ctl = [];
+  inst.path.segs.forEach(function (s, k) {
+    var p0 = segFrom(inst.path, k);
+    pts.push(S(s.x, s.y));
+    ctl.push(s.cx === null ? S((p0.x + s.x) / 2, (p0.y + s.y) / 2) : S(s.cx, s.cy));
+  });
+  return { pts: pts, ctl: ctl, S: S };
+}
+
+function drawPaths(g, gm) {
+  scnInstances().forEach(function (inst) {
+    var o = findObject(inst.obj);
+    if (!o || !inst.path || !inst.path.segs.length || (ui.scnHide || {})[inst.band]) return;
+    var sel = inst.id === ui.scnSel, editing = sel && pathEditing();
+    if (!sel && !ui.scnPaths) return;
+    var P = pathScreenPts(inst, gm), path = inst.path;
+    g.lineWidth = sel ? 2 : 1;
+    g.strokeStyle = sel ? '#ffd166' : 'rgba(255,209,102,0.35)';
+    g.beginPath();
+    g.moveTo(P.pts[0].x, P.pts[0].y);
+    path.segs.forEach(function (s, k) {
+      if (s.cx === null) g.lineTo(P.pts[k + 1].x, P.pts[k + 1].y);
+      else g.quadraticCurveTo(P.ctl[k].x, P.ctl[k].y, P.pts[k + 1].x, P.pts[k + 1].y);
+    });
+    g.stroke();
+    var last = P.pts[P.pts.length - 1];
+    if (path.mode === 'loop' && (last.x !== P.pts[0].x || last.y !== P.pts[0].y)) {
+      g.setLineDash([4, 4]);                     // the jump back to the start
+      g.beginPath(); g.moveTo(last.x, last.y); g.lineTo(P.pts[0].x, P.pts[0].y); g.stroke();
+      g.setLineDash([]);
+    }
+    if (!sel) return;
+    // Handles: the start (hollow), each point (numbered), each curve handle.
+    g.font = '600 10px ui-monospace, Menlo, Consolas, monospace';
+    g.textBaseline = 'bottom';
+    P.pts.forEach(function (p, i) {
+      var waits = i > 0 && isWait(segFrom(path, i - 1), path.segs[i - 1]);
+      g.fillStyle = i ? '#ffd166' : '#14141a';
+      g.strokeStyle = '#ffd166';
+      g.lineWidth = 1.5;
+      if (i) g.fillRect(p.x - 3.5, p.y - 3.5, 7, 7); else g.strokeRect(p.x - 3.5, p.y - 3.5, 7, 7);
+      if (i && !waits) { g.fillStyle = '#ffd166'; g.fillText(String(i), p.x + 6, p.y - 3); }
+    });
+    if (editing) {
+      P.ctl.forEach(function (c, k) {
+        if (isWait(segFrom(path, k), path.segs[k])) return;
+        g.beginPath(); g.arc(c.x, c.y, 3.5, 0, Math.PI * 2);
+        g.fillStyle = path.segs[k].cx === null ? '#14141a' : '#ffd166';
+        g.fill(); g.strokeStyle = '#ffd166'; g.lineWidth = 1.5; g.stroke();
+      });
+    }
+  });
+}
+
+// Which handle of the edited path is under the pointer: a point, or a curve handle.
+function pathHandleAt(gm, mx, my) {
+  if (!pathEditing()) return null;
+  var inst = selInst(), P = pathScreenPts(inst, gm), R = 6;
+  for (var i = P.pts.length - 1; i >= 1; i--) {
+    if (Math.abs(mx - P.pts[i].x) <= R && Math.abs(my - P.pts[i].y) <= R) return { kind: 'pt', k: i - 1 };
+  }
+  for (var k = P.ctl.length - 1; k >= 0; k--) {
+    if (isWait(segFrom(inst.path, k), inst.path.segs[k])) continue;
+    if (Math.hypot(mx - P.ctl[k].x, my - P.ctl[k].y) <= R) return { kind: 'ctl', k: k };
+  }
+  return null;
+}
+
+// A world point (where the pointer is) as a path offset for this instance.
+function pathOffset(inst, wx, wy, round) {
+  var o = findObject(inst.obj), base = instWorld(inst), f = round ? Math.round : Math.floor;
+  return { x: f(wx - o.w / 2) - base.x, y: f(wy - o.h / 2) - base.y };
+}
+
+// A new segment keeps the pace of the one before it, so a patrol drawn
+// point by point walks at one speed until told otherwise.
+function paceFor(path) {
+  for (var k = path.segs.length - 1; k >= 0; k--) {
+    var v = segSpeed(path, k);
+    if (v > 0) return v;
+  }
+  return PATH_SPEED;
+}
+function newSeg(path, x, y) {
+  var p0 = segFrom(path, path.segs.length), len = Math.hypot(x - p0.x, y - p0.y);
+  return { x: x, y: y, cx: null, cy: null, ms: Math.max(TICK_MS, Math.round(len / paceFor(path) * 1000)), state: null, flip: null };
+}
+function addPathPoint(inst, wx, wy) {
+  var p = pathOffset(inst, wx, wy, false), path = inst.path;
+  var last = segFrom(path, path.segs.length);
+  if (p.x === last.x && p.y === last.y) return;    // a click on the last point: nothing to add
+  editInst(inst, null, function (x) { x.path.segs.push(newSeg(x.path, p.x, p.y)); });
+}
+
+function renderScnPath() {
+  var box = $('scnPathSect'), inst = selInst();
+  box.innerHTML = '';
+  var o = inst && findObject(inst.obj);
+  box.hidden = !o;
+  if (!o) return;
+  box.appendChild(el('h3', null, 'Path'));
+  if (!inst.path) {
+    box.appendChild(el('p', 'note', 'A preview of movement: nothing is exported, since the engine moves objects in game code.'));
+    var add = el('button', 'chip', 'Add a path');
+    add.type = 'button';
+    add.onclick = function () {
+      editInst(inst, null, function (x) { x.path = { mode: 'loop', delay: 0, segs: [] }; });
+      ui.pathEdit = inst.id; saveUi(); renderScene();
+    };
+    var r0 = el('div', 'btnrow'); r0.appendChild(add); box.appendChild(r0);
+    return;
+  }
+  var path = inst.path, editing = pathEditing();
+
+  var top = el('div', 'btnrow');
+  top.style.marginTop = '0';
+  var ed = el('button', 'chip' + (editing ? ' primary' : ''), editing ? 'Done editing' : 'Edit points');
+  ed.type = 'button';
+  ed.onclick = function () { ui.pathEdit = editing ? null : inst.id; saveUi(); renderScene(); };
+  top.appendChild(ed);
+  box.appendChild(top);
+  if (editing) {
+    box.appendChild(el('p', 'note', 'Click to add a point. Drag a square to move it, a circle to bend its segment; '
+      + 'double-click a circle to straighten. Delete removes the last point, Esc finishes.'));
+  }
+
+  var mr = el('div', 'pickrow');
+  mr.style.marginTop = '10px';
+  var mode = document.createElement('select');
+  mode.className = 'sel2';
+  [['loop', 'Loop'], ['once', 'Once, then hold']].forEach(function (p) { var op = el('option', null, p[1]); op.value = p[0]; mode.appendChild(op); });
+  mode.value = path.mode;
+  mode.onchange = function () { editInst(inst, null, function (x) { x.path.mode = mode.value; }); };
+  mr.appendChild(mode);
+  mr.appendChild(el('span', 'small', 'after'));
+  mr.appendChild(numInput(path.delay, 0, 600000, function (inp) {
+    var v = intIn(inp.value, 0, 600000, path.delay);
+    if (v === path.delay) { inp.value = v; return; }
+    editInst(inst, null, function (x) { x.path.delay = v; });
+  }));
+  mr.appendChild(el('span', 'small', 'ms'));
+  box.appendChild(mr);
+
+  if (!path.segs.length) box.appendChild(el('p', 'note', 'No points yet' + (editing ? ': click in the scene.' : '.')));
+  var list = el('div', 'seglist');
+  path.segs.forEach(function (s, k) {
+    var p0 = segFrom(path, k), wait = isWait(p0, s), row = el('div', 'seg');
+    var head = el('div', 'seghead');
+    var len = segLength(p0, s);
+    head.appendChild(el('span', 'segn', wait ? 'wait' : String(k + 1)));
+    head.appendChild(el('span', 'small mono', wait ? 'stay at ' + s.x + ', ' + s.y
+      : 'to ' + s.x + ', ' + s.y + (s.cx !== null ? ' ⌒' : '') + ' · ' + len.toFixed(1) + ' px · ' + (len / s.ms * 1000).toFixed(1) + ' px/s'));
+    var x = el('button', 'segx', '✕');
+    x.type = 'button'; x.title = 'Remove this segment';
+    x.onclick = function () { editInst(inst, null, function (i2) { i2.path.segs.splice(k, 1); }); };
+    head.appendChild(x);
+    row.appendChild(head);
+
+    var line = el('div', 'segline');
+    var sts = document.createElement('select');
+    var own = el('option', null, '(' + instState(inst, o).name + ')');
+    own.value = ''; sts.appendChild(own);
+    o.states.forEach(function (st) { var op = el('option', null, st.name); op.value = st.id; sts.appendChild(op); });
+    sts.value = s.state && o.states.some(function (st) { return st.id === s.state; }) ? s.state : '';
+    sts.title = 'The state shown on this segment; in brackets, the instance’s own';
+    sts.onchange = function () { editInst(inst, null, function (i2) { i2.path.segs[k].state = sts.value || null; }); };
+    line.appendChild(sts);
+    var fl = document.createElement('select');
+    [['', 'as placed'], ['1', 'flipped'], ['0', 'not flipped']].forEach(function (p) { var op = el('option', null, p[1]); op.value = p[0]; fl.appendChild(op); });
+    fl.value = s.flip === null ? '' : s.flip ? '1' : '0';
+    fl.title = 'Flip X on this segment';
+    fl.onchange = function () { editInst(inst, null, function (i2) { i2.path.segs[k].flip = fl.value === '' ? null : fl.value === '1'; }); };
+    line.appendChild(fl);
+    line.appendChild(numInput(s.ms, 1, 600000, function (inp) {
+      var v = intIn(inp.value, 1, 600000, s.ms);
+      if (v === s.ms) { inp.value = v; return; }
+      editInst(inst, null, function (i2) { i2.path.segs[k].ms = v; });
+    }));
+    line.appendChild(el('span', 'small', 'ms'));
+    row.appendChild(line);
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+
+  var total = pathTotal(path);
+  if (total) {
+    box.appendChild(el('p', 'note', (path.mode === 'loop' ? 'One lap: ' : 'Runs for ') + total + ' ms'
+      + (path.delay ? ', starting at ' + path.delay + ' ms' : '') + '.'));
+  }
+  var br = el('div', 'btnrow');
+  var wt = el('button', 'chip', 'Add wait'); wt.type = 'button';
+  wt.onclick = function () {
+    editInst(inst, null, function (i2) {
+      var p = segFrom(i2.path, i2.path.segs.length);
+      i2.path.segs.push({ x: p.x, y: p.y, cx: null, cy: null, ms: 500, state: null, flip: null });
+    });
+  };
+  var home = el('button', 'chip', 'Back to start'); home.type = 'button';
+  var end = segFrom(path, path.segs.length);
+  home.disabled = end.x === 0 && end.y === 0;
+  home.onclick = function () { editInst(inst, null, function (i2) { i2.path.segs.push(newSeg(i2.path, 0, 0)); }); };
+  var del = el('button', 'chip danger', 'Delete path'); del.type = 'button';
+  del.onclick = function () { ui.pathEdit = null; editInst(inst, null, function (i2) { i2.path = null; }); };
+  br.appendChild(wt); br.appendChild(home); br.appendChild(del);
+  box.appendChild(br);
+}
+
+/* ---- the scene clock, made visible: a scrubber ---- */
+function timeSpan() {
+  var span = 4000;
+  scnInstances().forEach(function (inst) {
+    if (inst.path && inst.path.segs.length) span = Math.max(span, inst.path.delay + pathTotal(inst.path) * (inst.path.mode === 'loop' ? 2 : 1));
+  });
+  return Math.ceil(span / 1000) * 1000;
+}
+function syncTime() {
+  var span = timeSpan(), t = scnElapsed(), r = $('scnTime');
+  r.max = span;
+  if (document.activeElement !== r) r.value = t % span;
+  $('scnTimeLbl').textContent = (t / 1000).toFixed(2) + ' s';
+}
+$('scnTime').oninput = function () {
+  ui.scnPlaying = false;
+  scnPausedAt = +this.value;
+  saveUi(); syncScnPlay(); drawScene();
+};
+$('scnRestart').onclick = function () {
+  scnStart = performance.now(); scnPausedAt = 0;
+  drawScene();
+};
+$('scnPaths').onchange = function () { ui.scnPaths = this.checked; saveUi(); drawScene(); };
+
+function normPath(p) {
+  if (!isObj(p)) return null;
+  var R = 2 * MAX_SCENE;
+  return {
+    mode: p.mode === 'once' ? 'once' : 'loop',
+    delay: intIn(p.delay, 0, 600000, 0),
+    segs: (Array.isArray(p.segs) ? p.segs : []).filter(isObj).slice(0, 256).map(function (s) {
+      var curved = s.cx != null && s.cy != null;
+      return { x: intIn(s.x, -R, R, 0), y: intIn(s.y, -R, R, 0),
+               cx: curved ? intIn(s.cx, -R, R, 0) : null, cy: curved ? intIn(s.cy, -R, R, 0) : null,
+               ms: intIn(s.ms, 1, 600000, 500), state: typeof s.state === 'string' ? s.state : null,
+               flip: s.flip === true || s.flip === false ? s.flip : null };
+    })
+  };
+}
 
 
 /* ==========================================================================
@@ -3710,6 +4171,11 @@ function commitImport(an, choice, existing, jsonName) {
       if (x.obj !== o.id) return;
       var same = states.filter(function (st) { return st.name === byName[x.state]; })[0];
       x.state = same ? same.id : states[0].id;
+      if (x.path) x.path.segs.forEach(function (sg) {
+        if (!sg.state) return;
+        var m = states.filter(function (st) { return st.name === byName[sg.state]; })[0];
+        sg.state = m ? m.id : null;
+      });
     });
   } else {
     o = { id: newId('obj', taken), name: freeObjectName(an.base), w: an.cw, h: an.ch, palette: pal.id,
