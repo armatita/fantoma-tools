@@ -15,7 +15,7 @@ Live at: `https://<your-github-username>.github.io/fantoma-tools/`
 
 | Tool | What it does |
 | --- | --- |
-| [Pixel Studio](tools/pixel-studio/) | Draw sprites on an 8/16/32 grid, export PNG |
+| [Pixel Studio](tools/pixel-studio/) | Draw sprites on an 8/16/32 grid, export PNG at actual size (1×) or enlarged 4/8/16× |
 | [SFX Forge](tools/sfx-forge/) | Compose buzzer melodies and frequency sweeps, export a `SoundStep[]` C array for `cpp/fantoma/sound.h` |
 | [Model Viewer](tools/model-viewer/) | The case parts shown assembled. Pick between printed versions, colour them, download any part — or several on one plate — ready to slice |
 | [Protoplaca](tools/protoplaca/) | Replace a breadboard with a printed plate. Draw the components and the wires between them; get bosses and wire tunnels to print, and a 3D tab that says whether it all fits. English and European Portuguese |
@@ -188,6 +188,22 @@ Open the tool's own page first — not the hub — then:
 
 Each tool declares its own manifest with its own `id` and `scope`, which is why
 they install as separate apps with separate icons rather than one bookmark.
+
+### Getting back to the hub
+
+You can also install just the hub and open everything from it. The hub's scope
+(`/fantoma-tools/`) contains every tool, so a tile opens the tool *inside the
+hub's window* — and an installed app window has no back button. So each tool
+shows a **← Fantoma Tools** link at the top when it was opened from the hub
+(`Alt+←` also works on the desktop, as does the back gesture on Android).
+
+The link is deliberately **hidden when a tool runs as its own installed app**:
+the hub is outside that app's scope, and Chrome would open it with a URL strip
+across the top like a stray web page. The mechanism: the hub adds `#from-hub`
+to its tile links; `shared/app.js` records that in `sessionStorage` (which
+belongs to one window, so it survives reloads there and never leaks into a
+separately installed tool's window) and strips the hash. In an ordinary browser
+tab the link always shows. None of this needs any code in the tools themselves.
 
 ---
 
@@ -403,9 +419,13 @@ for the origin will force a clean install.
    });
    ```
 
-   That one call registers the service worker, requests persistent storage, and
-   appends the standard Export / Import / Install panel.
-5. Add a tile to `index.html`, and add the tool's files to its `SW_ASSETS`.
+   That one call registers the service worker, requests persistent storage,
+   appends the standard Export / Import / Install panel, and adds the
+   **← Fantoma Tools** link. The link goes at the top of `.wrap` if the page
+   has one, otherwise the top of `<body>`; pass `hubLinkInto: someElement` if
+   neither suits the layout.
+5. Add a tile to `index.html` (the hub tags it with `#from-hub` automatically),
+   and add the tool's files to its `SW_ASSETS`.
 
 ---
 

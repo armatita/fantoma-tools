@@ -89,6 +89,13 @@
 var deferredInstall = null;
 var installBtn = document.getElementById('fantoma-install');
 
+// Tell each tool it was opened from here, so it shows a link back. Done in
+// script rather than in each href so a newly added tile can't forget it.
+// The tool side of this is cameFromHub() in shared/app.js.
+Array.prototype.forEach.call(document.querySelectorAll('a.tile'), function (a) {
+  a.hash = 'from-hub';
+});
+
 window.addEventListener('beforeinstallprompt', function (e) {
   e.preventDefault();
   deferredInstall = e;

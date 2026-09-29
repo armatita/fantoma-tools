@@ -50,7 +50,7 @@
   button:active, .btn:active { transform: translateY(1px); }
   button.active { background: #5ee88f; color: #0d0d12; border-color: #5ee88f; }
   button.flex1, .btn.flex1 { flex: 1; }
-  input, textarea {
+  input, textarea, select {
     background: #17171f; border: 1px solid #2b2b36; border-radius: 6px;
     color: #f4f4f2; padding: 8px 10px; font-size: 13px; font-family: inherit;
   }
@@ -66,7 +66,11 @@
   .status { text-align: center; font-size: 12px; color: #5ee88f; margin-top: 10px; min-height: 16px; }
   .hint { font-size: 11px; color: #9a9aa4; margin-bottom: 8px; text-align: center; }
   .card { margin-top: 14px; border: 1px solid #2b2b36; border-radius: 8px; padding: 12px; text-align: center; }
-  .card img { max-width: 60%; image-rendering: pixelated; border: 1px solid #2b2b36; border-radius: 4px; }
+  /* width, not max-width: a 1x export is only 8-32 px across, and max-width
+     never scales an image UP, so the preview would be a speck. */
+  .card img { width: 60%; max-width: 240px; image-rendering: pixelated; border: 1px solid #2b2b36; border-radius: 4px; }
+  .scalerow { align-items: center; }
+  .scalerow span { font-size: 11px; color: #9a9aa4; white-space: nowrap; }
   .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
   .cell { border: 1px solid #2b2b36; border-radius: 8px; padding: 6px; }
   .cell .mini { display: grid; aspect-ratio: 1/1; background: #1b1b24; border-radius: 4px; overflow: hidden; cursor: pointer; }
@@ -108,6 +112,10 @@
   <div class="row">
     <input id="nameInput" class="flex1" placeholder="name this sketch">
     <button id="saveImgBtn" class="active">Save PNG</button>
+  </div>
+  <div class="row scalerow">
+    <span>PNG size</span>
+    <select id="scaleSelect" class="flex1"></select>
   </div>
   <label class="checkrow">
     <input type="checkbox" id="transparentBg">
@@ -157,6 +165,12 @@
 <script>
 const PALETTE = ["#0d0d12","#f4f4f2","#ff4d5e","#ffb84d","#ffe94d","#5ee88f","#4dd8ff","#5c7dff","#b45cff","#ff5cd6","#7a5230","#8a8a94"];
 const GRID_SIZES = [8, 16, 32];
+
+// How many PNG pixels each sketch pixel becomes on export. 1x is the real
+// sprite -- what goes into the Fantoma firmware. The larger sizes exist
+// because a 16x16 image is a speck in a phone gallery, and galleries blur
+// small images when you zoom in; an 8x or 16x copy stays crisp there.
+const EXPORT_SCALES = [1, 4, 8, 16];
 // Nothing here touches localStorage directly. The shared Store namespaces
 // every key as fantoma:pixel-studio:<name>, because localStorage is scoped to
 // the origin and every tool on this domain shares one bucket.
@@ -173,6 +187,7 @@ let tool = "draw";
 let drawing = false;
 let lastIndex = -1;
 let saves = [];
+let exportScale = 1;
 
 function makeGrid(size, fill = null) {
   return Array.from({ length: size * size }, () => fill);
@@ -290,6 +305,23 @@ function renderAll() {
   renderGrid();
   renderPalette();
   renderTools();
+  renderScales();
+}
+
+// The labels show the real output size, so they change with the grid size.
+function renderScales() {
+  const sel = document.getElementById("scaleSelect");
+  sel.innerHTML = "";
+  EXPORT_SCALES.forEach(s => {
+    const o = document.createElement("option");
+    const px = gridSize * s;
+    o.value = String(s);
+    o.textContent = s === 1
+      ? `${px}\u00d7${px} px \u2014 actual size`
+      : `${px}\u00d7${px} px \u2014 ${s}\u00d7 enlarged`;
+    sel.appendChild(o);
+  });
+  sel.value = String(exportScale);
 }
 
 // Buttons
@@ -318,7 +350,7 @@ function dataURLtoBlob(dataURL) {
 
 // Renders the grid to a PNG data URL. Synchronous on purpose.
 function renderPNG() {
-  const scale = 24;
+  const scale = exportScale;
   const canvas = document.getElementById("hiddenCanvas");
   canvas.width = gridSize * scale;
   canvas.height = gridSize * scale;
@@ -345,7 +377,11 @@ function renderPNG() {
 
 document.getElementById("saveImgBtn").onclick = () => {
   const name = document.getElementById("nameInput").value.trim() || "pixel-art";
-  const filename = `${sanitizeKey(name)}.png`;
+  // The size is in the name so an enlarged copy can never be mistaken for
+  // the real sprite: ghost-16x16.png vs ghost-16x16@8x.png.
+  const size = `${gridSize}x${gridSize}`;
+  const suffix = exportScale > 1 ? `@${exportScale}x` : "";
+  const filename = `${sanitizeKey(name)}-${size}${suffix}.png`;
   const dataURL = renderPNG();
 
   // Preview uses the data URL directly — those are reliably long-pressable
@@ -472,7 +508,16 @@ function renderGallery() {
   });
 }
 
+document.getElementById("scaleSelect").onchange = (e) => {
+  exportScale = parseInt(e.target.value, 10) || 1;
+  store.set("exportScale", exportScale);
+};
+
 // init
+{
+  const saved = store.get("exportScale", 1);
+  exportScale = EXPORT_SCALES.includes(saved) ? saved : 1;
+}
 restoreCurrent();
 loadSaves();
 renderAll();

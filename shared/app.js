@@ -12,11 +12,67 @@
  * appends a standard footer panel with Export / Import / Install. Keeping
  * it here rather than in each tool means the backup format and the install
  * behaviour stay identical across every tool, which is the whole point.
+ *
+ * It also adds a "<- Fantoma Tools" link at the top of the tool, when that
+ * makes sense -- see showHubLink() below. It goes at the top of `.wrap` if
+ * the page has one, otherwise the top of <body>; pass `hubLinkInto` to put
+ * it somewhere else.
  */
 (function (global) {
   'use strict';
 
   var deferredInstall = null;
+
+  /* ---- where the hub is, and whether we came from it ----------------
+   *
+   * The installed hub's scope is /fantoma-tools/, which CONTAINS every
+   * tool. So tapping a tile opens the tool inside the hub's own window --
+   * and an installed app window has no back button. Hence a link back.
+   *
+   * But a tool can also be installed as an app in its own right, and there
+   * a hub link would be wrong: the hub is outside that app's scope, so
+   * Chrome would open it with a URL strip across the top, like a stray web
+   * page. So the link only shows when:
+   *   - the page is in an ordinary browser tab (harmless, and useful), or
+   *   - this window was opened from the hub.
+   *
+   * The hub marks its tile links with #from-hub. We note that in
+   * sessionStorage -- which belongs to one window, so it survives reloads
+   * in the hub's window but never leaks into a separately installed tool's
+   * window -- and strip the hash so it doesn't linger in the address.
+   */
+  var HUB_URL = (function () {
+    // This file lives at <hub>/shared/app.js, so the hub is one level up.
+    // Working it out from our own URL means tools at any depth get it right.
+    var me = document.currentScript && document.currentScript.src;
+    return me ? new URL('../', me).href : null;
+  }());
+
+  var FROM_HUB_KEY = 'fantoma:from-hub';
+
+  var cameFromHub = (function () {
+    var marked = location.hash === '#from-hub';
+    try {
+      if (marked) sessionStorage.setItem(FROM_HUB_KEY, '1');
+      marked = sessionStorage.getItem(FROM_HUB_KEY) === '1';
+    } catch (e) { /* storage blocked: fall back to the hash alone */ }
+    if (location.hash === '#from-hub' && history.replaceState) {
+      history.replaceState(history.state, '', location.pathname + location.search);
+    }
+    return marked;
+  }());
+
+  function inInstalledWindow() {
+    var mm = global.matchMedia;
+    return !!(mm && (mm('(display-mode: standalone)').matches
+      || mm('(display-mode: minimal-ui)').matches
+      || mm('(display-mode: window-controls-overlay)').matches))
+      || navigator.standalone === true;
+  }
+
+  function showHubLink() {
+    return !!HUB_URL && (cameFromHub || !inInstalledWindow());
+  }
 
   // Captured at the top level: Chrome fires this early, often before the
   // tool has finished booting, and the event is only useful if we kept it.
@@ -53,7 +109,13 @@
       '#fantoma-panel button#fantoma-install{border-color:var(--fa);color:var(--fa);}' +
       '#fantoma-panel .fa-note{margin-top:8px;line-height:1.55;color:#6b6b76;font-size:11px;}' +
       '#fantoma-panel .fa-msg{margin-top:8px;min-height:15px;color:var(--fa);font-size:11px;}' +
-      '#fantoma-panel a{color:var(--fa);}';
+      '#fantoma-panel a{color:var(--fa);}' +
+      '#fantoma-hub-link{display:inline-block;align-self:flex-start;flex:none;' +
+      'margin:0 0 10px;padding:2px 0;color:' + accent + ';text-decoration:none;' +
+      'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;' +
+      'letter-spacing:.04em;opacity:.8;}' +
+      '#fantoma-hub-link:hover,#fantoma-hub-link:focus-visible{opacity:1;text-decoration:underline;}' +
+      '#fantoma-hub-link.fa-pad{margin:0;padding:6px 12px;}';
     var style = el('style', { id: 'fantoma-panel-style' });
     style.textContent = css;
     document.head.appendChild(style);
@@ -68,11 +130,24 @@
     });
   }
 
+  function buildHubLink(options) {
+    if (!showHubLink() || document.getElementById('fantoma-hub-link')) return;
+    var host = options.hubLinkInto || document.querySelector('.wrap') || document.body;
+    var link = el('a', { id: 'fantoma-hub-link', href: HUB_URL }, '\u2190 Fantoma Tools');
+    // A full-bleed page (no padding on <body>) would put the text flush
+    // against the window edge; give it its own gutter there.
+    if (host === document.body && parseFloat(getComputedStyle(document.body).paddingLeft) === 0) {
+      link.className = 'fa-pad';
+    }
+    host.insertBefore(link, host.firstChild);
+  }
+
   function build(options) {
     var store = options.store;
     var toolId = options.toolId;
 
     injectStyle(options.accent || '#5ee88f');
+    buildHubLink(options);
 
     var panel = el('section', { id: 'fantoma-panel' });
     panel.appendChild(el('h2', {}, 'Data'));
