@@ -210,6 +210,23 @@ ul.warns li.info { color: var(--ink-dim); }
 .scnobj .th canvas { image-rendering: pixelated; }
 .scnobj .nm { font: 600 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scnobj .tag { font: 10px var(--mono); color: var(--ink-faint); }
+#tsCanvasWrap { flex: 1; position: relative; min-height: 0; }
+#tsCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#tsReadout { font: 11px var(--mono); color: var(--ink-dim); margin-left: auto; min-width: 64px; min-height: 14px; text-align: right; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 5px 12px; color: var(--ink-dim); cursor: pointer; font: inherit; font-size: 12px; }
+.seg button.on { background: var(--accent); color: #14141a; font-weight: 600; }
+canvas.glyph { image-rendering: pixelated; vertical-align: middle; border: 1px solid var(--line); border-radius: 2px; }
+table.cover { width: 100%; border-collapse: collapse; font: 11px var(--mono); margin-top: 6px; }
+table.cover th { font-weight: 400; color: var(--ink-faint); text-align: left; padding: 2px 4px 4px 0; }
+table.cover td { padding: 3px 4px 3px 0; }
+table.cover tr:not(:first-child) { cursor: pointer; }
+table.cover tr:not(:first-child):hover { background: var(--panel-2); }
+table.cover tr.hi { background: rgba(255,209,102,0.15); }
+table.cover td.plan { color: var(--ink-dim); font-family: inherit; }
+table.cover td.new { color: var(--warn); font-family: inherit; }
+canvas.tplprev { display: block; image-rendering: pixelated; margin: 8px 0 4px; border: 1px solid var(--line); }
+ul.warns li canvas.glyph { margin-right: 4px; }
 #scnViewWrap { display: flex; justify-content: center; background: #000; border-radius: 6px; padding: 8px; }
 #scnView { display: block; image-rendering: pixelated; }
 /* Space reserved even while empty: text appearing as the pointer enters
@@ -350,6 +367,7 @@ h4.mh:first-child { margin-top: 0; }
   <nav id="tabs">
     <button type="button" data-tab="scene">Scene</button>
     <button type="button" data-tab="objects">Objects</button>
+    <button type="button" data-tab="tiles">Tiles</button>
     <button type="button" data-tab="palettes">Palettes</button>
   </nav>
   <span class="spacer"></span>
@@ -491,6 +509,53 @@ h4.mh:first-child { margin-top: 0; }
         <div class="sect" id="stateSect"></div>
         <div class="sect" id="budgetSect"></div>
         <div class="sect" id="exportSect"></div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ================= TILES ================= -->
+  <section class="view" id="view-tiles" hidden>
+    <aside class="side">
+      <div class="sidehead">Tilesets</div>
+      <div class="scroll" id="tsList"></div>
+      <div class="sidefoot">
+        <button type="button" class="chip primary" id="tsLinkBtn" title="An .aseprite file with a tilemap layer over a template; it reloads whenever you save it">Link tileset&hellip;</button>
+        <button type="button" class="chip" id="tsStarterBtn" title="An Aseprite file ready to draw tiles on: a template layer and an empty tilemap layer">New starter file&hellip;</button>
+      </div>
+    </aside>
+
+    <div class="placeholder" id="tsEmpty" hidden><div>
+      <h2>No tilesets yet</h2>
+      <p>A tileset is drawn in Aseprite on a <b>tilemap layer</b> over a <b>template</b>: a
+        picture of every place a tile can stand. The template is the rule set &mdash; each
+        place&rsquo;s neighbours say which situation its tile is for.</p>
+      <ol>
+        <li><b>New starter file&hellip;</b> writes an Aseprite file with a template (the built-in
+          platformer one, or a picture of yours) and an empty tilemap layer, at the tile size you choose.</li>
+        <li>In Aseprite, draw on the <b>tiles</b> layer. Where the same tile belongs in two places,
+          place it again from the tileset rather than drawing it twice.</li>
+        <li><b>Link tileset&hellip;</b> here. Every save then updates this tab: the rules, the checks,
+          and a random level tiled with your art.</li>
+      </ol>
+    </div></div>
+
+    <div class="objstage" id="tsStage" hidden>
+      <div class="objbar">
+        <span class="seg" id="tsViewSw"><button type="button" data-v="template">Template</button><button type="button" data-v="level">Level</button></span>
+        <label>Zoom <select id="tsZoom"><option value="0">fit</option><option value="1">1&times;</option><option value="2">2&times;</option>
+          <option value="3">3&times;</option><option value="4">4&times;</option><option value="6">6&times;</option><option value="8">8&times;</option></select></label>
+        <label title="Tile numbers on the template"><input type="checkbox" id="tsNumbers"> Numbers</label>
+        <label title="In the level, mark cells tiled by the closest drawn situation rather than their own"><input type="checkbox" id="tsMarks"> Mark stand-ins</label>
+        <span id="tsReadout"></span>
+      </div>
+      <div id="tsCanvasWrap"><canvas id="tsCanvas"></canvas></div>
+    </div>
+
+    <aside class="side right" id="tsInspector" hidden>
+      <div class="scroll">
+        <div class="sect" id="tsInfoSect"></div>
+        <div class="sect" id="tsCheckSect"></div>
+        <div class="sect" id="tsCoverSect"></div>
       </div>
     </aside>
   </section>
@@ -687,7 +752,8 @@ function blankProject() {
     scene: { w: 64, h: 64, bg: '#000000', instances: [] },
     include: DEFAULT_INCLUDE,
     palettes: [],
-    objects: []
+    objects: [],
+    tilesets: []
   };
 }
 
@@ -746,6 +812,8 @@ function normProject(raw) {
     return obj;
   });
 
+  p.tilesets = (Array.isArray(raw.tilesets) ? raw.tilesets : []).map(function (t) { return normTileset(t, taken, palIds); }).filter(Boolean);
+
   // Instances point at objects and states by id. One whose object is gone
   // is dropped; one whose state is gone falls back to the first, at draw.
   var objIds = {};
@@ -777,6 +845,7 @@ function allIds() {
     o.states.forEach(function (st) { t[st.id] = true; });
   });
   project.scene.instances.forEach(function (i) { t[i.id] = true; });
+  project.tilesets.forEach(function (x) { t[x.id] = true; });
   return t;
 }
 
@@ -788,7 +857,7 @@ var project = blankProject();
    project, so opening a file does not drag someone else's tab choice in. */
 var ui = store.get('ui', {});
 if (!ui || typeof ui !== 'object') ui = {};
-ui.tab = ['scene', 'objects', 'palettes'].indexOf(ui.tab) >= 0 ? ui.tab : 'palettes';
+ui.tab = ['scene', 'objects', 'tiles', 'palettes'].indexOf(ui.tab) >= 0 ? ui.tab : 'palettes';
 ui.col = typeof ui.col === 'number' ? ui.col : -1;
 ui.playing = ui.playing !== false;
 ui.zoom = [0, 1, 2, 4, 8, 16, 32].indexOf(ui.zoom) >= 0 ? ui.zoom : 0;
@@ -809,6 +878,16 @@ ui.scnBand = typeof ui.scnBand === 'number' && ui.scnBand >= 0 && ui.scnBand <= 
 ui.scnHide = ui.scnHide && typeof ui.scnHide === 'object' ? ui.scnHide : {};
 ui.scnSel = typeof ui.scnSel === 'string' ? ui.scnSel : null;
 ui.scnPaths = ui.scnPaths !== false;
+ui.ts = typeof ui.ts === 'string' ? ui.ts : null;
+ui.tsView = ui.tsView === 'level' ? 'level' : 'template';
+ui.tsZoom = [0, 1, 2, 3, 4, 6, 8].indexOf(ui.tsZoom) >= 0 ? ui.tsZoom : 0;
+ui.tsNumbers = ui.tsNumbers !== false;
+ui.tsMarks = ui.tsMarks !== false;
+ui.tsHi = null;
+ui.tsTile = typeof ui.tsTile === 'number' ? ui.tsTile : 8;
+ui.tsLvl = ui.tsLvl && typeof ui.tsLvl === 'object' ? ui.tsLvl : {};
+ui.tsLvl = { kind: ui.tsLvl.kind === 'caves' ? 'caves' : 'platformer', w: intIn(ui.tsLvl.w, 4, 256, 32),
+             h: intIn(ui.tsLvl.h, 4, 256, 16), seed: intIn(ui.tsLvl.seed, 0, 4294967295, 1984) };
 ui.pathEdit = null;                   // which instance's path is being edited; never restored
 
 
@@ -997,7 +1076,7 @@ function addPalette(name, colors) {
 }
 
 function deletePalette(pal) {
-  var users = objectsUsing(pal.id);
+  var users = paletteUsers(pal.id);
   if (users.length) {
     toast('\u201c' + pal.name + '\u201d is used by ' + users.map(function (o) { return o.name; }).join(', ')
       + '. Give ' + (users.length === 1 ? 'it' : 'them') + ' another palette first.');
@@ -1421,7 +1500,7 @@ function renderPalActions() {
   r3.appendChild(btn('Delete palette', function () { deletePalette(pal); }, 'danger'));
   box.appendChild(r3);
 
-  var users = objectsUsing(pal.id);
+  var users = paletteUsers(pal.id);
   if (users.length) {
     box.appendChild(el('p', 'note', 'Used by ' + users.map(function (o) { return o.name; }).join(', ')
       + '. Editing a colour recolours them; reordering or inserting keeps them looking the same.'));
@@ -2864,6 +2943,8 @@ function currentState() {
   return null;
 }
 function objectsUsing(palId) { return project.objects.filter(function (o) { return o.palette === palId; }); }
+function tilesetsUsing(palId) { return project.tilesets.filter(function (t) { return t.palette === palId; }); }
+function paletteUsers(palId) { return objectsUsing(palId).concat(tilesetsUsing(palId)); }
 
 function objTransparent(o) {
   return o.states.some(function (st) {
@@ -2895,6 +2976,11 @@ function colourUse(palId, idx) {
       if (n) out.push({ obj: o, st: st, n: n });
     });
   });
+  tilesetsUsing(palId).forEach(function (t) {
+    var n = 0;
+    t.tiles.forEach(function (f) { var px = decodeFrame(f); for (var i = 0; i < px.length; i++) if (px[i] === idx) n++; });
+    if (n) out.push({ obj: t, st: { name: 'tiles' }, n: n });
+  });
   return out;
 }
 
@@ -2907,6 +2993,13 @@ function remapPalette(palId, oldToNew) {
         for (var i = 0; i < px.length; i++) out[i] = px[i] === TRANSPARENT ? TRANSPARENT : oldToNew[px[i]];
         return encodeFrame(out);
       });
+    });
+  });
+  tilesetsUsing(palId).forEach(function (t) {
+    t.tiles = t.tiles.map(function (f) {
+      var px = decodeFrame(f), out = new Uint16Array(px.length);
+      for (var i = 0; i < px.length; i++) out[i] = px[i] === TRANSPARENT ? TRANSPARENT : oldToNew[px[i]];
+      return encodeFrame(out);
     });
   });
 }
@@ -4474,8 +4567,16 @@ function parseAsepriteFile(buf, fileName) {
       tags: tags, hasTagList: true, cw: W, ch: H, image: null, slices: slices,
       layers: layers.filter(function (L, i) { return shown[i]; }).map(function (L) { return L.name; })
     };
+    // The raw data, for readers that need more than flattened frames
+    // (tilesets). A linked cel resolves to the cel it links to.
+    function celFor(fi, li) {
+      var fr = frames[fi], ce = fr && fr.cels.filter(function (x) { return x.layer === li; })[0];
+      if (ce && ce.type === 1) { var lf = frames[ce.link]; ce = lf && lf.cels.filter(function (x) { return x.layer === li; })[0]; }
+      return ce && ce.data ? ce : null;
+    }
     return { ase: ase, sheet: sheet, notes: notes,
-             mode: depth === 32 ? 'RGBA' : depth === 16 ? 'Grayscale' : 'Indexed' };
+             mode: depth === 32 ? 'RGBA' : depth === 16 ? 'Grayscale' : 'Indexed',
+             raw: { layers: layers, tilesets: tilesets, W: W, H: H, pixelAt: pixelAt, celFor: celFor } };
   });
 }
 
@@ -4604,7 +4705,7 @@ function reloadLinked(objId, file) {
     var pal = findPalette(o.palette);
     if (!pal) { L.state = 'review'; L.msg = 'The object has no palette; review the import.'; L.pending = an; return; }
     var miss = paletteMissing(pal, an.colours);
-    var others = objectsUsing(pal.id).filter(function (x) { return x !== o; });
+    var others = paletteUsers(pal.id).filter(function (x) { return x !== o; });
     if (miss.length && others.length) {
       // Growing a shared palette changes other objects: that is a decision.
       L.state = 'review'; L.pending = an;
@@ -4621,10 +4722,10 @@ function reloadLinked(objId, file) {
   });
 }
 
-var linkBusy = false;
+var linkBusy = false, tsLinkSig = '';
 function pollLinks() {
   if (linkBusy || document.visibilityState !== 'visible') return;
-  var ids = Object.keys(links).filter(function (id) { return links[id].state === 'ok' && findObject(id); });
+  var ids = Object.keys(links).filter(function (id) { return links[id].state === 'ok' && (findObject(id) || findTileset(id)); });
   if (!ids.length) return;
   linkBusy = true;
   ids.reduce(function (chain, id) {
@@ -4632,7 +4733,7 @@ function pollLinks() {
       var L = links[id];
       return L.handle.getFile().then(function (file) {
         if (file.lastModified === L.last && file.size === L.size) return;
-        return reloadLinked(id, file).then(function () {
+        return (findTileset(id) ? reloadLinkedTileset(id, file) : reloadLinked(id, file)).then(function () {
           L.last = file.lastModified; L.size = file.size; L.fails = 0;
         }, function (err) {
           // Often a file caught half-written: try again next tick, and only
@@ -4645,7 +4746,13 @@ function pollLinks() {
         L.msg = L.state === 'missing' ? 'The file was moved or deleted.' : '';
       });
     });
-  }, Promise.resolve()).then(function () { linkBusy = false; renderLinkUi(); }, function () { linkBusy = false; });
+  }, Promise.resolve()).then(function () {
+    linkBusy = false; renderLinkUi();
+    // The tiles panel is rebuilt only when a link's state changed, so a
+    // field being typed in is not wiped every second.
+    var sig = Object.keys(links).map(function (id) { return id + links[id].state + (links[id].at || 0); }).join();
+    if (sig !== tsLinkSig) { tsLinkSig = sig; if (ui.tab === 'tiles') renderTsInfo(); }
+  }, function () { linkBusy = false; });
 }
 setInterval(pollLinks, 1000);
 
@@ -4660,7 +4767,7 @@ function linkStateText(L) {
 
 // The link block in the object inspector, and the reconnect button.
 function renderLinkUi() {
-  var waiting = Object.keys(links).filter(function (id) { return links[id].state === 'prompt' && findObject(id); }).length;
+  var waiting = Object.keys(links).filter(function (id) { return links[id].state === 'prompt' && (findObject(id) || findTileset(id)); }).length;
   var rb = $('objReconnect');
   if (rb) { rb.hidden = !waiting; rb.textContent = 'Reconnect ' + waiting + ' linked file' + (waiting === 1 ? '' : 's'); }
   var box = $('objLink');
@@ -4683,6 +4790,857 @@ function renderLinkUi() {
   box.appendChild(br);
 }
 $('objLinkBtn').onclick = linkAseprite;
+
+/* ==========================================================================
+   Tilesets (phase 7)
+   ==========================================================================
+   A tileset is drawn in Aseprite on a TILEMAP layer laid over a TEMPLATE: a
+   picture of every place a tile can stand. The template is the rule set --
+   no rules are written by hand. For each template cell its eight
+   neighbours, filled or empty, describe the situation that tile was drawn
+   for; the tilemap says which tile was drawn there. Pedro's platformer
+   template, read this literal way, has no conflicts (measured 2026-10-01;
+   the usual shortcut of ignoring a diagonal unless both sides beside it are
+   filled gives six), so the literal reading is the one used.
+
+   The template comes from a layer named "template" when there is one, so a
+   cell that has no tile yet is "not drawn yet" rather than empty space --
+   otherwise every neighbour of an undrawn cell would be judged against the
+   wrong shape. Without such a layer, the placed tiles are the shape.
+
+   The level preview fills a random level with those rules: the exact
+   situation if a tile was drawn for it, else the closest drawn situation
+   (a side neighbour weighs four times a diagonal), marked, and listed in the
+   coverage report so it is clear which shapes the template still lacks.
+
+   The engine has no tilemap yet, so nothing here is exported; the flash cost
+   shown is what the tiles would cost as images.
+   -------------------------------------------------------------------------- */
+var NB = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];   // N NE E SE S SW W NW
+var NB_NAMES = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+var TILE_X = 1, TILE_Y = 2, TILE_D = 4;                    // flip bits as stored here
+var TEMPLATE_BASIC = ["###.###.#.##..#.", "....###...###..#", "##..###.#..##.#.", ".##.....#......#",
+                      "....###.....#...", ".#..#.#..#.###..", "###.###.##..#..."];
+
+function findTileset(id) {
+  for (var i = 0; i < project.tilesets.length; i++) if (project.tilesets[i].id === id) return project.tilesets[i];
+  return null;
+}
+function currentTileset() { return findTileset(ui.ts); }
+function maskAt(occ, w, h, x, y) {
+  var m = 0;
+  for (var i = 0; i < 8; i++) {
+    var xx = x + NB[i][0], yy = y + NB[i][1];
+    if (xx >= 0 && yy >= 0 && xx < w && yy < h && occ[yy * w + xx]) m |= 1 << i;
+  }
+  return m;
+}
+function maskName(m) {
+  var out = NB_NAMES.filter(function (_, i) { return m & (1 << i); });
+  return out.length ? out.join(' ') : 'alone';
+}
+
+/* ---- reading a tileset file ---- */
+function analyseTilesetFile(file) {
+  return file.arrayBuffer().then(function (buf) { return parseAsepriteFile(buf, file.name); }).then(function (r) {
+    var raw = r.raw, notes = [];
+    var tmIdx = -1;
+    raw.layers.forEach(function (L, i) { if (tmIdx < 0 && L.type === 2 && L.visible && !L.reference) tmIdx = i; });
+    if (tmIdx < 0) throw new Error(file.name + ' has no visible tilemap layer. Draw the tiles on a tilemap layer (Layer → New → New Tilemap Layer).');
+    var L = raw.layers[tmIdx], ts = raw.tilesets[L.tileset];
+    if (!ts || !ts.data) throw new Error('The tilemap layer “' + L.name + '” has no tileset inside this file.');
+    if (raw.layers.filter(function (x) { return x.type === 2 && x.visible; }).length > 1) {
+      notes.push({ cls: 'info', text: 'More than one tilemap layer: “' + L.name + '” is the one read.' });
+    }
+    var tw = ts.w, th = ts.h, mw = Math.ceil(raw.W / tw), mh = Math.ceil(raw.H / th);
+    var ids = new Array(mw * mh).fill(0), flips = new Array(mw * mh).fill(0);
+    var cel = raw.celFor(0, tmIdx);
+    if (cel) {
+      if (cel.x % tw || cel.y % th) notes.push({ cls: 'warn', text: 'The tilemap is not aligned to its own grid; cells are read from its position rounded down.' });
+      var ox = Math.floor(cel.x / tw), oy = Math.floor(cel.y / th);
+      var dv = new DataView(cel.data.buffer, cel.data.byteOffset, cel.data.byteLength);
+      for (var ty = 0; ty < cel.h; ty++) {
+        for (var tx = 0; tx < cel.w; tx++) {
+          var v = dv.getUint32((ty * cel.w + tx) * 4, true), id = v & cel.idMask;
+          var mx = ox + tx, my = oy + ty;
+          if (mx < 0 || my < 0 || mx >= mw || my >= mh) continue;
+          if (ts.emptyIsZero ? id === 0 : v === 0xFFFFFFFF) continue;
+          if (id >= ts.n) continue;
+          ids[my * mw + mx] = id;
+          flips[my * mw + mx] = (v & cel.xMask ? TILE_X : 0) | (v & cel.yMask ? TILE_Y : 0) | (v & cel.dMask ? TILE_D : 0);
+        }
+      }
+    }
+    // The tiles themselves: id 0 is "empty" in Aseprite's format, so tile k
+    // is stored at k-1 here.
+    var tiles = [];
+    for (var k = 1; k < ts.n; k++) {
+      var rgba = new Uint8ClampedArray(tw * th * 4);
+      for (var py = 0; py < th; py++) {
+        for (var px = 0; px < tw; px++) {
+          var c = raw.pixelAt(ts.data, (k * th + py) * tw + px, false), o = (py * tw + px) * 4;
+          rgba[o] = c[0]; rgba[o + 1] = c[1]; rgba[o + 2] = c[2]; rgba[o + 3] = c[3];
+        }
+      }
+      tiles.push(rgba);
+    }
+    // The template: a layer named "template", any visibility. A cell counts
+    // as part of the shape when over half of it is drawn.
+    var occ = new Array(mw * mh).fill(0), tplIdx = -1;
+    raw.layers.forEach(function (x, i) { if (tplIdx < 0 && x.type === 0 && /template/i.test(x.name)) tplIdx = i; });
+    var tcel = tplIdx >= 0 ? raw.celFor(0, tplIdx) : null;
+    if (tcel) {
+      var count = new Array(mw * mh).fill(0);
+      for (var y = 0; y < tcel.h; y++) {
+        for (var x = 0; x < tcel.w; x++) {
+          var sx = tcel.x + x, sy = tcel.y + y;
+          if (sx < 0 || sy < 0 || sx >= mw * tw || sy >= mh * th) continue;
+          if (raw.pixelAt(tcel.data, y * tcel.w + x, false)[3] >= 128) count[Math.floor(sy / th) * mw + Math.floor(sx / tw)]++;
+        }
+      }
+      for (var c2 = 0; c2 < occ.length; c2++) occ[c2] = count[c2] * 2 > tw * th ? 1 : 0;
+    } else {
+      for (var c3 = 0; c3 < occ.length; c3++) occ[c3] = ids[c3] ? 1 : 0;
+      notes.push({ cls: 'info', text: 'No layer named “template”, so the placed tiles are taken as the shape. With one, Canvas can tell an empty place from a tile not drawn yet.' });
+    }
+    var colours = [], seen = {}, semi = 0, transparent = false;
+    tiles.forEach(function (t) {
+      for (var i = 0; i < t.length; i += 4) {
+        if (t[i + 3] > 0 && t[i + 3] < 255) semi++;
+        if (t[i + 3] < 128) { transparent = true; continue; }
+        var hx = rgbToHex(t[i], t[i + 1], t[i + 2]);
+        if (!seen[hx]) { seen[hx] = true; colours.push(hx); }
+      }
+    });
+    if (semi) notes.push({ cls: 'warn', text: semi + ' partly transparent pixels in the tiles; the engine has no blending (alpha 128 is the line).' });
+    return { base: cName(file.name.replace(/\.(aseprite|ase)$/i, '')), tw: tw, th: th, mw: mw, mh: mh,
+             tiles: tiles, ids: ids, flips: flips, occ: occ, colours: colours, transparent: transparent,
+             notes: r.notes.filter(function (n) { return !/Hidden layers|Reference layers/.test(n.text); }).concat(notes),
+             template: tcel ? 'layer' : 'tiles' };
+  });
+}
+
+// Store it: tiles become palette indices, as sprites do.
+function commitTileset(an, palId, existing, fileName, quiet) {
+  snapshot();
+  var pal = palId === 'new' ? null : findPalette(palId);
+  if (!pal) {
+    pal = { id: newId('pal', allIds()), name: uniqueName(an.base), colors: an.colours.slice() };
+    project.palettes.push(pal);
+  } else {
+    paletteMissing(pal, an.colours).forEach(function (h) { pal.colors.push(h); });
+  }
+  var index = {};
+  pal.colors.forEach(function (h, i) { if (!(h in index)) index[h] = i; });
+  var tiles = an.tiles.map(function (c) {
+    var px = new Uint16Array(an.tw * an.th);
+    for (var i = 0; i < px.length; i++) {
+      var k = i * 4;
+      px[i] = c[k + 3] < 128 ? TRANSPARENT : index[rgbToHex(c[k], c[k + 1], c[k + 2])];
+    }
+    return encodeFrame(px);
+  });
+  var ts = existing || { id: newId('ts', allIds()), name: freeTilesetName(an.base) };
+  ts.tw = an.tw; ts.th = an.th; ts.palette = pal.id; ts.tiles = tiles; ts.source = fileName;
+  ts.map = { w: an.mw, h: an.mh, ids: an.ids.slice(), flips: an.flips.slice() };
+  ts.occ = an.occ.slice();
+  ts.template = an.template;
+  if (!existing) project.tilesets.push(ts);
+  changed();
+  if (quiet) { renderAll(); return ts; }
+  ui.ts = ts.id; ui.tab = 'tiles'; saveUi();
+  setTab('tiles');
+  toast('Read ' + ts.name + ': ' + tiles.length + ' tile' + (tiles.length === 1 ? '' : 's') + ' of ' + an.tw + '×' + an.th);
+  return ts;
+}
+function freeTilesetName(want) {
+  var base = cName(want), name = base, k = 2;
+  while (project.tilesets.some(function (t) { return t.name === name; })) name = base + '_' + (k++);
+  return name;
+}
+
+function normTileset(raw, taken, palIds) {
+  if (!isObj(raw)) return null;
+  var t = { id: (typeof raw.id === 'string' && raw.id && !taken[raw.id]) ? raw.id : newId('ts', taken) };
+  taken[t.id] = true;
+  t.name = cName(raw.name);
+  t.tw = intIn(raw.tw, 1, 256, 8); t.th = intIn(raw.th, 1, 256, 8);
+  t.palette = (typeof raw.palette === 'string' && palIds[raw.palette]) ? raw.palette : null;
+  t.source = typeof raw.source === 'string' ? raw.source : '';
+  t.template = raw.template === 'tiles' ? 'tiles' : 'layer';
+  var need = t.tw * t.th;
+  t.tiles = (Array.isArray(raw.tiles) ? raw.tiles : []).filter(function (f) {
+    try { return typeof f === 'string' && decodeFrame(f).length === need; } catch (e) { return false; }
+  });
+  var m = isObj(raw.map) ? raw.map : {};
+  var w = intIn(m.w, 1, 1024, 1), h = intIn(m.h, 1, 1024, 1), n = w * h;
+  function arr(a, max) { return (Array.isArray(a) ? a : []).slice(0, n).map(function (v) { return intIn(v, 0, max, 0); }).concat(new Array(Math.max(0, n - (Array.isArray(a) ? a.length : 0))).fill(0)).slice(0, n); }
+  t.map = { w: w, h: h, ids: arr(m.ids, t.tiles.length).map(function (v) { return v <= t.tiles.length ? v : 0; }), flips: arr(m.flips, 7) };
+  t.occ = arr(raw.occ, 1);
+  return t;
+}
+
+/* ---- the rules, read from the template ---- */
+function tilesetRules(ts) {
+  var w = ts.map.w, h = ts.map.h, byMask = {}, undrawn = [], outside = [], used = {};
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var i = y * w + x, id = ts.map.ids[i];
+      if (id) used[id] = (used[id] || 0) + 1;
+      if (!ts.occ[i]) { if (id) outside.push({ x: x, y: y }); continue; }
+      if (!id) { undrawn.push({ x: x, y: y }); continue; }
+      var m = maskAt(ts.occ, w, h, x, y), key = id + ':' + ts.map.flips[i];
+      var e = byMask[m] || (byMask[m] = { mask: m, choices: {} });
+      (e.choices[key] = e.choices[key] || { id: id, flip: ts.map.flips[i], cells: [] }).cells.push({ x: x, y: y });
+    }
+  }
+  var rules = {}, conflicts = [];
+  Object.keys(byMask).forEach(function (k) {
+    var e = byMask[k], ch = Object.keys(e.choices).map(function (c) { return e.choices[c]; });
+    rules[k] = ch[0];
+    if (ch.length > 1) conflicts.push({ mask: e.mask, choices: ch });
+  });
+  var planned = {};
+  undrawn.forEach(function (c) { planned[maskAt(ts.occ, w, h, c.x, c.y)] = true; });
+  return { rules: rules, masks: Object.keys(rules).map(Number), conflicts: conflicts, undrawn: undrawn, outside: outside, used: used, planned: planned };
+}
+
+// Closest drawn situation: a side neighbour weighs four times a diagonal.
+function maskCost(a, b) {
+  var d = a ^ b, c = 0;
+  for (var i = 0; i < 8; i++) if (d & (1 << i)) c += (i % 2 === 0) ? 4 : 1;
+  return c;
+}
+function autotile(level, R) {
+  var w = level.w, h = level.h, out = new Array(w * h), missing = {};
+  var near = {};
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var i = y * w + x;
+      if (!level.cells[i]) { out[i] = null; continue; }
+      var m = maskAt(level.cells, w, h, x, y), r = R.rules[m];
+      if (r) { out[i] = { id: r.id, flip: r.flip, mask: m, exact: true }; continue; }
+      if (!(m in near)) {
+        var best = -1, bc = Infinity;
+        R.masks.forEach(function (k) { var c = maskCost(m, k); if (c < bc || (c === bc && k < best)) { bc = c; best = k; } });
+        near[m] = best;
+      }
+      var rb = near[m] >= 0 ? R.rules[near[m]] : null;
+      out[i] = { id: rb ? rb.id : 0, flip: rb ? rb.flip : 0, mask: m, exact: false, via: near[m] };
+      (missing[m] = missing[m] || { mask: m, count: 0, cells: [], via: near[m] }).count++;
+      missing[m].cells.push(i);
+    }
+  }
+  return { tiles: out, missing: Object.keys(missing).map(function (k) { return missing[k]; }).sort(function (a, b) { return b.count - a.count; }) };
+}
+
+/* ---- random levels ---- */
+function rng32(seed) {                              // mulberry32: small, seedable, good enough
+  var a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeLevel(kind, w, h, seed) {
+  var R = rng32(seed), c = new Array(w * h).fill(0);
+  function set(x, y) { if (x >= 0 && y >= 0 && x < w && y < h) c[y * w + x] = 1; }
+  function ri(a, b) { return a + Math.floor(R() * (b - a + 1)); }
+  if (kind === 'caves') {
+    for (var i = 0; i < c.length; i++) c[i] = R() < 0.46 ? 1 : 0;
+    for (var it = 0; it < 4; it++) {
+      var n2 = c.slice();
+      for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+        var k = 0;
+        for (var d = 0; d < 8; d++) { var xx = x + NB[d][0], yy = y + NB[d][1]; if (xx < 0 || yy < 0 || xx >= w || yy >= h || c[yy * w + xx]) k++; }
+        n2[y * w + x] = k >= 5 ? 1 : 0;
+      }
+      c = n2;
+    }
+    return { w: w, h: h, cells: c };
+  }
+  // Platformer: uneven ground with gaps, floating platforms of mixed
+  // thickness, pillars, and a few loose blocks and diagonal pairs -- enough
+  // variety to touch most situations a tileset must cover.
+  var gy = h - 3;
+  for (var x2 = 0; x2 < w; x2++) {
+    if (R() < 0.08 && x2 > 1 && x2 < w - 3) { x2 += ri(1, 2); continue; }   // a gap
+    if (R() < 0.18) gy = Math.max(h - 5, Math.min(h - 2, gy + (R() < 0.5 ? -1 : 1)));
+    for (var y2 = gy; y2 < h; y2++) set(x2, y2);
+  }
+  var plats = Math.max(2, Math.round(w * h / 45));
+  for (var p = 0; p < plats; p++) {
+    var len = ri(1, 6), thick = R() < 0.6 ? 1 : R() < 0.75 ? 2 : 3;
+    var px = ri(0, w - len), py = ri(1, Math.max(1, h - 7));
+    for (var a = 0; a < len; a++) for (var b = 0; b < thick; b++) set(px + a, py + b);
+  }
+  for (var q = 0; q < Math.max(1, Math.round(w / 10)); q++) {
+    var cx = ri(1, w - 2), top = ri(h - 9, h - 5);
+    for (var y3 = top; y3 < h; y3++) set(cx, y3);
+  }
+  for (var s = 0; s < Math.max(1, Math.round(w / 8)); s++) {
+    var bx = ri(0, w - 2), by = ri(1, h - 6);
+    set(bx, by);
+    if (R() < 0.5) set(bx + 1, by + 1);                        // touching only at a corner
+  }
+  return { w: w, h: h, cells: c };
+}
+
+/* ---- drawing ---- */
+function tsColours32(ts) {
+  var pal = findPalette(ts.palette);
+  if (!pal) return null;
+  return pal.colors.map(function (hx) { var c = hexToRgb(panelOf(hx).hex); return ((255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0]) >>> 0; });
+}
+// One tile into an RGBA buffer, flips as the tilemap stores them.
+function blitTile(buf, bw, ts, cols, id, flip, dx, dy) {
+  var px = decodeFrame(ts.tiles[id - 1]), tw = ts.tw, th = ts.th;
+  for (var y = 0; y < th; y++) {
+    for (var x = 0; x < tw; x++) {
+      var sx = x, sy = y;
+      if (flip & TILE_D) { var t = sx; sx = sy; sy = t; }
+      if (flip & TILE_X) sx = tw - 1 - sx;
+      if (flip & TILE_Y) sy = th - 1 - sy;
+      if (sx >= tw || sy >= th) continue;
+      var v = px[sy * tw + sx];
+      if (v === TRANSPARENT) continue;
+      buf[(dy + y) * bw + dx + x] = cols[v] !== undefined ? cols[v] : 0xffff00ff;
+    }
+  }
+}
+
+var tsCv = $('tsCanvas'), tsOff = document.createElement('canvas');
+var tsLevel = null, tsTiled = null;             // the level on screen, and how it was tiled
+
+function tsGeom(cols, rows, ts) {
+  var r = tsCv.getBoundingClientRect(), W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
+  var pw = cols * ts.tw, ph = rows * ts.th;
+  var k = ui.tsZoom || Math.max(1, Math.floor(Math.min((W - 40) / pw, (H - 40) / ph)));
+  return { W: W, H: H, k: k, ox: Math.round((W - pw * k) / 2), oy: Math.round((H - ph * k) / 2) };
+}
+
+function drawTiles() {
+  if (ui.tab !== 'tiles') return;
+  var ts = currentTileset();
+  var dpr = window.devicePixelRatio || 1, r = tsCv.getBoundingClientRect();
+  var W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
+  tsCv.width = W * dpr; tsCv.height = H * dpr;
+  var g = tsCv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#101015'; g.fillRect(0, 0, W, H);
+  if (!ts) return;
+  var cols = tsColours32(ts), R = tilesetRules(ts);
+  var level = ui.tsView === 'level';
+  var gw = level ? tsLevel.w : ts.map.w, gh = level ? tsLevel.h : ts.map.h;
+  var gm = tsGeom(gw, gh, ts), k = gm.k, tw = ts.tw, th = ts.th;
+  var bg = hexToRgb(panelOf(project.scene.bg).hex);
+  var bgc = ((255 << 24) | (bg[2] << 16) | (bg[1] << 8) | bg[0]) >>> 0;
+  blit(tsOff, gw * tw, gh * th, function (buf) {
+    buf.fill(level ? bgc : 0);
+    if (!cols) return;
+    for (var y = 0; y < gh; y++) {
+      for (var x = 0; x < gw; x++) {
+        var t = level ? tsTiled.tiles[y * gw + x] : (ts.map.ids[y * gw + x] ? { id: ts.map.ids[y * gw + x], flip: ts.map.flips[y * gw + x] } : null);
+        if (t && t.id) blitTile(buf, gw * tw, ts, cols, t.id, t.flip, x * tw, y * th);
+      }
+    }
+  });
+  if (!level) {                                   // the template under the tiles
+    g.fillStyle = '#1c1c24';
+    for (var y0 = 0; y0 < gh; y0++) for (var x0 = 0; x0 < gw; x0++) {
+      if (ts.occ[y0 * gw + x0]) g.fillRect(gm.ox + x0 * tw * k, gm.oy + y0 * th * k, tw * k, th * k);
+    }
+  }
+  g.imageSmoothingEnabled = false;
+  g.drawImage(tsOff, gm.ox, gm.oy, gw * tw * k, gh * th * k);
+  g.strokeStyle = '#33333f'; g.lineWidth = 1;
+  g.strokeRect(gm.ox - 0.5, gm.oy - 0.5, gw * tw * k + 1, gh * th * k + 1);
+
+  function cellRect(x, y) { return [gm.ox + x * tw * k, gm.oy + y * th * k, tw * k, th * k]; }
+  if (!level) {
+    // Not drawn yet: hatched. Outside the template: outlined red.
+    R.undrawn.forEach(function (c) {
+      var q = cellRect(c.x, c.y);
+      g.save(); g.beginPath(); g.rect(q[0], q[1], q[2], q[3]); g.clip();
+      g.strokeStyle = 'rgba(255,209,102,0.55)';
+      for (var s = -q[3]; s < q[2]; s += 6) { g.beginPath(); g.moveTo(q[0] + s, q[1] + q[3]); g.lineTo(q[0] + s + q[3], q[1]); g.stroke(); }
+      g.restore();
+    });
+    R.outside.forEach(function (c) { var q = cellRect(c.x, c.y); g.strokeStyle = '#ff6b6b'; g.strokeRect(q[0] + 0.5, q[1] + 0.5, q[2] - 1, q[3] - 1); });
+    R.conflicts.forEach(function (cf) { cf.choices.forEach(function (ch) { ch.cells.forEach(function (c) {
+      var q = cellRect(c.x, c.y); g.strokeStyle = '#ff9f43'; g.lineWidth = 2; g.strokeRect(q[0] + 1, q[1] + 1, q[2] - 2, q[3] - 2); g.lineWidth = 1;
+    }); }); });
+    if (ui.tsNumbers && tw * k >= 14) {                    // the numbered picture, made for you
+      g.font = '600 ' + Math.min(11, Math.floor(tw * k / 2.2)) + 'px ui-monospace, Menlo, Consolas, monospace';
+      g.textBaseline = 'top';
+      for (var y1 = 0; y1 < gh; y1++) for (var x1 = 0; x1 < gw; x1++) {
+        var id1 = ts.map.ids[y1 * gw + x1];
+        if (!id1) continue;
+        var q1 = cellRect(x1, y1), txt = String(id1) + (ts.map.flips[y1 * gw + x1] ? '′' : '');
+        var tw1 = g.measureText(txt).width;
+        g.fillStyle = 'rgba(16,16,21,0.8)'; g.fillRect(q1[0] + 1, q1[1] + 1, tw1 + 4, 12);
+        g.fillStyle = '#ffd166'; g.fillText(txt, q1[0] + 3, q1[1] + 2);
+      }
+    }
+  } else if (ui.tsMarks) {
+    // A cell tiled by the closest situation, not its own: a magenta corner.
+    tsTiled.tiles.forEach(function (t, i) {
+      if (!t || t.exact) return;
+      var q = cellRect(i % gw, Math.floor(i / gw));
+      var hi = ui.tsHi === t.mask;
+      g.fillStyle = hi ? '#ffd166' : '#ff3ea5';
+      g.beginPath(); g.moveTo(q[0], q[1]); g.lineTo(q[0] + Math.max(4, q[2] / 3), q[1]); g.lineTo(q[0], q[1] + Math.max(4, q[3] / 3)); g.fill();
+      if (hi) { g.strokeStyle = '#ffd166'; g.lineWidth = 2; g.strokeRect(q[0] + 1, q[1] + 1, q[2] - 2, q[3] - 2); g.lineWidth = 1; }
+    });
+  }
+}
+if (window.ResizeObserver) new ResizeObserver(function () { drawTiles(); }).observe($('tsCanvasWrap'));
+
+// A 3x3 picture of a situation: the centre, and which neighbours are filled.
+function maskGlyph(m, size) {
+  var c = document.createElement('canvas'), s = size || 5;
+  c.width = c.height = s * 3; c.className = 'glyph'; c.title = maskName(m);
+  var g = c.getContext('2d');
+  g.fillStyle = '#14141a'; g.fillRect(0, 0, s * 3, s * 3);
+  g.fillStyle = '#b98cff'; g.fillRect(s, s, s, s);
+  g.fillStyle = '#8a8a96';
+  for (var i = 0; i < 8; i++) if (m & (1 << i)) g.fillRect((1 + NB[i][0]) * s, (1 + NB[i][1]) * s, s, s);
+  return c;
+}
+
+/* ---- panels ---- */
+function tsBudget(ts) {
+  var pal = findPalette(ts.palette);
+  if (!pal) return null;
+  var transparent = ts.tiles.some(function (f) { return decodeFrame(f).indexOf(TRANSPARENT) >= 0; });
+  var n = pal.colors.length, bpp = bppFor(n + (transparent ? 1 : 0));
+  if (!bpp) return null;
+  var per = frameBytes(ts.tw, ts.th, bpp);
+  return { n: n, transparent: transparent, bpp: bpp, per: per, pixels: per * ts.tiles.length, pal: paletteBytes(bpp) };
+}
+
+function renderTsList() {
+  var box = $('tsList');
+  box.innerHTML = '';
+  if (!project.tilesets.length) { box.appendChild(el('div', 'empty-note', 'No tilesets yet.')); return; }
+  project.tilesets.forEach(function (ts) {
+    var row = el('div', 'orow' + (ts.id === ui.ts ? ' sel' : ''));
+    row.appendChild(el('span', 'nm', ts.name));
+    row.appendChild(el('span', 'tag', (links[ts.id] ? '⟳ ' : '') + ts.tiles.length + ' × ' + ts.tw + '×' + ts.th));
+    row.onclick = function () { ui.ts = ts.id; ui.tsHi = null; saveUi(); renderTiles(); };
+    box.appendChild(row);
+  });
+}
+
+function renderTsInfo() {
+  var box = $('tsInfoSect'), ts = currentTileset();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Tileset'));
+  if (!ts) return;
+  var t = el('table', 'kv');
+  function kv(a, b) { var tr = el('tr'); tr.appendChild(el('td', null, a)); tr.appendChild(el('td', null, b)); t.appendChild(tr); }
+  kv('Tiles', ts.tiles.length + ' of ' + ts.tw + ' × ' + ts.th + ' px');
+  kv('Template', ts.map.w + ' × ' + ts.map.h + ' cells' + (ts.template === 'tiles' ? ' (from the tiles)' : ''));
+  if (ts.source) kv('From', ts.source);
+  box.appendChild(t);
+  box.appendChild(tsLinkBlock(ts));
+
+  box.appendChild(el('span', 'lbl', 'Palette'));
+  var sel = document.createElement('select');
+  sel.className = 'sel2';
+  var need = 0;
+  ts.tiles.forEach(function (f) { decodeFrame(f).forEach(function (v) { if (v !== TRANSPARENT && v + 1 > need) need = v + 1; }); });
+  project.palettes.forEach(function (pal) {
+    var op = el('option', null, pal.name + ' (' + pal.colors.length + ')'); op.value = pal.id;
+    if (pal.colors.length < need) { op.disabled = true; op.textContent += ' — needs ' + need; }
+    sel.appendChild(op);
+  });
+  sel.value = ts.palette || '';
+  sel.onchange = function () { snapshot(); ts.palette = sel.value; changed(); renderTiles(); };
+  box.appendChild(sel);
+
+  var b = tsBudget(ts);
+  box.appendChild(el('span', 'lbl', 'Flash, if stored as images'));
+  if (!b) { box.appendChild(el('p', 'note bad', 'No palette, or too many colours.')); }
+  else {
+    box.appendChild(el('p', 'note', b.n + ' colour' + (b.n === 1 ? '' : 's') + (b.transparent ? ' + transparent' : '') + ' → ' + b.bpp + ' bpp: '
+      + b.per + ' B a tile × ' + ts.tiles.length + ' = ' + bytesLabel(b.pixels) + ', + ' + b.pal + ' B palette = ' + bytesLabel(b.pixels + b.pal) + '.'));
+  }
+  box.appendChild(el('p', 'note', 'The engine has no tilemap yet, so a tileset is a preview: it is exported once the engine and Canvas agree a tilemap format.'));
+  var br = el('div', 'btnrow');
+  var del = el('button', 'chip danger', 'Delete tileset'); del.type = 'button';
+  del.onclick = function () {
+    if (!confirm('Delete “' + ts.name + '”? (Undo brings it back.)')) return;
+    snapshot();
+    project.tilesets.splice(project.tilesets.indexOf(ts), 1);
+    dropLink(ts.id);
+    ui.ts = project.tilesets.length ? project.tilesets[0].id : null; saveUi();
+    changed(); renderTiles();
+  };
+  br.appendChild(del); box.appendChild(br);
+}
+
+// Pairs of tiles that are the same, or nearly: a stray pixel costs a whole tile.
+function tileTwins(ts) {
+  var out = [], px = ts.tiles.map(function (f) { return decodeFrame(f); });
+  for (var i = 0; i < px.length; i++) {
+    for (var j = i + 1; j < px.length; j++) {
+      var d = 0;
+      for (var k = 0; k < px[i].length && d <= 3; k++) if (px[i][k] !== px[j][k]) d++;
+      if (d <= 3) out.push({ a: i + 1, b: j + 1, d: d });
+    }
+  }
+  return out;
+}
+
+function renderTsChecks() {
+  var box = $('tsCheckSect'), ts = currentTileset();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Checks'));
+  if (!ts) return;
+  var R = tilesetRules(ts), ul = el('ul', 'warns');
+  function li(cls, node) { var x = el('li', cls); if (typeof node === 'string') x.textContent = node; else x.appendChild(node); ul.appendChild(x); }
+  R.conflicts.forEach(function (cf) {
+    var s = el('span');
+    s.appendChild(maskGlyph(cf.mask)); s.appendChild(document.createTextNode(' The same situation is drawn as tiles '
+      + cf.choices.map(function (c) { return c.id + (c.flip ? '′' : ''); }).join(' and ') + ' (outlined orange). One rule needs one tile.'));
+    li('bad', s);
+  });
+  if (R.undrawn.length) li('info', R.undrawn.length + ' template place' + (R.undrawn.length === 1 ? ' has' : 's have') + ' no tile yet (hatched).');
+  if (R.outside.length) li('warn', R.outside.length + ' tile' + (R.outside.length === 1 ? ' sits' : 's sit') + ' outside the template (outlined red), so ' + (R.outside.length === 1 ? 'it makes' : 'they make') + ' no rule.');
+  tileTwins(ts).forEach(function (p) {
+    li('warn', p.d ? 'Tiles ' + p.a + ' and ' + p.b + ' differ by only ' + p.d + ' pixel' + (p.d === 1 ? '' : 's') + ': a stray pixel, or meant?'
+      : 'Tiles ' + p.a + ' and ' + p.b + ' are identical: one would do, and save a tile of flash.');
+  });
+  var unused = [];
+  for (var id = 1; id <= ts.tiles.length; id++) if (!R.used[id]) unused.push(id);
+  if (unused.length) li('info', 'Tile' + (unused.length === 1 ? ' ' : 's ') + unused.join(', ') + (unused.length === 1 ? ' is' : ' are') + ' in the tileset but placed nowhere.');
+  var flipped = ts.map.flips.filter(Boolean).length;
+  if (flipped) li('info', flipped + ' cell' + (flipped === 1 ? ' uses a' : 's use') + ' flipped tile' + (flipped === 1 ? '' : 's') + ' (marked ′). Whether the engine’s tilemap will flip tiles is not decided.');
+  li('info', R.masks.length + ' situation' + (R.masks.length === 1 ? '' : 's') + ' drawn, of 256 possible.');
+  box.appendChild(ul);
+}
+
+function renderTsLevel() {
+  var box = $('tsCoverSect'), ts = currentTileset();
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Level preview'));
+  if (!ts) return;
+  var lv = ui.tsLvl;
+  var r1 = el('div', 'pickrow');
+  var kind = document.createElement('select');
+  kind.className = 'sel2';
+  [['platformer', 'Platformer'], ['caves', 'Caves']].forEach(function (p) { var op = el('option', null, p[1]); op.value = p[0]; kind.appendChild(op); });
+  kind.value = lv.kind;
+  kind.onchange = function () { lv.kind = kind.value; newLevel(false); };
+  r1.appendChild(kind);
+  box.appendChild(r1);
+  var r2 = el('div', 'pickrow'); r2.style.marginTop = '6px';
+  r2.appendChild(numInput(lv.w, 4, 256, function (inp) { lv.w = intIn(inp.value, 4, 256, lv.w); newLevel(false); }));
+  r2.appendChild(el('span', 'small', '×'));
+  r2.appendChild(numInput(lv.h, 4, 256, function (inp) { lv.h = intIn(inp.value, 4, 256, lv.h); newLevel(false); }));
+  r2.appendChild(el('span', 'small', 'tiles'));
+  box.appendChild(r2);
+  var r3 = el('div', 'btnrow');
+  var nb = el('button', 'chip primary', 'New random level'); nb.type = 'button';
+  nb.onclick = function () { newLevel(true); };
+  r3.appendChild(nb);
+  box.appendChild(r3);
+  box.appendChild(el('p', 'note', 'Seed ' + lv.seed + ' · ' + (lv.w * ts.tw) + ' × ' + (lv.h * ts.th) + ' px. The background is the scene’s.'));
+
+  if (!tsTiled) return;
+  var filled = tsTiled.tiles.filter(Boolean).length, fb = tsTiled.tiles.filter(function (t) { return t && !t.exact; }).length;
+  box.appendChild(el('span', 'lbl', 'Coverage'));
+  box.appendChild(el('p', 'note' + (fb ? ' warn' : ''), filled + ' tiles placed: ' + (filled - fb) + ' matched exactly'
+    + (fb ? ', ' + fb + ' by the closest situation (magenta corner), from ' + tsTiled.missing.length + ' situation'
+      + (tsTiled.missing.length === 1 ? '' : 's') + ' the template lacks:' : '. Every situation in this level is drawn.')));
+  if (!tsTiled.missing.length) return;
+  var R = tilesetRules(ts);
+  // Two different jobs: a place the template already has but no tile yet,
+  // or a shape the template does not have at all.
+  var planned = tsTiled.missing.filter(function (m) { return R.planned[m.mask]; });
+  if (planned.length) {
+    var pc = planned.reduce(function (a, m) { return a + m.count; }, 0);
+    box.appendChild(el('p', 'note', planned.length + ' of them (' + pc + ' tile' + (pc === 1 ? '' : 's') + ') are places already in your template, '
+      + 'just not drawn yet — marked “planned”. The rest are shapes the template does not have.'));
+  }
+  var t = el('table', 'cover');
+  var hr = el('tr');
+  ['situation', 'times', '', 'shown as'].forEach(function (x) { hr.appendChild(el('th', null, x)); });
+  t.appendChild(hr);
+  tsTiled.missing.slice(0, 40).forEach(function (m) {
+    var tr = el('tr' );
+    if (ui.tsHi === m.mask) tr.className = 'hi';
+    var g1 = el('td'); g1.appendChild(maskGlyph(m.mask, 5)); tr.appendChild(g1);
+    tr.appendChild(el('td', null, String(m.count)));
+    tr.appendChild(el('td', R.planned[m.mask] ? 'plan' : 'new', R.planned[m.mask] ? 'planned' : 'not in template'));
+    var via = R.rules[m.via], g2 = el('td');
+    if (via) { g2.appendChild(maskGlyph(m.via, 5)); g2.appendChild(document.createTextNode(' tile ' + via.id)); }
+    tr.appendChild(g2);
+    tr.title = maskName(m.mask) + ' — click to show where';
+    tr.onclick = function () { ui.tsHi = ui.tsHi === m.mask ? null : m.mask; ui.tsView = 'level'; saveUi(); renderTiles(); };
+    t.appendChild(tr);
+  });
+  box.appendChild(t);
+  if (tsTiled.missing.length > 40) box.appendChild(el('p', 'note', '… and ' + (tsTiled.missing.length - 40) + ' more.'));
+  box.appendChild(el('p', 'note', 'Each row: a situation (purple = the tile, grey = filled neighbours), how often this level has it, and the drawn situation used instead. Click a row to highlight it.'));
+}
+
+function newLevel(reseed) {
+  var lv = ui.tsLvl;
+  if (reseed) lv.seed = (Math.random() * 1e9) >>> 0;
+  ui.tsView = 'level'; ui.tsHi = null; saveUi();
+  renderTiles();
+}
+
+function renderTiles() {
+  if (ui.ts && !currentTileset()) ui.ts = null;
+  if (!ui.ts && project.tilesets.length) ui.ts = project.tilesets[0].id;
+  var has = project.tilesets.length > 0, ts = currentTileset();
+  $('tsEmpty').hidden = has; $('tsStage').hidden = !has; $('tsInspector').hidden = !has;
+  renderTsList();
+  if (!has) return;
+  var lv = ui.tsLvl;
+  tsLevel = makeLevel(lv.kind, lv.w, lv.h, lv.seed);
+  tsTiled = autotile(tsLevel, tilesetRules(ts));
+  Array.prototype.forEach.call(document.querySelectorAll('#tsViewSw button'), function (b) { b.classList.toggle('on', b.getAttribute('data-v') === ui.tsView); });
+  $('tsZoom').value = String(ui.tsZoom);
+  $('tsNumbers').checked = ui.tsNumbers; $('tsMarks').checked = ui.tsMarks;
+  renderTsInfo(); renderTsChecks(); renderTsLevel();
+  drawTiles();
+}
+
+Array.prototype.forEach.call(document.querySelectorAll('#tsViewSw button'), function (b) {
+  b.onclick = function () { ui.tsView = b.getAttribute('data-v'); saveUi(); renderTiles(); };
+});
+$('tsZoom').onchange = function () { ui.tsZoom = +this.value; saveUi(); drawTiles(); };
+$('tsNumbers').onchange = function () { ui.tsNumbers = this.checked; saveUi(); drawTiles(); };
+$('tsMarks').onchange = function () { ui.tsMarks = this.checked; saveUi(); drawTiles(); };
+tsCv.addEventListener('pointermove', function (e) {
+  var ts = currentTileset();
+  if (!ts) return;
+  var level = ui.tsView === 'level', gw = level ? tsLevel.w : ts.map.w, gh = level ? tsLevel.h : ts.map.h;
+  var gm = tsGeom(gw, gh, ts), r = tsCv.getBoundingClientRect();
+  var x = Math.floor((e.clientX - r.left - gm.ox) / (ts.tw * gm.k)), y = Math.floor((e.clientY - r.top - gm.oy) / (ts.th * gm.k));
+  if (x < 0 || y < 0 || x >= gw || y >= gh) { $('tsReadout').textContent = ''; return; }
+  var i = y * gw + x, txt = 'cell ' + x + ', ' + y;
+  if (level) {
+    var t = tsTiled.tiles[i];
+    if (t) txt += ' · ' + maskName(t.mask) + ' · tile ' + t.id + (t.exact ? '' : ' (closest)');
+  } else if (ts.occ[i] || ts.map.ids[i]) {
+    txt += ' · ' + maskName(maskAt(ts.occ, gw, gh, x, y)) + (ts.map.ids[i] ? ' · tile ' + ts.map.ids[i] : ' · not drawn yet');
+  }
+  $('tsReadout').textContent = txt;
+});
+tsCv.addEventListener('pointerleave', function () { $('tsReadout').textContent = ''; });
+
+/* ---- linking a tileset file ---- */
+function linkTileset() {
+  function take(file, handle) {
+    return analyseTilesetFile(file).then(function (an) {
+      var existing = project.tilesets.filter(function (t) { return t.name === an.base; })[0] || null;
+      var pal = existing && findPalette(existing.palette) ? existing.palette
+        : (project.palettes.filter(function (p) { return !paletteMissing(p, an.colours).length; })[0] || {}).id || 'new';
+      var ts = commitTileset(an, pal, existing, file.name, false);
+      an.notes.forEach(function (n) { if (n.cls !== 'info') toast(n.text); });
+      if (handle) {
+        links[ts.id] = { handle: handle, name: file.name, last: file.lastModified, size: file.size, state: 'ok', msg: '', at: Date.now(), kind: 'tileset' };
+        saveLink(ts.id, handle).then(renderTiles);
+      }
+    });
+  }
+  if (!canLink()) {
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = '.aseprite,.ase';
+    input.onchange = function () { var f = input.files && input.files[0]; if (f) take(f, null).catch(function (e) { toast(e.message); }); };
+    input.click();
+    return;
+  }
+  window.showOpenFilePicker({ multiple: false, types: [{ description: 'Aseprite files', accept: { 'application/octet-stream': ['.aseprite', '.ase'] } }] })
+    .then(function (hs) { return hs[0].getFile().then(function (f) { return take(f, hs[0]); }); })
+    .catch(function (err) { if (!err || err.name !== 'AbortError') toast(err && err.message ? err.message : 'Could not read that file'); });
+}
+
+// A linked tileset changed: same palette rule as sprites.
+function reloadLinkedTileset(id, file) {
+  var L = links[id], ts = findTileset(id);
+  return analyseTilesetFile(file).then(function (an) {
+    var pal = findPalette(ts.palette);
+    var miss = pal ? paletteMissing(pal, an.colours) : an.colours;
+    var others = pal ? objectsUsing(pal.id).concat(project.tilesets.filter(function (t) { return t !== ts && t.palette === pal.id; })) : [];
+    if (pal && miss.length && others.length) {
+      L.state = 'review'; L.pending = an;
+      L.msg = miss.length + ' new colour' + (miss.length === 1 ? '' : 's') + ', and “' + pal.name + '” is shared.';
+      toast(ts.name + ': ' + L.msg + ' Review it in the Tiles tab.');
+      return;
+    }
+    commitTileset(an, pal ? pal.id : 'new', ts, file.name, true);
+    L.state = 'ok'; L.msg = ''; L.pending = null; L.at = Date.now();
+    toast('Reloaded ' + ts.name + ' from ' + file.name + (miss.length ? ' (+' + miss.length + ' colour' + (miss.length === 1 ? '' : 's') + ')' : ''));
+  });
+}
+
+function tsLinkBlock(ts) {
+  var box = el('div');
+  var L = links[ts.id];
+  if (!L) return box;
+  box.appendChild(el('span', 'lbl', 'Linked file'));
+  box.appendChild(el('p', 'note mono', L.name));
+  box.appendChild(el('p', 'note ' + (L.state === 'ok' ? '' : L.state === 'prompt' ? 'warn' : 'bad'), linkStateText(L)));
+  var br = el('div', 'btnrow');
+  function btn(label, fn, cls) { var b = el('button', 'chip' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = fn; br.appendChild(b); }
+  if (L.state === 'prompt') btn('Reconnect', reconnectLinks, 'primary');
+  if (L.state === 'review' && L.pending) {
+    btn('Add the colours', function () { commitTileset(L.pending, ts.palette, ts, L.name, true); L.state = 'ok'; L.msg = ''; L.pending = null; L.at = Date.now(); renderTiles(); }, 'primary');
+    btn('Own palette', function () { commitTileset(L.pending, 'new', ts, L.name, true); L.state = 'ok'; L.msg = ''; L.pending = null; L.at = Date.now(); renderTiles(); });
+  }
+  if (L.state === 'ok' || L.state === 'error') btn('Reload now', function () { L.last = 0; L.size = -1; L.state = 'ok'; pollLinks(); });
+  btn('Unlink', function () { dropLink(ts.id).then(renderTiles); toast('Unlinked ' + ts.name + '; its tiles stay.'); });
+  box.appendChild(br);
+  return box;
+}
+
+/* ---- starter files: Canvas writes the .aseprite ---- */
+// A template from the built-in layout or a picture; then a file with that
+// template as a locked layer and an empty tilemap layer over it, at the
+// tile size chosen. Written from the same specification the reader uses,
+// and checked by opening it in Aseprite.
+function aseDeflate(bytes) {
+  var cs = new CompressionStream('deflate');
+  return new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+}
+function writeStarterAse(occ, mw, mh, T) {
+  var W = mw * T, H = mh * T;
+  var tpl = new Uint8Array(W * H * 4);
+  for (var cy = 0; cy < mh; cy++) for (var cx = 0; cx < mw; cx++) {
+    if (!occ[cy * mw + cx]) continue;
+    for (var y = 0; y < T; y++) for (var x = 0; x < T; x++) {
+      var e = x === 0 || y === 0 || x === T - 1 || y === T - 1, o = ((cy * T + y) * W + cx * T + x) * 4;
+      tpl[o] = e ? 150 : 200; tpl[o + 1] = e ? 150 : 200; tpl[o + 2] = e ? 160 : 205; tpl[o + 3] = 255;
+    }
+  }
+  return Promise.all([aseDeflate(tpl), aseDeflate(new Uint8Array(T * T * 4)), aseDeflate(new Uint8Array(mw * mh * 4))]).then(function (z) {
+    var parts = [];
+    function B(n) { parts.push(Uint8Array.of(n & 255)); }
+    function Wd(n) { parts.push(Uint8Array.of(n & 255, (n >> 8) & 255)); }
+    function D(n) { parts.push(Uint8Array.of(n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255)); }
+    function Z(n) { parts.push(new Uint8Array(n)); }
+    function S(s) { var b = new TextEncoder().encode(s); Wd(b.length); parts.push(b); }
+    function chunk(type, body) { var start = parts.length; body(); var len = 6; for (var i = start; i < parts.length; i++) len += parts[i].length; parts.splice(start, 0, (function () { var h = new Uint8Array(6), dv = new DataView(h.buffer); dv.setUint32(0, len, true); dv.setUint16(4, type, true); return h; })()); return 1; }
+    var n = 0;
+    n += chunk(0x2019, function () { D(1); D(0); D(0); Z(8); Wd(0); B(0); B(0); B(0); B(255); });   // palette: one black entry
+    n += chunk(0x2023, function () {                                                                 // tileset: tile 0 empty
+      D(0); D(2 | 4); D(1); Wd(T); Wd(T); Wd(1); Z(14); S('tiles'); D(z[1].length); parts.push(z[1]);
+    });
+    n += chunk(0x2004, function () { Wd(1); Wd(0); Wd(0); Wd(0); Wd(0); Wd(0); B(255); Z(3); S('template'); });   // visible, locked
+    n += chunk(0x2004, function () { Wd(3); Wd(2); Wd(0); Wd(0); Wd(0); Wd(0); B(255); Z(3); S('tiles'); D(0); });
+    n += chunk(0x2005, function () { Wd(0); Wd(0); Wd(0); B(255); Wd(2); Wd(0); Z(5); Wd(W); Wd(H); parts.push(z[0]); });
+    n += chunk(0x2005, function () {
+      Wd(1); Wd(0); Wd(0); B(255); Wd(3); Wd(0); Z(5); Wd(mw); Wd(mh); Wd(32);
+      D(0x1fffffff); D(0x80000000); D(0x40000000); D(0x20000000); Z(10); parts.push(z[2]);
+    });
+    var body = 0; parts.forEach(function (p) { body += p.length; });
+    var frame = new Uint8Array(16), fv = new DataView(frame.buffer);
+    fv.setUint32(0, 16 + body, true); fv.setUint16(4, 0xF1FA, true); fv.setUint16(6, n, true); fv.setUint16(8, 100, true); fv.setUint32(12, n, true);
+    var head = new Uint8Array(128), hv = new DataView(head.buffer);
+    hv.setUint32(0, 128 + 16 + body, true); hv.setUint16(4, 0xA5E0, true); hv.setUint16(6, 1, true);
+    hv.setUint16(8, W, true); hv.setUint16(10, H, true); hv.setUint16(12, 32, true); hv.setUint32(14, 1, true); hv.setUint16(18, 100, true);
+    hv.setUint16(32, 1, true); head[34] = 1; head[35] = 1; hv.setUint16(40, T, true); hv.setUint16(42, T, true);
+    var out = new Uint8Array(128 + 16 + body), at = 0;
+    [head, frame].concat(parts).forEach(function (p) { out.set(p, at); at += p.length; });
+    return out;
+  });
+}
+
+// A template from a picture: guess the cell size from where ink starts and
+// stops, and call a cell filled when over half of it is ink (not white, not clear).
+function templateFromPicture(img, cell) {
+  var ink = function (k) { var d = img.data; return d[k + 3] >= 128 && (d[k] + d[k + 1] + d[k + 2]) < 600; };
+  if (!cell) {
+    var g = 0;
+    function gcd(a, b) { while (b) { var t = b; b = a % b; a = t; } return a; }
+    for (var y = 0; y < img.h; y += 3) for (var x = 1; x < img.w; x++) {
+      if (ink((y * img.w + x) * 4) !== ink((y * img.w + x - 1) * 4)) g = gcd(g, x);
+    }
+    for (var x2 = 0; x2 < img.w; x2 += 3) for (var y2 = 1; y2 < img.h; y2++) {
+      if (ink((y2 * img.w + x2) * 4) !== ink(((y2 - 1) * img.w + x2) * 4)) g = gcd(g, y2);
+    }
+    cell = g >= 2 ? g : 8;
+  }
+  var mw = Math.floor(img.w / cell), mh = Math.floor(img.h / cell), occ = new Array(mw * mh).fill(0);
+  for (var cy = 0; cy < mh; cy++) for (var cx = 0; cx < mw; cx++) {
+    var n = 0;
+    for (var yy = 0; yy < cell; yy++) for (var xx = 0; xx < cell; xx++) if (ink(((cy * cell + yy) * img.w + cx * cell + xx) * 4)) n++;
+    occ[cy * mw + cx] = n * 2 > cell * cell ? 1 : 0;
+  }
+  return { occ: occ, w: mw, h: mh, cell: cell };
+}
+
+function showStarter() {
+  openModal('New tileset starter file');
+  var body = $('modalBody'), foot = $('modalFoot');
+  var st = { tpl: { occ: [], w: TEMPLATE_BASIC[0].length, h: TEMPLATE_BASIC.length }, T: ui.tsTile || 8, name: 'tileset' };
+  TEMPLATE_BASIC.forEach(function (r) { for (var i = 0; i < r.length; i++) st.tpl.occ.push(r[i] === '#' ? 1 : 0); });
+  body.appendChild(el('p', 'note', 'Canvas writes an Aseprite file: your template as a locked layer, and an empty tilemap layer over it '
+    + 'at the tile size below. Draw tiles on “tiles”; where the same tile belongs twice, place it again from the tileset rather than redrawing it.'));
+  body.appendChild(el('h4', 'mh', 'Template'));
+  var prev = document.createElement('canvas'); prev.className = 'tplprev';
+  var info = el('p', 'note');
+  function draw() {
+    var s = 6; prev.width = st.tpl.w * s; prev.height = st.tpl.h * s;
+    var g = prev.getContext('2d'); g.fillStyle = '#14141a'; g.fillRect(0, 0, prev.width, prev.height);
+    g.fillStyle = '#c8c8cd';
+    for (var y = 0; y < st.tpl.h; y++) for (var x = 0; x < st.tpl.w; x++) if (st.tpl.occ[y * st.tpl.w + x]) g.fillRect(x * s, y * s, s - 1, s - 1);
+    var n = st.tpl.occ.filter(Boolean).length;
+    info.textContent = st.tpl.w + ' × ' + st.tpl.h + ' cells, ' + n + ' places → a ' + (st.tpl.w * st.T) + ' × ' + (st.tpl.h * st.T) + ' px file.';
+  }
+  var r1 = el('div', 'btnrow');
+  var b1 = el('button', 'chip', 'Platformer (built in)'); b1.type = 'button';
+  b1.onclick = function () { st.tpl = { occ: [], w: TEMPLATE_BASIC[0].length, h: TEMPLATE_BASIC.length }; TEMPLATE_BASIC.forEach(function (r) { for (var i = 0; i < r.length; i++) st.tpl.occ.push(r[i] === '#' ? 1 : 0); }); draw(); };
+  var b2 = el('button', 'chip', 'From a picture…'); b2.type = 'button';
+  b2.onclick = function () {
+    var input = document.createElement('input'); input.type = 'file'; input.accept = 'image/png,image/*';
+    input.onchange = function () {
+      var f = input.files && input.files[0];
+      if (!f) return;
+      readPixels(f).then(function (img) {
+        var t = templateFromPicture(img, 0);
+        st.tpl = t; st.name = cName(f.name.replace(/\.[^.]+$/, ''));
+        draw();
+        toast('Read ' + f.name + ' as ' + t.w + ' × ' + t.h + ' cells of ' + t.cell + ' px');
+      }).catch(function () { toast('Could not read that picture'); });
+    };
+    input.click();
+  };
+  r1.appendChild(b1); r1.appendChild(b2);
+  body.appendChild(r1); body.appendChild(prev); body.appendChild(info);
+  body.appendChild(el('h4', 'mh', 'Tile size'));
+  var tr = el('div', 'pickrow');
+  tr.appendChild(numInput(st.T, 2, 64, function (inp) { st.T = intIn(inp.value, 2, 64, st.T); inp.value = st.T; draw(); }));
+  tr.appendChild(el('span', 'small', 'px square (8 is the default)'));
+  body.appendChild(tr);
+  draw();
+  var cancel = el('button', 'chip', 'Cancel'); cancel.type = 'button'; cancel.onclick = closeModal;
+  var go = el('button', 'chip primary', 'Download starter'); go.type = 'button';
+  go.onclick = function () {
+    ui.tsTile = st.T; saveUi();
+    writeStarterAse(st.tpl.occ, st.tpl.w, st.tpl.h, st.T).then(function (bytes) {
+      var name = st.name + '_' + st.T + 'px.aseprite';
+      var blob = new Blob([bytes], { type: 'application/octet-stream' }), url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      closeModal(); toast('Downloaded ' + name + ': open it in Aseprite and draw on “tiles”.');
+    });
+  };
+  foot.appendChild(cancel); foot.appendChild(go);
+}
+
+$('tsLinkBtn').onclick = linkTileset;
+$('tsStarterBtn').onclick = showStarter;
 $('objReconnect').onclick = reconnectLinks;
 $('modal').onclick = function (e) { if (e.target === $('modal')) closeModal(); };
 
@@ -4693,7 +5651,7 @@ $('modal').onclick = function (e) { if (e.target === $('modal')) closeModal(); }
 function setTab(tab) {
   ui.tab = tab;
   saveUi();
-  ['scene', 'objects', 'palettes'].forEach(function (t) {
+  ['scene', 'objects', 'tiles', 'palettes'].forEach(function (t) {
     $('view-' + t).hidden = t !== tab;
   });
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
@@ -4701,6 +5659,7 @@ function setTab(tab) {
   });
   if (tab === 'scene') renderScene(); else scnStopLoop();
   if (tab === 'palettes') renderPalettes();
+  if (tab === 'tiles') renderTiles();
   if (tab === 'objects') renderObjects(); else stopAnim();
 }
 

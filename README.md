@@ -697,9 +697,61 @@ and the link surviving a page reload. **Reconnect after a browser restart
 could not be automated** -- that private file system never asks for
 permission -- so Pedro's first restart is its test.
 
-Next: tilesets (rules read from Pedro's templates, a random-level preview and
-a coverage report), then the palette draft-and-promote workflow, then a
-particle explorer.
+**Phase 7 is built**: a **Tiles** tab. A tileset is drawn in Aseprite on a
+**tilemap layer** over a **template** -- a picture of every place a tile can
+stand -- and the template is the rule set: no rules are written by hand.
+
+- **Rules by literal 8-neighbour reading.** Each template place's eight
+  neighbours, filled or empty, are the situation its tile is for. Measured
+  on Pedro's platformer template (2026-10-01): read literally, 50 places give
+  44 situations and no conflicts; the common shortcut of ignoring a diagonal
+  unless both sides beside it are filled gives six, and sides-only gives nine.
+  His style uses diagonals on purpose, so the literal reading is the one used.
+- **The template comes from a layer named `template`**, so a place with no
+  tile yet is *not drawn yet* (hatched) rather than empty space. Without one,
+  the placed tiles are the shape.
+- **The Template view** is the numbered picture, made for you: each place
+  shows its tile number. **Checks**: one situation drawn as two tiles (the
+  16/24 kind of slip), places not drawn yet, tiles outside the template,
+  identical tiles and tiles a few pixels apart (a stray pixel costs a whole
+  tile of flash), unused tiles, flipped tiles.
+- **The Level view** tiles a random level (platformer or caves, size and
+  seed set in the panel) with the rules: the exact situation when drawn,
+  else the closest one (a side neighbour weighs four times a diagonal),
+  marked with a magenta corner. The **coverage report** lists each missing
+  situation as a little 3×3 picture, how often the level has it, what stood
+  in, and whether it is **planned** (a template place not drawn yet) or **not
+  in the template** at all. Click a row to see where.
+- **Linked like sprites**: Link tileset… reads the tilemap layer and its
+  tileset directly and reloads on every save. Tiles are stored as palette
+  indices, so palette edits carry them along, and a palette a tileset uses
+  cannot be deleted.
+- **New starter file…** writes an `.aseprite` file: the template (built-in
+  platformer, or read from a picture of yours -- cell size found from where
+  the ink starts and stops) as a locked layer, an empty tilemap layer over
+  it, and an **editable tile size** (8 by default).
+- **No export yet**: the engine has no tilemap (the workbench builds ground
+  from one object per tile, and its pool holds at most 255), so the flash
+  cost shown is what the tiles would cost as images. The format is for the
+  engine session to settle first, as `image-format.md` was.
+
+**How it was proven** (2026-10-01), on Pedro's `tileset_grass_set.aseprite`
+(read from a copy, never written): the counts were worked out first in Python
+-- 24 tiles of 8×8, 50 template places, 42 drawn, 8 not drawn yet, 38
+situations, no conflicts -- and Canvas found exactly those, and the same tile
+in every cell. Laid out by Canvas's own map, its tiles matched Aseprite's
+render of the `tiles` layer on all 7168 pixels. The starter files Canvas
+writes (8 and 12 px) were opened by Aseprite, which saw the right size, grid,
+locked template and tilemap layer, let a tile be drawn and placed twice, and
+saved -- and Canvas read that edited copy back correctly. Pedro's
+`tileset_basic.png` read as a picture gives his 16×7 template at 25 px
+cells, identical to the built-in one. The live link, palette moves (art
+unchanged), the refusal to delete a used colour, the project round trip and
+undo were checked in the browser.
+
+Next: the palette draft-and-promote workflow, then a particle explorer. Open
+for tiles: a depth rule ("top lit, fading to black below" needs more than one
+tile of context) and the engine's tilemap format.
 
 ---
 
