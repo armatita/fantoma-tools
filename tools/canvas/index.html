@@ -428,10 +428,12 @@ h4.mh:first-child { margin-top: 0; }
     <div class="objstage">
       <div class="objbar">
         <button type="button" class="chip" id="scnPlay"></button>
+        <span class="seg" id="scnToolSw" title="V select · B paint ground · E erase ground"><button type="button" data-t="select">Select</button><button type="button" data-t="paint">Paint</button><button type="button" data-t="erase">Erase</button></span>
         <label>Zoom <select id="scnZoom"></select></label>
         <label title="Collision boxes as the engine uses them: at the object&rsquo;s top-left, never mirrored"><input type="checkbox" id="scnBoxes"> Collision boxes</label>
         <label><input type="checkbox" id="scnGrid"> Pixel grid</label>
         <label title="Show every instance's path, not only the selected one's"><input type="checkbox" id="scnPaths"> Paths</label>
+        <label title="Mark tiles standing in for a situation the template lacks"><input type="checkbox" id="scnMarks"> Stand-ins</label>
         <span class="scrub"><button type="button" class="chip" id="scnRestart" title="Back to 0 s">⟲</button>
           <input type="range" id="scnTime" min="0" max="4000" step="16" value="0" title="Scene time: drag to scrub (pauses)">
           <span id="scnTimeLbl" class="small mono"></span></span>
@@ -449,6 +451,7 @@ h4.mh:first-child { margin-top: 0; }
         </div>
         <div class="sect" id="scnInstSect"></div>
         <div class="sect" id="scnPathSect" hidden></div>
+        <div class="sect" id="scnTileSect"></div>
         <div class="sect" id="scnBandSect"></div>
         <div class="sect" id="scnCheckSect"></div>
       </div>
@@ -749,7 +752,7 @@ function blankProject() {
   return {
     format: FORMAT, version: VERSION, name: 'untitled',
     camera: { w: 64, h: 64, x: 0, y: 0 },
-    scene: { w: 64, h: 64, bg: '#000000', instances: [] },
+    scene: { w: 64, h: 64, bg: '#000000', instances: [], tilemaps: [] },
     include: DEFAULT_INCLUDE,
     palettes: [],
     objects: [],
@@ -813,6 +816,19 @@ function normProject(raw) {
   });
 
   p.tilesets = (Array.isArray(raw.tilesets) ? raw.tilesets : []).map(function (t) { return normTileset(t, taken, palIds); }).filter(Boolean);
+  // Tile layers keep only where ground is; the grid is fitted to the scene
+  // and the tile size when shown (fitTilemaps).
+  var tsIds = {};
+  p.tilesets.forEach(function (t) { tsIds[t.id] = true; });
+  p.scene.tilemaps = (Array.isArray(sc.tilemaps) ? sc.tilemaps : []).filter(function (m) { return isObj(m) && tsIds[m.tileset]; }).map(function (m) {
+    var id = (typeof m.id === 'string' && m.id && !taken[m.id]) ? m.id : newId('tm', taken);
+    taken[id] = true;
+    var cols = intIn(m.cols, 0, 4096, 0), rows = intIn(m.rows, 0, 4096, 0);
+    var cells = typeof m.cells === 'string' ? m.cells.replace(/[^1]/g, '0') : '';
+    if (cells.length !== cols * rows) { cells = ''; cols = 0; rows = 0; }
+    return { id: id, tileset: m.tileset, band: intIn(m.band, 0, BANDS.length - 1, BAND_PLAY), cols: cols, rows: rows, cells: cells,
+             edges: m.edges === 'empty' ? 'empty' : 'continue', hidden: !!m.hidden };
+  });
 
   // Instances point at objects and states by id. One whose object is gone
   // is dropped; one whose state is gone falls back to the first, at draw.
@@ -846,6 +862,7 @@ function allIds() {
   });
   project.scene.instances.forEach(function (i) { t[i.id] = true; });
   project.tilesets.forEach(function (x) { t[x.id] = true; });
+  project.scene.tilemaps.forEach(function (x) { t[x.id] = true; });
   return t;
 }
 
@@ -878,6 +895,9 @@ ui.scnBand = typeof ui.scnBand === 'number' && ui.scnBand >= 0 && ui.scnBand <= 
 ui.scnHide = ui.scnHide && typeof ui.scnHide === 'object' ? ui.scnHide : {};
 ui.scnSel = typeof ui.scnSel === 'string' ? ui.scnSel : null;
 ui.scnPaths = ui.scnPaths !== false;
+ui.scnTool = ['select', 'paint', 'erase'].indexOf(ui.scnTool) >= 0 ? ui.scnTool : 'select';
+ui.scnTm = typeof ui.scnTm === 'string' ? ui.scnTm : null;
+ui.scnMarks = ui.scnMarks !== false;
 ui.ts = typeof ui.ts === 'string' ? ui.ts : null;
 ui.tsView = ui.tsView === 'level' ? 'level' : 'template';
 ui.tsZoom = [0, 1, 2, 3, 4, 6, 8].indexOf(ui.tsZoom) >= 0 ? ui.tsZoom : 0;
@@ -1643,7 +1663,7 @@ function composite(buf, bw, bh, ox, oy, elapsed, skipBand) {
   var bg = hexToRgb(panelOf(project.scene.bg).hex);
   buf.fill(((255 << 24) | (bg[2] << 16) | (bg[1] << 8) | bg[0]) >>> 0);
   var cache = {};
-  drawOrder().forEach(function (inst) {
+  function drawOne(inst) {
     if (inst.hidden || (skipBand && skipBand[inst.band])) return;
     var o = findObject(inst.obj);
     if (!o) return;
@@ -1666,7 +1686,13 @@ function composite(buf, bw, bh, ox, oy, elapsed, skipBand) {
         buf[py * bw + pxx] = cols[v] !== undefined ? cols[v] : 0xffff00ff;
       }
     }
-  });
+  }
+  for (var b = 0; b < BANDS.length; b++) {
+    if (!(skipBand && skipBand[b])) {
+      tileLayers().forEach(function (tm) { if (tm.band === b && !tm.hidden) drawTileLayer(buf, bw, bh, ox, oy, tm); });
+    }
+    scnInstances().forEach(function (inst) { if (inst.band === b) drawOne(inst); });
+  }
 }
 
 function blit(canvas, bw, bh, fill) {
@@ -1760,6 +1786,7 @@ function drawScene() {
     g.setLineDash([]);
   }
 
+  drawTileOverlays(g, gm);
   drawPaths(g, gm);
 
   // The camera, and its handle.
@@ -1925,7 +1952,33 @@ function sceneChecks() {
     if (!findPalette(o.palette)) bad.push(o.name + ' has no palette, so it cannot be drawn.');
     if (o.box.x || o.box.y) warns.push(o.name + '’s box is drawn offset in the Objects tab; the engine, and this scene, put it at the top-left.');
   });
-  return { bad: bad, warns: warns, infos: infos, used: used };
+  var usedTs = {};
+  tileLayers().forEach(function (tm) {
+    var ts = findTileset(tm.tileset);
+    if (!ts) { bad.push('Tile layer ' + tmLabel(tm) + ' has no tileset.'); return; }
+    if (tm.hidden) return;
+    usedTs[ts.id] = ts;
+    var T = tmTiled(tm);
+    if (!T) return;
+    var stand = T.tiles.filter(function (t) { return t && !t.exact; }).length;
+    if (stand) infos.push(tmLabel(tm) + ': ' + stand + ' tile' + (stand === 1 ? '' : 's') + ' stand' + (stand === 1 ? 's' : '') + ' in for a situation the template lacks (magenta corner).');
+    if (tm.band !== BAND_PLAY) return;
+    // Objects inside solid ground: on_hit would fire every frame.
+    var inside = list.filter(function (inst) {
+      var o = findObject(inst.obj);
+      if (!o || inst.hidden || inst.band !== BAND_PLAY || !o.box.w || !o.box.h) return false;
+      var at = instWorld(inst);
+      var x0 = Math.floor(at.x / ts.tw), y0 = Math.floor(at.y / ts.th);
+      var x1 = Math.floor((at.x + o.box.w - 1) / ts.tw), y1 = Math.floor((at.y + o.box.h - 1) / ts.th);
+      for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) {
+        if (x >= 0 && y >= 0 && x < tm.cols && y < tm.rows && tm.cells.charAt(y * tm.cols + x) === '1') return true;
+      }
+      return false;
+    });
+    if (inside.length) infos.push(inside.slice(0, 3).map(instLabel).join(', ') + (inside.length > 3 ? ' and ' + (inside.length - 3) + ' more' : '')
+      + ' overlap' + (inside.length === 1 ? 's' : '') + ' solid ground in the play band.');
+  });
+  return { bad: bad, warns: warns, infos: infos, used: used, usedTs: usedTs };
 }
 
 /* ---- rendering the panels ---- */
@@ -2027,6 +2080,8 @@ function deleteInst(inst) {
 function renderScnInst() {
   var box = $('scnInstSect'), inst = selInst();
   box.innerHTML = '';
+  var tml = !inst && currentTm();
+  if (tml) { renderTileLayerPanel(box, tml); return; }
   box.appendChild(el('h3', null, 'Instance'));
   var o = inst && findObject(inst.obj);
   if (!o) {
@@ -2110,6 +2165,7 @@ function renderScnBands() {
   for (var b = BANDS.length - 1; b >= 0; b--) {
     (function (b) {
       var members = scnInstances().filter(function (i) { return i.band === b; });
+      var nTiles = tileLayers().filter(function (tm) { return tm.band === b; }).length;
       var row = el('div', 'bandrow' + (hide[b] ? ' off' : ''));
       var eye = el('button', 'eye', hide[b] ? '◌' : '●');
       eye.type = 'button';
@@ -2117,7 +2173,7 @@ function renderScnBands() {
       eye.onclick = function () { ui.scnHide = ui.scnHide || {}; ui.scnHide[b] = !hide[b]; saveUi(); renderScene(); };
       row.appendChild(eye);
       row.appendChild(el('span', 'nm', b + ' ' + BANDS[b].name));
-      row.appendChild(el('span', 'tag', members.length ? String(members.length) : ''));
+      row.appendChild(el('span', 'tag', (members.length || nTiles) ? String(members.length) + (nTiles ? ' + ' + nTiles + ' tiles' : '') : ''));
       row.title = BANDS[b].key + (BANDS[b].note ? ': ' + BANDS[b].note : '');
       box.appendChild(row);
       // Drawn in list order within the band: the last one here is on top.
@@ -2130,8 +2186,15 @@ function renderScnBands() {
         if (inst.hidden) tags.push('hidden');
         if (inst.flipX || inst.flipY) tags.push('flip ' + (inst.flipX ? 'x' : '') + (inst.flipY ? 'y' : ''));
         r.appendChild(el('span', 'tag', tags.join(' · ')));
-        r.onclick = function () { ui.scnSel = inst.id; saveUi(); renderScene(); };
+        r.onclick = function () { ui.scnSel = inst.id; ui.scnTm = null; saveUi(); renderScene(); };
         box.appendChild(r);
+      });
+      tileLayers().filter(function (tm) { return tm.band === b; }).forEach(function (tm) {
+        var r2 = el('div', 'srow' + (tm.id === ui.scnTm ? ' sel' : ''));
+        r2.appendChild(el('span', 'nm', tmLabel(tm)));
+        r2.appendChild(el('span', 'tag', 'tiles · under the objects' + (tm.hidden ? ' · hidden' : '')));
+        r2.onclick = function () { ui.scnTm = tm.id; ui.scnSel = null; ui.pathEdit = null; saveUi(); renderScene(); };
+        box.appendChild(r2);
       });
     })(b);
   }
@@ -2150,8 +2213,8 @@ function renderScnChecks() {
   if (!ul.children.length) ul.appendChild(el('li', 'info', 'Nothing to report.'));
   box.appendChild(ul);
 
-  var ids = Object.keys(chk.used);
-  if (!ids.length) return;
+  var ids = Object.keys(chk.used), tsIds = Object.keys(chk.usedTs);
+  if (!ids.length && !tsIds.length) return;
   var t = el('table', 'cost'), total = 0, hr = el('tr');
   ['object', 'placed', 'flash'].forEach(function (x) { hr.appendChild(el('th', null, x)); });
   t.appendChild(hr);
@@ -2162,6 +2225,14 @@ function renderScnChecks() {
     tr.appendChild(el('td', null, String(n)));
     tr.appendChild(el('td', null, b.total ? bytesLabel(b.total) : '—'));
     total += b.total || 0;
+    t.appendChild(tr);
+  });
+  tsIds.forEach(function (id) {
+    var ts = chk.usedTs[id], b = tsBudget(ts), tr = el('tr');
+    tr.appendChild(el('td', null, ts.name + ' (tiles)'));
+    tr.appendChild(el('td', null, String(tileLayers().filter(function (tm) { return tm.tileset === id; }).length)));
+    tr.appendChild(el('td', null, b ? bytesLabel(b.pixels + b.pal) : '—'));
+    total += b ? b.pixels + b.pal : 0;
     t.appendChild(tr);
   });
   var tt = el('tr');
@@ -2191,9 +2262,14 @@ function renderScene() {
   renderSceneFields();
   renderScnObjList();
   if (!pathEditing()) ui.pathEdit = null;
+  if (ui.scnTm && !currentTm()) ui.scnTm = null;
+  fitTilemaps();
   renderScnInst();
   renderScnPath();
+  renderScnTiles();
   renderScnBands();
+  Array.prototype.forEach.call(document.querySelectorAll('#scnToolSw button'), function (b) { b.classList.toggle('on', b.getAttribute('data-t') === ui.scnTool); });
+  $('scnMarks').checked = ui.scnMarks;
   renderScnChecks();
   $('scnPaths').checked = ui.scnPaths;
   $('scnBoxes').checked = ui.scnBoxes;
@@ -2247,6 +2323,17 @@ sceneCv.addEventListener('pointerdown', function (e) {
     scnDrag = { kind: 'camera', wx: w.x, wy: w.y, x: cam.x, y: cam.y, moved: false };
     return;
   }
+  if (ui.scnTool !== 'select') {
+    var tm = currentTm(), c = tm && tmCellAt(tm, w.x, w.y);
+    if (!tm) { toast('Choose a tile layer to paint on, or add one (Tile layers, on the right).'); return; }
+    var val = ui.scnTool === 'paint' ? '1' : '0';
+    if (e.shiftKey) { if (c) scnDrag = { kind: 'rect', tm: tm, val: val, a: c, b: c }; drawScene(); return; }
+    snapshot();
+    var did = c ? setCells(tm, [c], val) : 0;
+    scnDrag = { kind: 'paint', tm: tm, val: val, last: c, moved: true };
+    if (did) drawScene();
+    return;
+  }
   if (pathEditing()) {
     // Editing a path: handles first; anywhere else, a click adds a point
     // and a drag still pans.
@@ -2258,13 +2345,13 @@ sceneCv.addEventListener('pointerdown', function (e) {
   var inst = hitInstance(w.x, w.y);
   if (inst) {
     if (ui.scnSel !== inst.id) ui.pathEdit = null;
-    ui.scnSel = inst.id; saveUi();
+    ui.scnSel = inst.id; ui.scnTm = null; saveUi();
     // By delta, so a sprite caught mid-path moves its whole path with it.
     scnDrag = { kind: 'move', inst: inst, wx: w.x, wy: w.y, x0: inst.x, y0: inst.y, moved: false };
     renderScnInst(); renderScnPath(); renderScnBands(); drawScene();
     return;
   }
-  if (ui.scnSel) { ui.scnSel = null; ui.pathEdit = null; saveUi(); renderScnInst(); renderScnPath(); renderScnBands(); }
+  if (ui.scnSel || ui.scnTm) { ui.scnSel = null; ui.scnTm = null; ui.pathEdit = null; saveUi(); renderScnInst(); renderScnPath(); renderScnTiles(); renderScnBands(); }
   scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm, dist: 0 };
   drawScene();
 });
@@ -2273,6 +2360,21 @@ sceneCv.addEventListener('pointermove', function (e) {
   var gm = scnGeom(), r = sceneCv.getBoundingClientRect();
   var mx = e.clientX - r.left, my = e.clientY - r.top, w = toWorld(gm, mx, my);
   $('scnReadout').textContent = Math.floor(w.x) + ', ' + Math.floor(w.y);
+  if (!scnDrag && ui.scnTool !== 'select') {
+    var htm = currentTm(), hc = htm && tmCellAt(htm, w.x, w.y);
+    sceneCv.style.cursor = 'crosshair';
+    if (JSON.stringify(hc) !== JSON.stringify(scnHover)) { scnHover = hc; drawScene(); }
+    return;
+  }
+  if (scnDrag && (scnDrag.kind === 'paint' || scnDrag.kind === 'rect')) {
+    var pc = tmCellAt(scnDrag.tm, w.x, w.y);
+    if (!pc) return;
+    if (scnDrag.kind === 'rect') { if (pc.x !== scnDrag.b.x || pc.y !== scnDrag.b.y) { scnDrag.b = pc; drawScene(); } return; }
+    var n = setCells(scnDrag.tm, scnDrag.last ? cellLine(scnDrag.last, pc) : [pc], scnDrag.val);
+    scnDrag.last = pc; scnHover = pc;
+    if (n) drawScene();
+    return;
+  }
   if (!scnDrag) {
     var tab = camTab(gm);
     sceneCv.style.cursor = (e.altKey || (mx >= tab.x && mx < tab.x + tab.w && my >= tab.y && my < tab.y + tab.h)) ? 'move'
@@ -2322,6 +2424,11 @@ function endScnDrag() {
   var d = scnDrag;
   scnDrag = null;
   sceneCv.style.cursor = '';
+  if (d.kind === 'rect') {
+    snapshot();
+    if (setCells(d.tm, cellRectList(d.a, d.b), d.val)) { changed(); renderScene(); } else { past.pop(); drawScene(); }
+    return;
+  }
   if (d.moved) { changed(); renderScene(); return; }
   if (d.kind === 'pan' && d.add && d.dist < 4 && pathEditing()) addPathPoint(selInst(), d.add.x, d.add.y);
 }
@@ -2334,7 +2441,7 @@ sceneCv.addEventListener('dblclick', function (e) {
 });
 sceneCv.addEventListener('pointerup', endScnDrag);
 sceneCv.addEventListener('pointercancel', endScnDrag);
-sceneCv.addEventListener('pointerleave', function () { if (!scnDrag) $('scnReadout').textContent = ''; });
+sceneCv.addEventListener('pointerleave', function () { if (!scnDrag) { $('scnReadout').textContent = ''; if (scnHover) { scnHover = null; drawScene(); } } });
 
 sceneCv.addEventListener('wheel', function (e) {
   e.preventDefault();
@@ -2365,6 +2472,10 @@ sceneCv.addEventListener('drop', function (e) {
 // Keys while the scene tab is showing; returns true when it used the key.
 function sceneKey(e) {
   var inst = selInst(), mod = e.ctrlKey || e.metaKey;
+  if (!mod && !e.altKey) {
+    var tool = { v: 'select', b: 'paint', e: 'erase' }[e.key.toLowerCase()];
+    if (tool) { setTool(tool); return true; }
+  }
   if (e.key === ' ') { e.preventDefault(); $('scnPlay').click(); return true; }
   if (pathEditing()) {
     if (e.key === 'Escape') { ui.pathEdit = null; saveUi(); renderScene(); return true; }
@@ -2418,6 +2529,7 @@ function sceneField(id, apply) {
     snapshot();
     project.camera = cam;
     project.scene.w = sc.w; project.scene.h = sc.h;
+    fitTilemaps();
     changed();
     renderSceneFields();
     drawScene();
@@ -4827,10 +4939,11 @@ function findTileset(id) {
   return null;
 }
 function currentTileset() { return findTileset(ui.ts); }
-function maskAt(occ, w, h, x, y) {
+function maskAt(occ, w, h, x, y, clamp) {
   var m = 0;
   for (var i = 0; i < 8; i++) {
     var xx = x + NB[i][0], yy = y + NB[i][1];
+    if (clamp) { xx = Math.min(w - 1, Math.max(0, xx)); yy = Math.min(h - 1, Math.max(0, yy)); }  // the edge continues
     if (xx >= 0 && yy >= 0 && xx < w && yy < h && occ[yy * w + xx]) m |= 1 << i;
   }
   return m;
@@ -5011,14 +5124,14 @@ function maskCost(a, b) {
   for (var i = 0; i < 8; i++) if (d & (1 << i)) c += (i % 2 === 0) ? 4 : 1;
   return c;
 }
-function autotile(level, R) {
+function autotile(level, R, clamp) {
   var w = level.w, h = level.h, out = new Array(w * h), missing = {};
   var near = {};
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
       var i = y * w + x;
       if (!level.cells[i]) { out[i] = null; continue; }
-      var m = maskAt(level.cells, w, h, x, y), r = R.rules[m];
+      var m = maskAt(level.cells, w, h, x, y, clamp), r = R.rules[m];
       if (r) { out[i] = { id: r.id, flip: r.flip, mask: m, exact: true }; continue; }
       if (!(m in near)) {
         var best = -1, bc = Infinity;
@@ -5273,8 +5386,11 @@ function renderTsInfo() {
   var br = el('div', 'btnrow');
   var del = el('button', 'chip danger', 'Delete tileset'); del.type = 'button';
   del.onclick = function () {
-    if (!confirm('Delete “' + ts.name + '”? (Undo brings it back.)')) return;
+    var layers = tileLayers().filter(function (tm) { return tm.tileset === ts.id; }).length;
+    if (!confirm('Delete “' + ts.name + '”?' + (layers ? ' ' + layers + ' tile layer' + (layers === 1 ? '' : 's') + ' in the scene use' + (layers === 1 ? 's' : '') + ' it and go too.' : '')
+      + ' (Undo brings it back.)')) return;
     snapshot();
+    project.scene.tilemaps = tileLayers().filter(function (tm) { return tm.tileset !== ts.id; });
     project.tilesets.splice(project.tilesets.indexOf(ts), 1);
     dropLink(ts.id);
     ui.ts = project.tilesets.length ? project.tilesets[0].id : null; saveUi();
@@ -5641,6 +5757,293 @@ function showStarter() {
 
 $('tsLinkBtn').onclick = linkTileset;
 $('tsStarterBtn').onclick = showStarter;
+
+/* --------------------------------------------------------------------------
+   Tile layers in the scene (phase 8)
+   --------------------------------------------------------------------------
+   What is painted is WHERE GROUND IS -- a cell filled or not -- never which
+   tile: the tileset's template rules choose every tile, as in the Tiles
+   tab's level, so edges, corners and diagonals follow the brush. Saving the
+   tileset in Aseprite re-tiles everything painted with it.
+
+   A layer belongs to one tileset and one band, on a grid starting at the
+   scene's top-left in that tileset's tile size. Within its band it draws
+   BEFORE the band's objects: the engine has no tilemap yet, so where tiles
+   sit in the draw order is an open question for it, and this is the
+   preview's answer until then. By default ground continues past the scene's
+   edge (so ground running off the bottom has no bottom border); a layer can
+   treat outside as empty instead.
+
+   Like the rest of the scene, nothing here is exported.
+   -------------------------------------------------------------------------- */
+var scnHover = null;                     // the cell under the pointer while painting
+
+function tileLayers() { return project.scene.tilemaps; }
+function findTm(id) {
+  var a = tileLayers();
+  for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
+  return null;
+}
+function currentTm() { return findTm(ui.scnTm); }
+function tmLabel(tm) { var ts = findTileset(tm.tileset); return (ts ? ts.name : '?') + ' ' + (tileLayers().indexOf(tm) + 1); }
+
+// The layer's grid follows the scene's size and the tileset's tile size;
+// cells keep their position when either changes.
+function fitTilemap(tm) {
+  var ts = findTileset(tm.tileset);
+  if (!ts) return;
+  var cols = Math.ceil(project.scene.w / ts.tw), rows = Math.ceil(project.scene.h / ts.th);
+  if (tm.cols === cols && tm.rows === rows && tm.cells.length === cols * rows) return;
+  var out = [];
+  for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) {
+    out.push(x < tm.cols && y < tm.rows && tm.cells.charAt(y * tm.cols + x) === '1' ? '1' : '0');
+  }
+  tm.cols = cols; tm.rows = rows; tm.cells = out.join('');
+}
+function fitTilemaps() { tileLayers().forEach(fitTilemap); }
+
+// The tiles a layer shows, cached until its cells or its tileset change.
+var tmCache = {};
+function tmTiled(tm) {
+  var ts = findTileset(tm.tileset);
+  if (!ts || tm.cells.length !== tm.cols * tm.rows) return null;
+  var key = [tm.cells, tm.cols, tm.edges, ts.tiles.length, ts.map.ids.join(), ts.map.flips.join(), ts.occ.join()].join('|');
+  var c = tmCache[tm.id];
+  if (c && c.key === key) return c.val;
+  var occ = new Array(tm.cells.length);
+  for (var i = 0; i < occ.length; i++) occ[i] = tm.cells.charCodeAt(i) === 49 ? 1 : 0;
+  var val = autotile({ w: tm.cols, h: tm.rows, cells: occ }, tilesetRules(ts), tm.edges !== 'empty');
+  tmCache[tm.id] = { key: key, val: val };
+  return val;
+}
+
+function blitTileClip(buf, bw, bh, ts, pal32, id, flip, dx, dy) {
+  var px = decodeFrame(ts.tiles[id - 1]), tw = ts.tw, th = ts.th;
+  for (var y = 0; y < th; y++) {
+    var yy = dy + y;
+    if (yy < 0 || yy >= bh) continue;
+    for (var x = 0; x < tw; x++) {
+      var xx = dx + x;
+      if (xx < 0 || xx >= bw) continue;
+      var sx = x, sy = y;
+      if (flip & TILE_D) { var t = sx; sx = sy; sy = t; }
+      if (flip & TILE_X) sx = tw - 1 - sx;
+      if (flip & TILE_Y) sy = th - 1 - sy;
+      if (sx >= tw || sy >= th) continue;
+      var v = px[sy * tw + sx];
+      if (v === TRANSPARENT) continue;
+      buf[yy * bw + xx] = pal32[v] !== undefined ? pal32[v] : 0xffff00ff;
+    }
+  }
+}
+
+function drawTileLayer(buf, bw, bh, ox, oy, tm) {
+  var ts = findTileset(tm.tileset), T = tmTiled(tm);
+  if (!ts || !T) return;
+  var pal32 = tsColours32(ts);
+  if (!pal32) return;
+  var x0 = Math.max(0, Math.floor(ox / ts.tw)), y0 = Math.max(0, Math.floor(oy / ts.th));
+  var x1 = Math.min(tm.cols, Math.ceil((ox + bw) / ts.tw)), y1 = Math.min(tm.rows, Math.ceil((oy + bh) / ts.th));
+  for (var y = y0; y < y1; y++) {
+    for (var x = x0; x < x1; x++) {
+      var t = T.tiles[y * tm.cols + x];
+      if (t && t.id) blitTileClip(buf, bw, bh, ts, pal32, t.id, t.flip, x * ts.tw - ox, y * ts.th - oy);
+    }
+  }
+}
+
+/* ---- painting ---- */
+function tmCellAt(tm, wx, wy) {
+  var ts = findTileset(tm.tileset);
+  if (!ts) return null;
+  var x = Math.floor(wx / ts.tw), y = Math.floor(wy / ts.th);
+  return x >= 0 && y >= 0 && x < tm.cols && y < tm.rows ? { x: x, y: y } : null;
+}
+function setCells(tm, list, val) {
+  var a = tm.cells.split(''), n = 0;
+  list.forEach(function (c) {
+    if (c.x < 0 || c.y < 0 || c.x >= tm.cols || c.y >= tm.rows) return;
+    var i = c.y * tm.cols + c.x;
+    if (a[i] !== val) { a[i] = val; n++; }
+  });
+  if (n) tm.cells = a.join('');
+  return n;
+}
+// Every cell on the line between two cells, so a fast stroke leaves no gaps.
+function cellLine(a, b) {
+  var out = [], dx = Math.abs(b.x - a.x), dy = -Math.abs(b.y - a.y), sx = a.x < b.x ? 1 : -1, sy = a.y < b.y ? 1 : -1;
+  var err = dx + dy, x = a.x, y = a.y;
+  for (;;) {
+    out.push({ x: x, y: y });
+    if (x === b.x && y === b.y) break;
+    var e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x += sx; }
+    if (e2 <= dx) { err += dx; y += sy; }
+  }
+  return out;
+}
+function cellRectList(a, b) {
+  var out = [];
+  for (var y = Math.min(a.y, b.y); y <= Math.max(a.y, b.y); y++) for (var x = Math.min(a.x, b.x); x <= Math.max(a.x, b.x); x++) out.push({ x: x, y: y });
+  return out;
+}
+
+function setTool(t) {
+  ui.scnTool = t; saveUi();
+  if (t !== 'select' && !currentTm()) {
+    var first = tileLayers()[0];
+    if (first) { ui.scnTm = first.id; ui.scnSel = null; ui.pathEdit = null; }
+    else toast('Add a tile layer first (Tile layers, in the panel on the right).');
+  }
+  scnHover = null;
+  renderScene();
+}
+Array.prototype.forEach.call(document.querySelectorAll('#scnToolSw button'), function (b) {
+  b.onclick = function () { setTool(b.getAttribute('data-t')); };
+});
+
+// The editor's view of tile layers: stand-ins, solid ground, the brush.
+function drawTileOverlays(g, gm) {
+  var k = gm.k, hide = ui.scnHide || {};
+  function X(x) { return gm.ox + x * k; }
+  function Y(y) { return gm.oy + y * k; }
+  tileLayers().forEach(function (tm) {
+    var ts = findTileset(tm.tileset), T = tmTiled(tm);
+    if (!ts || !T || tm.hidden || hide[tm.band]) return;
+    var tw = ts.tw, th = ts.th;
+    if (ui.scnMarks) {                  // a stand-in tile: the closest drawn situation, not its own
+      g.fillStyle = '#ff3ea5';
+      T.tiles.forEach(function (t, i) {
+        if (!t || t.exact) return;
+        var x = X((i % tm.cols) * tw), y = Y(Math.floor(i / tm.cols) * th), s = Math.max(3, tw * k / 4);
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + s, y); g.lineTo(x, y + s); g.fill();
+      });
+    }
+    if (ui.scnBoxes && tm.band === BAND_PLAY) {   // solid ground: its outline
+      g.strokeStyle = '#ff6b6b'; g.lineWidth = 1;
+      g.beginPath();
+      for (var cy = 0; cy < tm.rows; cy++) for (var cx = 0; cx < tm.cols; cx++) {
+        if (tm.cells.charAt(cy * tm.cols + cx) !== '1') continue;
+        var on = function (x, y) { return x >= 0 && y >= 0 && x < tm.cols && y < tm.rows && tm.cells.charAt(y * tm.cols + x) === '1'; };
+        var x0 = X(cx * tw) + 0.5, y0 = Y(cy * th) + 0.5, x1 = X((cx + 1) * tw) - 0.5, y1 = Y((cy + 1) * th) - 0.5;
+        if (!on(cx, cy - 1)) { g.moveTo(x0, y0); g.lineTo(x1, y0); }
+        if (!on(cx, cy + 1)) { g.moveTo(x0, y1); g.lineTo(x1, y1); }
+        if (!on(cx - 1, cy)) { g.moveTo(x0, y0); g.lineTo(x0, y1); }
+        if (!on(cx + 1, cy)) { g.moveTo(x1, y0); g.lineTo(x1, y1); }
+      }
+      g.stroke();
+    }
+  });
+  var tm = currentTm(), ts = tm && findTileset(tm.tileset);
+  if (!tm || !ts || ui.scnTool === 'select') return;
+  var tw = ts.tw, th = ts.th;
+  if (k * tw >= 6) {                    // the layer's grid, faint, while painting
+    g.strokeStyle = 'rgba(255,255,255,0.07)'; g.beginPath();
+    for (var gx = 1; gx < tm.cols; gx++) { g.moveTo(Math.round(X(gx * tw)) + 0.5, Y(0)); g.lineTo(Math.round(X(gx * tw)) + 0.5, Y(tm.rows * th)); }
+    for (var gy = 1; gy < tm.rows; gy++) { g.moveTo(X(0), Math.round(Y(gy * th)) + 0.5); g.lineTo(X(tm.cols * tw), Math.round(Y(gy * th)) + 0.5); }
+    g.stroke();
+  }
+  var cells = scnDrag && scnDrag.kind === 'rect' ? cellRectList(scnDrag.a, scnDrag.b) : scnHover ? [scnHover] : [];
+  g.strokeStyle = ui.scnTool === 'erase' ? '#ff6b6b' : '#ffd166'; g.lineWidth = 2;
+  if (cells.length) {
+    var xs = cells.map(function (c) { return c.x; }), ys = cells.map(function (c) { return c.y; });
+    var ax = Math.min.apply(null, xs), ay = Math.min.apply(null, ys), bx = Math.max.apply(null, xs) + 1, by = Math.max.apply(null, ys) + 1;
+    g.strokeRect(X(ax * tw) + 1, Y(ay * th) + 1, (bx - ax) * tw * k - 2, (by - ay) * th * k - 2);
+  }
+  g.lineWidth = 1;
+}
+
+/* ---- panels ---- */
+function addTileLayer() {
+  var ts = currentTileset() || project.tilesets[0];
+  if (!ts) { toast('Link a tileset in the Tiles tab first.'); return; }
+  snapshot();
+  var tm = { id: newId('tm', allIds()), tileset: ts.id, band: BAND_PLAY, cols: 0, rows: 0, cells: '', edges: 'continue', hidden: false };
+  fitTilemap(tm);
+  tileLayers().push(tm);
+  ui.scnTm = tm.id; ui.scnSel = null; ui.pathEdit = null; ui.scnTool = 'paint'; saveUi();
+  changed(); renderScene();
+  toast('Paint where the ground is: B paint, E erase, V select; Shift-drag for a rectangle.');
+}
+
+function renderScnTiles() {
+  var box = $('scnTileSect');
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Tile layers'));
+  if (!project.tilesets.length) { box.appendChild(el('p', 'note', 'No tilesets yet: link one in the Tiles tab, then paint ground here.')); return; }
+  tileLayers().forEach(function (tm) {
+    var T = tmTiled(tm), filled = (tm.cells.match(/1/g) || []).length;
+    var stand = T ? T.tiles.filter(function (t) { return t && !t.exact; }).length : 0;
+    var r = el('div', 'srow' + (tm.id === ui.scnTm ? ' sel' : ''));
+    r.style.paddingLeft = '0';
+    r.appendChild(el('span', 'nm', tmLabel(tm)));
+    r.appendChild(el('span', 'tag', BANDS[tm.band].name + ' · ' + filled + ' cells' + (stand ? ' · ' + stand + ' stand-ins' : '') + (tm.hidden ? ' · hidden' : '')));
+    r.onclick = function () { ui.scnTm = tm.id; ui.scnSel = null; ui.pathEdit = null; saveUi(); renderScene(); };
+    box.appendChild(r);
+  });
+  var br = el('div', 'btnrow');
+  var add = el('button', 'chip', 'Add tile layer'); add.type = 'button'; add.onclick = addTileLayer;
+  br.appendChild(add);
+  box.appendChild(br);
+}
+
+// The selected layer, in the panel where an instance would be.
+function renderTileLayerPanel(box, tm) {
+  box.appendChild(el('h3', null, 'Tile layer'));
+  var ts = findTileset(tm.tileset);
+  box.appendChild(el('span', 'lbl', 'Tileset'));
+  var sel = document.createElement('select'); sel.className = 'sel2';
+  project.tilesets.forEach(function (t) { var op = el('option', null, t.name + ' (' + t.tw + '×' + t.th + ')'); op.value = t.id; sel.appendChild(op); });
+  sel.value = tm.tileset;
+  sel.onchange = function () { snapshot(); tm.tileset = sel.value; fitTilemap(tm); changed(); renderScene(); };
+  box.appendChild(sel);
+
+  box.appendChild(el('span', 'lbl', 'Band'));
+  var bs = document.createElement('select'); bs.className = 'sel2';
+  BANDS.forEach(function (b, i) { var op = el('option', null, i + ' ' + b.name); op.value = i; bs.appendChild(op); });
+  bs.value = tm.band;
+  bs.onchange = function () { snapshot(); tm.band = +bs.value; changed(); renderScene(); };
+  box.appendChild(bs);
+  box.appendChild(el('p', 'note', 'Drawn before the band’s objects. Where tiles sit in the engine’s draw order is still open: it has no tilemap yet.'));
+
+  box.appendChild(el('span', 'lbl', 'Scene edges'));
+  var es = document.createElement('select'); es.className = 'sel2';
+  [['continue', 'Ground continues past the edge'], ['empty', 'Outside the scene is empty']].forEach(function (p) { var op = el('option', null, p[1]); op.value = p[0]; es.appendChild(op); });
+  es.value = tm.edges;
+  es.onchange = function () { snapshot(); tm.edges = es.value; changed(); renderScene(); };
+  box.appendChild(es);
+  box.appendChild(checkRow('Hidden', tm.hidden, 'Not drawn, in the editor or the camera view', function (v) { snapshot(); tm.hidden = v; changed(); renderScene(); }));
+
+  var T = tmTiled(tm);
+  if (ts && T) {
+    var filled = T.tiles.filter(Boolean).length, stand = T.tiles.filter(function (t) { return t && !t.exact; }).length;
+    box.appendChild(el('p', 'note' + (stand ? ' warn' : ''), filled + ' cell' + (filled === 1 ? '' : 's') + ' of ' + tm.cols + ' × ' + tm.rows
+      + (stand ? '; ' + stand + ' use a stand-in tile (magenta corner) from ' + T.missing.length + ' situation' + (T.missing.length === 1 ? '' : 's')
+        + ' the template lacks — the Tiles tab lists which.' : '; every one has its own tile.')));
+  }
+  box.appendChild(el('p', 'note', 'B paint, E erase, V select. Drag to paint; Shift-drag fills a rectangle.'));
+  var br = el('div', 'btnrow');
+  var fill = el('button', 'chip', 'Fill with a random level'); fill.type = 'button';
+  fill.onclick = function () {
+    if ((tm.cells.match(/1/g) || []).length && !confirm('Replace what is painted with a random ' + ui.tsLvl.kind + ' level? (Undo brings it back.)')) return;
+    snapshot();
+    var lv = makeLevel(ui.tsLvl.kind, tm.cols, tm.rows, (Math.random() * 1e9) >>> 0);
+    tm.cells = lv.cells.map(function (v) { return v ? '1' : '0'; }).join('');
+    changed(); renderScene();
+  };
+  var clr = el('button', 'chip', 'Clear'); clr.type = 'button';
+  clr.onclick = function () { snapshot(); tm.cells = tm.cells.replace(/1/g, '0'); changed(); renderScene(); };
+  var del = el('button', 'chip danger', 'Delete layer'); del.type = 'button';
+  del.onclick = function () {
+    snapshot();
+    tileLayers().splice(tileLayers().indexOf(tm), 1);
+    ui.scnTm = null; if (ui.scnTool !== 'select') ui.scnTool = 'select'; saveUi();
+    changed(); renderScene();
+  };
+  br.appendChild(fill); br.appendChild(clr); br.appendChild(del);
+  box.appendChild(br);
+}
+$('scnMarks').onchange = function () { ui.scnMarks = this.checked; saveUi(); drawScene(); };
 $('objReconnect').onclick = reconnectLinks;
 $('modal').onclick = function (e) { if (e.target === $('modal')) closeModal(); };
 

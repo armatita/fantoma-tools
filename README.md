@@ -749,9 +749,43 @@ cells, identical to the built-in one. The live link, palette moves (art
 unchanged), the refusal to delete a used colour, the project round trip and
 undo were checked in the browser.
 
+**Phase 8 is built**: painting tiles in the Scene. What is painted is **where
+ground is** -- a cell filled or not -- never which tile: the tileset's template
+rules choose every tile, as in the level preview, so edges, corners and
+diagonals follow the brush, and saving the tileset in Aseprite re-tiles all of
+it.
+
+- **Tile layers**: one tileset and one band each (default `play`), on a grid
+  from the scene's top-left in that tileset's tile size. The grid follows the
+  scene's size and the tile size; painted cells keep their place.
+- **Tools**: Select / Paint / Erase in the Scene toolbar (V, B, E). A drag
+  paints every cell it crosses, however fast; Shift-drag fills or erases a
+  rectangle. One undo step per stroke.
+- **Draw order**: within its band a tile layer draws **before** the band's
+  objects. Where tiles sit in the engine's draw order is open -- it has no
+  tilemap -- so this is the preview's answer until the engine session decides.
+- **Scene edges**: by default ground continues past the scene's edge (painted
+  along the bottom, it reads as a top surface with more ground below, not a
+  thin bar); a layer can treat outside as empty instead.
+- The camera view, collision boxes (solid ground in `play` is outlined), the
+  checks (stand-in tiles; objects inside solid ground) and the flash table
+  (tilesets counted once) all include tile layers. **Fill with a random
+  level** gives a starting point.
+
+**How it was proven** (2026-10-01): the compositor was restructured to draw
+tile layers band by band, so phase 4's engine comparison scene was rendered
+again -- **0 pixels different from `scene_render()` at all eight instants**.
+On Pedro's grass tileset, painted shapes took the template's tiles exactly (a
+bar 1·2…2·3, a 3×2 block 14 15 16 / 18 19 20), the edge setting changed the
+bottom row as described, an object in the same band drew over the tiles on
+every overlapping pixel, a changed tileset re-tiled the painted ground, and a
+fast stroke, a rectangle, erasing and undo were driven by real pointer and key
+events.
+
 Next: the palette draft-and-promote workflow, then a particle explorer. Open
 for tiles: a depth rule ("top lit, fading to black below" needs more than one
-tile of context) and the engine's tilemap format.
+tile of context) and the engine's tilemap format, including where tiles draw
+within a band.
 
 ---
 

@@ -1,7 +1,7 @@
 /* Canvas — see ../../shared/sw-core.js for the caching strategy.
  * Bump the version below whenever this tool's files change, otherwise
  * installed copies keep serving the old build from cache. */
-self.SW_CACHE = 'canvas-v7';
+self.SW_CACHE = 'canvas-v8';
 self.SW_ASSETS = [
   './',
   './index.html',
