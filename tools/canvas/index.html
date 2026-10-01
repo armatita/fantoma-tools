@@ -79,7 +79,9 @@ aside.side {
   width: 260px; flex: none; background: var(--panel);
   border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0;
 }
-aside.side.right { border-right: 0; border-left: 1px solid var(--line); width: 300px; }
+aside.side.right { border-right: 0; border-left: 1px solid var(--line); width: var(--right-w, 300px); position: relative; }
+.paneGrip { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 5; }
+.paneGrip:hover, .paneGrip.on { background: var(--accent); opacity: .5; }
 .sidehead {
   display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px;
   font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
@@ -213,13 +215,15 @@ ul.warns li.info { color: var(--ink-dim); }
 #tsCanvasWrap { flex: 1; position: relative; min-height: 0; }
 #tsCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #tsReadout { font: 11px var(--mono); color: var(--ink-dim); margin-left: auto; min-width: 64px; min-height: 14px; text-align: right; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.seg button { background: transparent; border: 0; padding: 5px 12px; color: var(--ink-dim); cursor: pointer; font: inherit; font-size: 12px; }
-.seg button.on { background: var(--accent); color: #14141a; font-weight: 600; }
+/* The segmented switch. NOT "seg": that is a path segment row (phase 5), and
+   sharing the name laid each row out sideways. */
+.segsw { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.segsw button { background: transparent; border: 0; padding: 5px 12px; color: var(--ink-dim); cursor: pointer; font: inherit; font-size: 12px; }
+.segsw button.on { background: var(--accent); color: #14141a; font-weight: 600; }
 canvas.glyph { image-rendering: pixelated; vertical-align: middle; border: 1px solid var(--line); border-radius: 2px; }
 table.cover { width: 100%; border-collapse: collapse; font: 11px var(--mono); margin-top: 6px; }
 table.cover th { font-weight: 400; color: var(--ink-faint); text-align: left; padding: 2px 4px 4px 0; }
-table.cover td { padding: 3px 4px 3px 0; }
+table.cover td { padding: 3px 4px 3px 0; white-space: nowrap; }
 table.cover tr:not(:first-child) { cursor: pointer; }
 table.cover tr:not(:first-child):hover { background: var(--panel-2); }
 table.cover tr.hi { background: rgba(255,209,102,0.15); }
@@ -237,12 +241,17 @@ ul.warns li canvas.glyph { margin-right: 4px; }
 .scrub { display: flex; align-items: center; gap: 6px; flex: none; }
 #scnPlay, #objPlay { width: 84px; text-align: center; }  /* "Play" and "Pause" differ by 10 px */
 .scrub .chip { padding: 3px 8px; }
+.loopbox { display: flex; align-items: center; gap: 5px; flex: none; font-size: 12px; color: var(--ink-dim); }
+.loopbox label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+#scnLoopS { width: 64px; padding: 3px 6px; }
 #scnTime { width: 150px; accent-color: #ffd166; }
 #scnTimeLbl { width: 56px; white-space: nowrap; }
 .seglist { margin-top: 8px; }
 .seg { border-top: 1px solid var(--line); padding: 6px 0; }
 .seghead { display: flex; align-items: center; gap: 6px; }
-.seghead .small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seghead .to { font: 11px var(--mono); white-space: nowrap; flex: none; }
+.seghead .info { flex: 1; min-width: 0; text-align: right; font: 10px var(--mono); color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .segn { font: 700 10px var(--mono); color: #14141a; background: #ffd166; border-radius: 3px; padding: 1px 4px; }
 .segx { background: none; border: 0; color: var(--ink-faint); cursor: pointer; padding: 0 2px; }
 .segx:hover { color: var(--bad); }
@@ -428,7 +437,7 @@ h4.mh:first-child { margin-top: 0; }
     <div class="objstage">
       <div class="objbar">
         <button type="button" class="chip" id="scnPlay"></button>
-        <span class="seg" id="scnToolSw" title="V select · B paint ground · E erase ground"><button type="button" data-t="select">Select</button><button type="button" data-t="paint">Paint</button><button type="button" data-t="erase">Erase</button></span>
+        <span class="segsw" id="scnToolSw" title="V select · B paint ground · E erase ground"><button type="button" data-t="select">Select</button><button type="button" data-t="paint">Paint</button><button type="button" data-t="erase">Erase</button></span>
         <label>Zoom <select id="scnZoom"></select></label>
         <label title="Collision boxes as the engine uses them: at the object&rsquo;s top-left, never mirrored"><input type="checkbox" id="scnBoxes"> Collision boxes</label>
         <label><input type="checkbox" id="scnGrid"> Pixel grid</label>
@@ -437,6 +446,8 @@ h4.mh:first-child { margin-top: 0; }
         <span class="scrub"><button type="button" class="chip" id="scnRestart" title="Back to 0 s">⟲</button>
           <input type="range" id="scnTime" min="0" max="4000" step="16" value="0" title="Scene time: drag to scrub (pauses)">
           <span id="scnTimeLbl" class="small mono"></span></span>
+        <span class="loopbox" title="Every animation and path starts over at this time, as ⟲ does"><label><input type="checkbox" id="scnLoopOn"> Restart every</label>
+          <input class="num" id="scnLoopS" type="number" min="0.1" max="600" step="0.1"> s</span>
         <span id="scnReadout"></span>
       </div>
       <div id="sceneStage"><canvas id="sceneCanvas"></canvas></div>
@@ -544,7 +555,7 @@ h4.mh:first-child { margin-top: 0; }
 
     <div class="objstage" id="tsStage" hidden>
       <div class="objbar">
-        <span class="seg" id="tsViewSw"><button type="button" data-v="template">Template</button><button type="button" data-v="level">Level</button></span>
+        <span class="segsw" id="tsViewSw"><button type="button" data-v="template">Template</button><button type="button" data-v="level">Level</button></span>
         <label>Zoom <select id="tsZoom"><option value="0">fit</option><option value="1">1&times;</option><option value="2">2&times;</option>
           <option value="3">3&times;</option><option value="4">4&times;</option><option value="6">6&times;</option><option value="8">8&times;</option></select></label>
         <label title="Tile numbers on the template"><input type="checkbox" id="tsNumbers"> Numbers</label>
@@ -752,7 +763,7 @@ function blankProject() {
   return {
     format: FORMAT, version: VERSION, name: 'untitled',
     camera: { w: 64, h: 64, x: 0, y: 0 },
-    scene: { w: 64, h: 64, bg: '#000000', instances: [], tilemaps: [] },
+    scene: { w: 64, h: 64, bg: '#000000', instances: [], tilemaps: [], loop: { on: false, ms: 5000 } },
     include: DEFAULT_INCLUDE,
     palettes: [],
     objects: [],
@@ -781,6 +792,7 @@ function normProject(raw) {
     w: Math.max(p.camera.w, intIn(sc.w, 1, MAX_SCENE, p.camera.w)),
     h: Math.max(p.camera.h, intIn(sc.h, 1, MAX_SCENE, p.camera.h)),
     bg: normHex(sc.bg) || '#000000',       // bg_color; black is an unlit panel
+    loop: { on: !!(sc.loop && sc.loop.on), ms: intIn(sc.loop && sc.loop.ms, 100, 600000, 5000) },
     instances: []
   };
   p.camera.x = intIn(cam.x, 0, p.scene.w - p.camera.w, 0);
@@ -898,6 +910,7 @@ ui.scnPaths = ui.scnPaths !== false;
 ui.scnTool = ['select', 'paint', 'erase'].indexOf(ui.scnTool) >= 0 ? ui.scnTool : 'select';
 ui.scnTm = typeof ui.scnTm === 'string' ? ui.scnTm : null;
 ui.scnMarks = ui.scnMarks !== false;
+ui.scnTmHi = null;
 ui.ts = typeof ui.ts === 'string' ? ui.ts : null;
 ui.tsView = ui.tsView === 'level' ? 'level' : 'template';
 ui.tsZoom = [0, 1, 2, 3, 4, 6, 8].indexOf(ui.tsZoom) >= 0 ? ui.tsZoom : 0;
@@ -1622,6 +1635,8 @@ function instLabel(inst) {
    would. ---- */
 function scnElapsed() {
   var t = ui.scnPlaying ? performance.now() - scnStart : scnPausedAt;
+  var L = project.scene.loop;
+  if (L.on && L.ms > 0) t = t % L.ms;             // the scene restarts: every clock back to 0
   return Math.floor(t / TICK_MS) * TICK_MS;
 }
 function instFrame(st, elapsed) {
@@ -2272,6 +2287,9 @@ function renderScene() {
   $('scnMarks').checked = ui.scnMarks;
   renderScnChecks();
   $('scnPaths').checked = ui.scnPaths;
+  $('scnLoopOn').checked = project.scene.loop.on;
+  if (document.activeElement !== $('scnLoopS')) $('scnLoopS').value = (project.scene.loop.ms / 1000).toFixed(1).replace(/\.0$/, '');
+  $('scnLoopS').disabled = !project.scene.loop.on;
   $('scnBoxes').checked = ui.scnBoxes;
   $('scnGrid').checked = ui.scnGrid;
   syncScnZoom();
@@ -2820,8 +2838,11 @@ function renderScnPath() {
     var head = el('div', 'seghead');
     var len = segLength(p0, s);
     head.appendChild(el('span', 'segn', wait ? 'wait' : String(k + 1)));
-    head.appendChild(el('span', 'small mono', wait ? 'stay at ' + s.x + ', ' + s.y
-      : 'to ' + s.x + ', ' + s.y + (s.cx !== null ? ' ⌒' : '') + ' · ' + len.toFixed(1) + ' px · ' + (len / s.ms * 1000).toFixed(1) + ' px/s'));
+    head.appendChild(el('span', 'to', wait ? 'at ' + s.x + ',' + s.y : '→ ' + s.x + ',' + s.y + (s.cx !== null ? ' ⌒' : '')));
+    var info = el('span', 'info', wait ? 'stays ' + s.ms + ' ms' : len.toFixed(1) + ' px · ' + (len / s.ms * 1000).toFixed(1) + ' px/s');
+    info.title = wait ? 'Stays at ' + s.x + ', ' + s.y + ' for ' + s.ms + ' ms'
+      : 'To ' + s.x + ', ' + s.y + (s.cx !== null ? ' (curved)' : '') + ': ' + len.toFixed(1) + ' px in ' + s.ms + ' ms = ' + (len / s.ms * 1000).toFixed(1) + ' px/s';
+    head.appendChild(info);
     var x = el('button', 'segx', '✕');
     x.type = 'button'; x.title = 'Remove this segment';
     x.onclick = function () { editInst(inst, null, function (i2) { i2.path.segs.splice(k, 1); }); };
@@ -2879,6 +2900,7 @@ function renderScnPath() {
 
 /* ---- the scene clock, made visible: a scrubber ---- */
 function timeSpan() {
+  if (project.scene.loop.on) return project.scene.loop.ms;     // one loop is the whole story
   var span = 4000;
   scnInstances().forEach(function (inst) {
     if (inst.path && inst.path.segs.length) span = Math.max(span, inst.path.delay + pathTotal(inst.path) * (inst.path.mode === 'loop' ? 2 : 1));
@@ -5481,7 +5503,7 @@ function renderTsLevel() {
   if (planned.length) {
     var pc = planned.reduce(function (a, m) { return a + m.count; }, 0);
     box.appendChild(el('p', 'note', planned.length + ' of them (' + pc + ' tile' + (pc === 1 ? '' : 's') + ') are places already in your template, '
-      + 'just not drawn yet — marked “planned”. The rest are shapes the template does not have.'));
+      + 'just not drawn yet — marked “planned”. The rest, “new shape”, are shapes the template does not have.'));
   }
   var t = el('table', 'cover');
   var hr = el('tr');
@@ -5492,7 +5514,7 @@ function renderTsLevel() {
     if (ui.tsHi === m.mask) tr.className = 'hi';
     var g1 = el('td'); g1.appendChild(maskGlyph(m.mask, 5)); tr.appendChild(g1);
     tr.appendChild(el('td', null, String(m.count)));
-    tr.appendChild(el('td', R.planned[m.mask] ? 'plan' : 'new', R.planned[m.mask] ? 'planned' : 'not in template'));
+    tr.appendChild(el('td', R.planned[m.mask] ? 'plan' : 'new', R.planned[m.mask] ? 'planned' : 'new shape'));
     var via = R.rules[m.via], g2 = el('td');
     if (via) { g2.appendChild(maskGlyph(m.via, 5)); g2.appendChild(document.createTextNode(' tile ' + via.id)); }
     tr.appendChild(g2);
@@ -5935,6 +5957,17 @@ function drawTileOverlays(g, gm) {
     }
   });
   var tm = currentTm(), ts = tm && findTileset(tm.tileset);
+  if (tm && ts && ui.scnTmHi !== null && ui.scnTmHi !== undefined) {
+    var TH = tmTiled(tm);
+    if (TH) {
+      g.strokeStyle = '#ffd166'; g.lineWidth = 2;
+      TH.tiles.forEach(function (t, i) {
+        if (!t || t.exact || t.mask !== ui.scnTmHi) return;
+        g.strokeRect(X((i % tm.cols) * ts.tw) + 1, Y(Math.floor(i / tm.cols) * ts.th) + 1, ts.tw * k - 2, ts.th * k - 2);
+      });
+      g.lineWidth = 1;
+    }
+  }
   if (!tm || !ts || ui.scnTool === 'select') return;
   var tw = ts.tw, th = ts.th;
   if (k * tw >= 6) {                    // the layer's grid, faint, while painting
@@ -6019,7 +6052,29 @@ function renderTileLayerPanel(box, tm) {
     var filled = T.tiles.filter(Boolean).length, stand = T.tiles.filter(function (t) { return t && !t.exact; }).length;
     box.appendChild(el('p', 'note' + (stand ? ' warn' : ''), filled + ' cell' + (filled === 1 ? '' : 's') + ' of ' + tm.cols + ' × ' + tm.rows
       + (stand ? '; ' + stand + ' use a stand-in tile (magenta corner) from ' + T.missing.length + ' situation' + (T.missing.length === 1 ? '' : 's')
-        + ' the template lacks — the Tiles tab lists which.' : '; every one has its own tile.')));
+        + ' the template lacks:' : '; every one has its own tile.')));
+    if (T.missing.length) {
+      var R = tilesetRules(ts), t = el('table', 'cover'), hr = el('tr');
+      ['situation', 'cells', '', 'shown as'].forEach(function (x) { hr.appendChild(el('th', null, x)); });
+      t.appendChild(hr);
+      T.missing.slice(0, 30).forEach(function (m) {
+        var tr = el('tr');
+        if (ui.scnTmHi === m.mask) tr.className = 'hi';
+        var g1 = el('td'); g1.appendChild(maskGlyph(m.mask, 5)); tr.appendChild(g1);
+        tr.appendChild(el('td', null, String(m.count)));
+        tr.appendChild(el('td', R.planned[m.mask] ? 'plan' : 'new', R.planned[m.mask] ? 'planned' : 'new shape'));
+        var via = R.rules[m.via], g2 = el('td');
+        if (via) { g2.appendChild(maskGlyph(m.via, 5)); g2.appendChild(document.createTextNode(' tile ' + via.id)); }
+        tr.appendChild(g2);
+        tr.title = maskName(m.mask) + ' — click to outline these cells in the scene';
+        tr.onclick = function () { ui.scnTmHi = ui.scnTmHi === m.mask ? null : m.mask; renderScnInst(); drawScene(); };
+        t.appendChild(tr);
+      });
+      box.appendChild(t);
+      if (T.missing.length > 30) box.appendChild(el('p', 'note', '… and ' + (T.missing.length - 30) + ' more.'));
+      box.appendChild(el('p', 'note', '“Planned” is a place your template has but no tile yet (hatched in the Tiles tab); '
+        + '“new shape” is one the template does not have. Click a row to outline those cells.'));
+    }
   }
   box.appendChild(el('p', 'note', 'B paint, E erase, V select. Drag to paint; Shift-drag fills a rectangle.'));
   var br = el('div', 'btnrow');
@@ -6044,6 +6099,12 @@ function renderTileLayerPanel(box, tm) {
   box.appendChild(br);
 }
 $('scnMarks').onchange = function () { ui.scnMarks = this.checked; saveUi(); drawScene(); };
+$('scnLoopOn').onchange = function () { snapshot(); project.scene.loop.on = this.checked; changed(); renderScene(); };
+$('scnLoopS').onchange = function () {
+  var ms = intIn(Math.round(parseFloat(this.value) * 1000), 100, 600000, project.scene.loop.ms);
+  if (ms === project.scene.loop.ms) { renderScene(); return; }
+  snapshot(); project.scene.loop.ms = ms; changed(); renderScene();
+};
 $('objReconnect').onclick = reconnectLinks;
 $('modal').onclick = function (e) { if (e.target === $('modal')) closeModal(); };
 
@@ -6223,6 +6284,29 @@ if (savedProject) {
 }
 if (!findPalette(ui.pal)) ui.pal = project.palettes.length ? project.palettes[0].id : null;
 if (!findObject(ui.obj)) { ui.obj = null; ui.state = null; }
+// The right panel's width: dragged by its left edge, double-click for the
+// default, remembered on this machine.
+var RIGHT_MIN = 260, RIGHT_MAX = 640;
+function setRightWidth(w) {
+  w = Math.round(Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, w)));
+  document.documentElement.style.setProperty('--right-w', w + 'px');
+  return w;
+}
+ui.rightW = typeof ui.rightW === 'number' ? setRightWidth(ui.rightW) : 300;
+Array.prototype.forEach.call(document.querySelectorAll('aside.side.right'), function (aside) {
+  var grip = el('div', 'paneGrip');
+  grip.title = 'Drag to widen this panel; double-click for the default width';
+  grip.addEventListener('pointerdown', function (e) {
+    grip.setPointerCapture(e.pointerId); grip.classList.add('on');
+    var right = aside.getBoundingClientRect().right;
+    function move(ev) { ui.rightW = setRightWidth(right - ev.clientX); }
+    function up() { grip.classList.remove('on'); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); saveUi(); }
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up);
+    e.preventDefault();
+  });
+  grip.addEventListener('dblclick', function () { ui.rightW = setRightWidth(300); saveUi(); });
+  aside.appendChild(grip);
+});
 checkWidth();
 renderAll();
 loadLinks();

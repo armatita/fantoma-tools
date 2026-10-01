@@ -771,6 +771,22 @@ it.
   checks (stand-in tiles; objects inside solid ground) and the flash table
   (tilesets counted once) all include tile layers. **Fill with a random
   level** gives a starting point.
+- **Stand-ins** -- the little magenta corners -- mark cells whose situation has
+  no tile drawn for it, so the closest drawn one stands in. The tile layer's
+  panel lists them (planned, or a new shape) and outlines them on click.
+  Editor only: the camera view never shows them.
+
+Alongside (Pedro's requests, 2026-10-01):
+
+- **Restart every N s** in the Scene toolbar: every animation and path starts
+  over together at that time, as the ⟲ button does. Saved with the project.
+- **The right panel can be dragged wider** by its left edge (260–640 px,
+  double-click for 300), remembered on this machine.
+- **Path segments** read short -- "→ 56,0", with length and speed at the end
+  and the whole sentence in a tooltip. The rows had been laid out sideways and
+  forced a horizontal scroll: the Tiles tab's segmented switch and the path
+  segment rows both used the CSS class `seg`. The switch is now `segsw`, and
+  no class is defined twice as a top-level rule (checked by script).
 
 **How it was proven** (2026-10-01): the compositor was restructured to draw
 tile layers band by band, so phase 4's engine comparison scene was rendered
