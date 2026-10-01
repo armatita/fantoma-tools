@@ -281,6 +281,7 @@ fantoma-tools/
   scripts/
     make_icons.py             regenerates every icon (no dependencies)
     check_header.py           proves a Canvas export by decoding it (see Canvas)
+    aseprite_test_files.lua   Aseprite writes test files for Canvas's .aseprite reader
   tools/
     pixel-studio/
       index.html  manifest.webmanifest  sw.js  icons/
@@ -637,7 +638,68 @@ the compositor, now routed through the motion code, still matches the
 workbench's `scene_render()` on phase 4's test scene: 0 pixels different at
 all eight instants.
 
-After phase 5: a built-in editor.
+**Phase 6 is built**: `.aseprite` files read directly, and linked, so a
+save in Aseprite shows up in Canvas within a second -- in the Scene too,
+animated. This replaced the planned built-in editor as the next step: after
+a brainstorm on 2026-09-29, Aseprite stays the drawing tool, and Canvas
+removes the export round trip instead.
+
+- **Link .aseprite…** asks for files with the browser's file picker (File
+  System Access API: Chrome and Edge). Access is **read-only and limited to
+  the files picked** -- agreed with Pedro, who keeps permissions minimal.
+  Once a second, while the page is visible, Canvas asks each file only for
+  its size and date, and reads it again when either changes. The handles are
+  kept in IndexedDB; after a browser restart Chrome may ask once more, which
+  is what **Reconnect** is for. Elsewhere (Firefox) the button falls back to
+  a one-off import.
+- **A reload is quiet** and stays on the tab you are on. If every colour is
+  already in the palette, or the palette is the object's alone (new colours
+  are appended; nothing moves), it just updates. **A new colour in a shared
+  palette stops and asks** (Review…), because it would change other objects.
+  A file caught half-written is retried; a moved file says so.
+- **A state that keeps its name keeps its identity** across a re-import or a
+  reload, so placed copies, their paths and the state on screen stay put.
+- **The reader** is written from Aseprite's own specification
+  (`docs/ase-file-specs.md` in the aseprite repository). It flattens the
+  visible layers in Aseprite's order including cel z-index, honours layer and
+  cel opacity with Aseprite's own integer blend, follows linked cels, reads
+  RGBA, grayscale and indexed sprites (the transparent index, and the
+  Background layer that has none), tags, durations, slices and **tilemap
+  layers** (X/Y flips). Hidden layers, hidden groups and reference layers
+  are left out, and say so. Blend modes other than Normal are drawn as
+  Normal and **warned**.
+
+**How it was proven** (2026-10-01): each file was exported by Aseprite itself
+(`-b --sheet --data`) and compared with Canvas's direct reading, pixel by
+pixel. All twelve `.aseprite` files in the fantoma repo -- **identical, every
+RGBA pixel, state, duration and colour**. Five more written by Aseprite from
+`scripts/aseprite_test_files.lua` for what Pedro's files do not use (layer
+and cel opacity, a group, a hidden layer, z-index, a linked cel, indexed with
+a Background layer, grayscale, a flipped tilemap, a multiply layer): all
+identical except the multiply layer, which differs as warned. Two findings on
+the way, both kept here because they would bite again:
+
+- An **indexed** sprite exports as an indexed PNG, which has a single
+  transparent index for the whole image -- so Aseprite's own export shows a
+  Background layer's index 0 as clear. Compared against Aseprite's RGB
+  conversion instead, the reader is exact.
+- A browser canvas stores pixels **premultiplied**, so reading a PNG through
+  one shifts partly transparent pixels by a unit or two (alpha 200: 90 became
+  91). Decoded without premultiplying (Pillow), Aseprite's PNG and the reader
+  agreed on every such pixel. The sheet import still reads PNGs through a
+  canvas, so for art with partly transparent pixels **linking is the more
+  exact route**.
+
+The live link was tested with real file handles (the browser's private file
+system) rewritten in place: reload on save, a new colour appended, the
+shared-palette stop and Review, a half-written file, a deleted file, Unlink,
+and the link surviving a page reload. **Reconnect after a browser restart
+could not be automated** -- that private file system never asks for
+permission -- so Pedro's first restart is its test.
+
+Next: tilesets (rules read from Pedro's templates, a random-level preview and
+a coverage report), then the palette draft-and-promote workflow, then a
+particle explorer.
 
 ---
 

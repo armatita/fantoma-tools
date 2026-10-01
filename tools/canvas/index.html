@@ -88,7 +88,7 @@ aside.side.right { border-right: 0; border-left: 1px solid var(--line); width: 3
 .sidehead .spacer { flex: 1; }
 .scroll { overflow-y: auto; flex: 1; min-height: 0; }
 .center { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 40px; }
-.sidefoot { padding: 10px 12px; border-top: 1px solid var(--line); flex: none; display: flex; gap: 6px; }
+.sidefoot { padding: 10px 12px; border-top: 1px solid var(--line); flex: none; display: flex; gap: 6px; flex-wrap: wrap; }
 .sidefoot .chip { flex: 1; text-align: center; }
 .small { font-size: 11px; color: var(--ink-dim); }
 .faint { color: var(--ink-faint); }
@@ -443,7 +443,9 @@ h4.mh:first-child { margin-top: 0; }
       <div class="sidehead">Objects</div>
       <div class="scroll" id="objList"></div>
       <div class="sidefoot">
-        <button type="button" class="chip" id="objImport" title="Select an Aseprite sprite sheet: its .png and .json together">Import Aseprite&hellip;</button>
+        <button type="button" class="chip primary" id="objLinkBtn" title="Pick .aseprite files: each reloads here whenever you save it">Link .aseprite&hellip;</button>
+        <button type="button" class="chip" id="objImport" title="An exported Aseprite sprite sheet: its .png and .json together">Import sheet&hellip;</button>
+        <button type="button" class="chip" id="objReconnect" hidden title="After a browser restart, Chrome asks again before Canvas may read linked files"></button>
       </div>
     </aside>
 
@@ -455,11 +457,12 @@ h4.mh:first-child { margin-top: 0; }
           Aseprite load it with <b>&equiv;</b> (above the palette) &rarr; <b>Load Palette&hellip;</b></li>
         <li>Draw, and tag each animation (<b>Frame &rarr; Tags</b>). Each tag becomes a
           state; a file with no tags becomes one state named after the file.</li>
-        <li><b>File &rarr; Export Sprite Sheet</b>: on <b>Output</b>, tick <b>JSON Data</b>
-          (Hash or Array both work) and, under Meta, <b>Tags</b>. Leave Trim off and
-          choose any layout except Packed.</li>
-        <li><b>Import Aseprite&hellip;</b> here, and select the <b>.png</b> and the
-          <b>.json</b> together.</li>
+        <li><b>Link .aseprite&hellip;</b> here and pick the file. From then on, every
+          <b>Ctrl+S</b> in Aseprite updates it here within a second &mdash; in the Scene too.
+          Canvas only reads the files you pick (Chrome or Edge).</li>
+        <li>Or the old way: <b>File &rarr; Export Sprite Sheet</b> with <b>JSON Data</b> and,
+          under Meta, <b>Tags</b> ticked (Trim off, any layout but Packed), then
+          <b>Import sheet&hellip;</b> with the <b>.png</b> and <b>.json</b> together.</li>
       </ol>
       <p>Colours must match a palette exactly; if some do not, the import says which
         and offers to add them &mdash; it never guesses a nearest colour.</p>
@@ -2967,7 +2970,8 @@ function renderObjList() {
     var d = objDepth(o);
     var row = el('div', 'orow' + (o.id === ui.obj ? ' sel' : ''));
     row.appendChild(el('span', 'nm', o.name));
-    row.appendChild(el('span', 'tag', o.w + '×' + o.h + ' · ' + (d.bpp ? d.bpp + ' bpp' : 'no palette')));
+    row.appendChild(el('span', 'tag', (links[o.id] ? '⟳ ' : '') + o.w + '×' + o.h + ' · ' + (d.bpp ? d.bpp + ' bpp' : 'no palette')));
+    if (links[o.id]) row.title = 'Linked to ' + links[o.id].name;
     row.onclick = function () { selectObject(o, o.states[0]); };
     box.appendChild(row);
     o.states.forEach(function (st) {
@@ -3165,6 +3169,8 @@ function renderObjSect() {
   kv('Cell', o.w + ' × ' + o.h + ' px');
   if (o.source) kv('Imported from', o.source);
   box.appendChild(t);
+  var lk = el('div'); lk.id = 'objLink'; box.appendChild(lk);
+  renderLinkUi();
 
   // Palette: switching recolours by index -- a palette swap, previewed.
   box.appendChild(el('span', 'lbl', 'Palette'));
@@ -3231,6 +3237,7 @@ function renderObjSect() {
       + ' (Undo brings it back.)')) return;
     snapshot();
     project.scene.instances = project.scene.instances.filter(function (x) { return x.obj !== o.id; });
+    dropLink(o.id);
     var i = project.objects.indexOf(o);
     project.objects.splice(i, 1);
     var next = project.objects[Math.min(i, project.objects.length - 1)];
@@ -3872,7 +3879,7 @@ function analyseImport(ase, sheet, base) {
   // meant as separate animations or separate sprites. Worth a line either way.
   if (ase.layers.length > 1) {
     notes.push({ cls: 'info', text: 'This file has ' + ase.layers.length + ' layers ('
-      + ase.layers.slice(0, 5).join(', ') + (ase.layers.length > 5 ? ', …' : '') + '), and the export merged them into '
+      + ase.layers.slice(0, 5).join(', ') + (ase.layers.length > 5 ? ', …' : '') + '), merged into '
       + 'each frame. That is right when they are parts of one picture. If they were separate animations, put each on '
       + 'its own frames and tag it; if separate sprites, give each its own file.' });
   }
@@ -3973,10 +3980,12 @@ function openModal(title) {
   $('modalFoot').innerHTML = '';
   $('modal').hidden = false;
 }
-function closeModal() { $('modal').hidden = true; }
+var modalAfter = null;                // called once if the dialog closes without committing
+function closeModal() { $('modal').hidden = true; var f = modalAfter; modalAfter = null; if (f) f(); }
 
-function showImport(an, jsonName, pngName) {
+function showImport(an, jsonName, pngName, onCommit, onCancel) {
   openModal('Import ' + jsonName);
+  modalAfter = onCancel || null;
   var body = $('modalBody'), foot = $('modalFoot');
   var choice = { pal: null, target: 'new' };
 
@@ -4125,10 +4134,14 @@ function showImport(an, jsonName, pngName) {
   sel.onchange = function () { choice.pal = sel.value; refresh(); };
   refresh();
 
-  go.onclick = function () { commitImport(an, choice, existing, jsonName); closeModal(); };
+  go.onclick = function () {
+    var o = commitImport(an, choice, existing, jsonName);
+    modalAfter = null; closeModal();
+    if (onCommit) onCommit(o);
+  };
 }
 
-function commitImport(an, choice, existing, jsonName) {
+function commitImport(an, choice, existing, jsonName, quiet) {
   snapshot();
   var pal;
   if (choice.pal === 'new') {
@@ -4143,8 +4156,12 @@ function commitImport(an, choice, existing, jsonName) {
   pal.colors.forEach(function (h, i) { if (!(h in index)) index[h] = i; });
 
   var taken = allIds();
+  // Updating: a state that keeps its name keeps its id, so placed copies,
+  // their paths and the state on screen all stay put across a reload.
+  var keep = {};
+  if (existing && choice.target === 'update') existing.states.forEach(function (st) { keep[st.name] = st.id; });
   var states = an.states.map(function (st) {
-    var id = newId('st', taken);
+    var id = keep[st.name] || newId('st', taken);
     taken[id] = true;
     return {
       id: id, name: st.name, ms: st.ms, loop: st.loop, direction: st.direction, frameMs: st.frameMs,
@@ -4184,13 +4201,489 @@ function commitImport(an, choice, existing, jsonName) {
     project.objects.push(o);
   }
   changed();
+  if (quiet) {                           // a linked file saved: stay where you are
+    renderAll();
+    return o;
+  }
   ui.tab = 'objects';
   selectObject(o, o.states[0]);
   setTab('objects');
   toast('Imported ' + o.name + ': ' + o.states.length + ' state' + (o.states.length === 1 ? '' : 's'));
+  return o;
 }
 
 $('objImport').onclick = importAseprite;
+
+/* --------------------------------------------------------------------------
+   Reading .aseprite files directly, and keeping them linked (phase 6)
+   --------------------------------------------------------------------------
+   Written from Aseprite's own specification (docs/ase-file-specs.md in the
+   aseprite repository), not from memory. The reader turns a file into the
+   same { ase, sheet } pair the sprite-sheet import produces, so everything
+   after it -- the dialog, exact colour matching, transparency, notes -- is
+   the one already-tested path.
+
+   Flattening follows Aseprite's render order: layers in file order, each
+   cel moved by its z-index (NOTE.5); hidden layers, layers inside hidden
+   groups and reference layers are skipped; colours are mixed with
+   Aseprite's own "normal" blend. Other blend modes are drawn as normal and
+   SAID so -- a file that relies on them will not match.
+
+   A LINK keeps a read-only handle to a file the person picked (the File
+   System Access API, Chrome and Edge). Once a second, while the page is
+   visible, Canvas asks only for the file's size and date; when either
+   changes it reads it again and updates the object in place, on whatever
+   tab is showing. Handles live in IndexedDB, because localStorage cannot
+   hold them. After a browser restart Chrome may ask again before reading:
+   that is the browser's rule, and the Reconnect button is the answer.
+   -------------------------------------------------------------------------- */
+function aseInflate(bytes) {
+  var ds = new DecompressionStream('deflate');          // zlib (RFC 1950), as the spec's NOTE.3 says
+  var out = new Blob([bytes]).stream().pipeThrough(ds);
+  return new Response(out).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+}
+
+// MUL_UN8 from Aseprite's blend functions: a*b/255, rounded.
+function mulUn8(a, b) { var t = a * b + 0x80; return ((t >> 8) + t) >> 8; }
+
+// Aseprite's rgba_blender_normal, for one pixel: (r,g,b,a) over dst[k..k+3].
+function blendNormal(dst, k, r, g, b, a, opacity) {
+  var Ba = dst[k + 3];
+  var Sa = mulUn8(a, opacity);
+  if (Ba === 0) { dst[k] = r; dst[k + 1] = g; dst[k + 2] = b; dst[k + 3] = Sa; return; }
+  if (a === 0) return;
+  var Ra = Sa + Ba - mulUn8(Ba, Sa);
+  // C integer division: the STEP is truncated toward zero, then added.
+  // (Truncating the sum instead is off by one whenever the step is negative.)
+  dst[k]     = dst[k]     + ((r - dst[k])     * Sa / Ra | 0);
+  dst[k + 1] = dst[k + 1] + ((g - dst[k + 1]) * Sa / Ra | 0);
+  dst[k + 2] = dst[k + 2] + ((b - dst[k + 2]) * Sa / Ra | 0);
+  dst[k + 3] = Ra;
+}
+
+function parseAsepriteFile(buf, fileName) {
+  var dv = new DataView(buf), u8 = new Uint8Array(buf), p = 0;
+  function need(n) { if (p + n > buf.byteLength) throw new Error(fileName + ' ends early: is Aseprite still saving it?'); }
+  function byte() { need(1); return u8[p++]; }
+  function word() { need(2); var v = dv.getUint16(p, true); p += 2; return v; }
+  function short() { need(2); var v = dv.getInt16(p, true); p += 2; return v; }
+  function dword() { need(4); var v = dv.getUint32(p, true); p += 4; return v; }
+  function long() { need(4); var v = dv.getInt32(p, true); p += 4; return v; }
+  function str() { var n = word(); need(n); var s = new TextDecoder().decode(u8.subarray(p, p + n)); p += n; return s; }
+
+  if (buf.byteLength < 128 || dv.getUint16(4, true) !== 0xA5E0) throw new Error(fileName + ' is not an Aseprite file.');
+  p = 6;
+  var nFrames = word(), W = word(), H = word(), depth = word(), hflags = dword(), speed = word();
+  p += 8;
+  var transIdx = byte();
+  p = 128;
+  if ([32, 16, 8].indexOf(depth) < 0) throw new Error(fileName + ': unknown colour depth ' + depth + '.');
+  var bpp = depth / 8, layerOpacityValid = !!(hflags & 1);
+
+  var layers = [], frames = [], tags = [], slices = [], palette = [], tilesets = {}, notes = [], newPalette = false;
+  for (var f = 0; f < nFrames; f++) {
+    var fStart = p, fBytes = dword();
+    if (word() !== 0xF1FA) throw new Error(fileName + ': frame ' + f + ' is damaged.');
+    var oldChunks = word(), ms = word();
+    p += 2;
+    var newChunks = dword(), nChunks = newChunks || oldChunks;
+    var cels = [];
+    for (var c = 0; c < nChunks; c++) {
+      var cStart = p, cSize = dword(), type = word(), cEnd = cStart + cSize;
+      if (cSize < 6 || cEnd > buf.byteLength) throw new Error(fileName + ': a chunk in frame ' + f + ' is damaged.');
+      if (type === 0x2004) {                                   // layer
+        var lf = word(), lt = word(), level = word();
+        p += 4;
+        var blend = word(), op = byte();
+        p += 3;
+        var lname = str(), tsIndex = lt === 2 ? dword() : -1;
+        layers.push({ name: lname, flags: lf, type: lt, level: level, blend: blend,
+                      opacity: layerOpacityValid ? op : 255, tileset: tsIndex });
+      } else if (type === 0x2005) {                            // cel
+        var cel = { layer: word(), x: short(), y: short(), opacity: byte(), type: word(), z: short() };
+        p += 5;
+        if (cel.type === 1) cel.link = word();
+        else if (cel.type === 0 || cel.type === 2) {
+          cel.w = word(); cel.h = word();
+          var raw = u8.subarray(p, cEnd);
+          if (cel.type === 0) cel.pixels = Promise.resolve(raw.slice());
+          else cel.pixels = aseInflate(raw);
+        } else if (cel.type === 3) {
+          cel.w = word(); cel.h = word();
+          var bits = word();
+          cel.idMask = dword(); cel.xMask = dword(); cel.yMask = dword(); cel.dMask = dword();
+          p += 10;
+          if (bits !== 32) throw new Error(fileName + ': ' + bits + '-bit tiles are not supported (Aseprite writes 32).');
+          cel.pixels = aseInflate(u8.subarray(p, cEnd));
+        }
+        cels.push(cel);
+      } else if (type === 0x2018) {                            // tags
+        var nTags = word();
+        p += 8;
+        for (var t = 0; t < nTags; t++) {
+          var from = word(), to = word(), dir = byte(), rep = word();
+          p += 10;
+          tags.push({ name: str(), from: from, to: to, repeat: rep,
+                      direction: ['forward', 'reverse', 'pingpong', 'pingpong_reverse'][dir] || 'forward' });
+        }
+      } else if (type === 0x2019) {                            // palette (new)
+        var size = dword(), first = dword(), last = dword();
+        p += 8;
+        palette.length = Math.max(palette.length, size);
+        for (var e = first; e <= last; e++) {
+          var ef = word(), pr = byte(), pg = byte(), pb = byte(), pa = byte();
+          if (ef & 1) str();
+          palette[e] = [pr, pg, pb, pa];
+        }
+        newPalette = true;
+      } else if ((type === 0x0004 || type === 0x0011) && !newPalette) {   // palette (old)
+        var packets = word(), at = 0, k6 = type === 0x0011;
+        for (var q = 0; q < packets; q++) {
+          at += byte();
+          var nc = byte() || 256;
+          for (var e2 = 0; e2 < nc; e2++, at++) {
+            var r6 = byte(), g6 = byte(), b6 = byte();
+            palette[at] = k6 ? [r6 << 2 | r6 >> 4, g6 << 2 | g6 >> 4, b6 << 2 | b6 >> 4, 255] : [r6, g6, b6, 255];
+          }
+        }
+      } else if (type === 0x2022) {                            // slice
+        var nKeys = dword(), sf = dword();
+        p += 4;
+        var sl = { name: str(), keys: [] };
+        for (var s = 0; s < nKeys; s++) {
+          var key = { frame: dword(), bounds: { x: long(), y: long(), w: dword(), h: dword() } };
+          if (sf & 1) p += 16;
+          if (sf & 2) p += 8;
+          sl.keys.push(key);
+        }
+        slices.push(sl);
+      } else if (type === 0x2023) {                            // tileset
+        var tsId = dword(), tf = dword(), nTiles = dword(), tw = word(), th = word();
+        short();
+        p += 14;
+        var ts = { name: str(), n: nTiles, w: tw, h: th, emptyIsZero: !!(tf & 4) };
+        if (tf & 1) p += 8;
+        if (tf & 2) { var len = dword(); ts.pixels = aseInflate(u8.subarray(p, p + len)); p += len; }
+        else notes.push({ cls: 'warn', text: 'Tileset “' + ts.name + '” lives in another file, which Canvas cannot open from here; its tiles are left empty.' });
+        tilesets[tsId] = ts;
+      }
+      p = cEnd;                                                // skip whatever was not read
+    }
+    frames.push({ ms: ms || speed || 100, cels: cels });
+    p = fStart + fBytes;
+  }
+
+  // Which layers draw: visible, every enclosing group visible, not a reference.
+  var shown = [], parents = [];
+  layers.forEach(function (L, i) {
+    parents.length = L.level;
+    var hiddenAbove = parents.some(function (g) { return !g.visible; });
+    L.visible = !!(L.flags & 1) && !hiddenAbove;
+    L.reference = !!(L.flags & 64);
+    if (L.type === 1) parents[L.level] = L;
+    shown[i] = L.visible && !L.reference && L.type !== 1;
+  });
+  var skippedHidden = layers.filter(function (L) { return L.type !== 1 && !L.visible && !L.reference; }).map(function (L) { return L.name; });
+  var skippedRef = layers.filter(function (L) { return L.reference; }).map(function (L) { return L.name; });
+  if (skippedHidden.length) notes.push({ cls: 'info', text: 'Hidden layers are left out: ' + skippedHidden.join(', ') + '.' });
+  if (skippedRef.length) notes.push({ cls: 'info', text: 'Reference layers are left out: ' + skippedRef.join(', ') + '.' });
+  var odd = layers.filter(function (L, i) { return shown[i] && L.blend !== 0; });
+  if (odd.length) notes.push({ cls: 'warn', text: 'Layer' + (odd.length > 1 ? 's ' : ' ') + odd.map(function (L) { return L.name; }).join(', ')
+    + ' use a blend mode other than Normal; Canvas draws ' + (odd.length > 1 ? 'them' : 'it') + ' as Normal, so the result may differ from Aseprite.' });
+  var faded = layers.filter(function (L, i) { return shown[i] && L.opacity < 255; });
+  if (faded.length) notes.push({ cls: 'warn', text: 'Layer opacity below 100% (' + faded.map(function (L) { return L.name; }).join(', ')
+    + ') makes partly transparent pixels, which the engine cannot show.' });
+
+  // Wait for every compressed image, then draw each frame.
+  var waits = [];
+  frames.forEach(function (fr) { fr.cels.forEach(function (ce) { if (ce.pixels) waits.push(ce.pixels.then(function (px) { ce.data = px; })); }); });
+  Object.keys(tilesets).forEach(function (id) { var ts = tilesets[id]; if (ts.pixels) waits.push(ts.pixels.then(function (px) { ts.data = px; })); });
+
+  return Promise.all(waits).then(function () {
+    var pal = palette.map(function (c) { return c || [0, 0, 0, 255]; });
+    var diagonal = false;
+    // One source pixel as RGBA, honouring the colour mode and, for indexed
+    // sprites, the transparent index -- which a Background layer does not have.
+    function pixelAt(data, idx, background) {
+      if (bpp === 4) return [data[idx * 4], data[idx * 4 + 1], data[idx * 4 + 2], data[idx * 4 + 3]];
+      if (bpp === 2) { var v = data[idx * 2]; return [v, v, v, data[idx * 2 + 1]]; }
+      var i8 = data[idx];
+      if (i8 === transIdx && !background) return [0, 0, 0, 0];
+      var c8 = pal[i8] || [0, 0, 0, 255];
+      return [c8[0], c8[1], c8[2], c8[3]];
+    }
+    var sheet = { w: W * nFrames, h: H, data: new Uint8ClampedArray(W * nFrames * H * 4) };
+    var out = new Uint8ClampedArray(W * H * 4);
+    frames.forEach(function (fr, fi) {
+      out.fill(0);
+      var order = fr.cels.map(function (ce) {
+        var src = ce.type === 1 ? (frames[ce.link] && frames[ce.link].cels.filter(function (x) { return x.layer === ce.layer; })[0]) : ce;
+        return { ce: ce, src: src };
+      }).filter(function (o) { return o.src && shown[o.ce.layer] && o.src.data; });
+      order.sort(function (a, b) {
+        var oa = a.ce.layer + a.ce.z, ob = b.ce.layer + b.ce.z;
+        return oa - ob || a.ce.z - b.ce.z;
+      });
+      order.forEach(function (o) {
+        var L = layers[o.ce.layer], src = o.src, bg = !!(L.flags & 8);
+        var opacity = mulUn8(src.opacity, L.opacity);
+        if (src.type === 3) {
+          var ts = tilesets[L.tileset];
+          if (!ts || !ts.data) return;
+          var tw = ts.w, th = ts.h, tdv = new DataView(src.data.buffer, src.data.byteOffset, src.data.byteLength);
+          for (var ty = 0; ty < src.h; ty++) {
+            for (var tx = 0; tx < src.w; tx++) {
+              var tv = tdv.getUint32((ty * src.w + tx) * 4, true);
+              var id = tv & src.idMask;
+              if (ts.emptyIsZero ? id === 0 : tv === 0xFFFFFFFF) continue;
+              if (id >= ts.n) continue;
+              if (tv & src.dMask) diagonal = true;
+              var fx = !!(tv & src.xMask), fy = !!(tv & src.yMask);
+              for (var py = 0; py < th; py++) {
+                for (var px = 0; px < tw; px++) {
+                  var dx = src.x + tx * tw + px, dy = src.y + ty * th + py;
+                  if (dx < 0 || dy < 0 || dx >= W || dy >= H) continue;
+                  var sx = fx ? tw - 1 - px : px, sy = fy ? th - 1 - py : py;
+                  var c = pixelAt(ts.data, (id * th + sy) * tw + sx, bg);
+                  blendNormal(out, (dy * W + dx) * 4, c[0], c[1], c[2], c[3], opacity);
+                }
+              }
+            }
+          }
+          return;
+        }
+        for (var y = 0; y < src.h; y++) {
+          var yy = src.y + y;
+          if (yy < 0 || yy >= H) continue;
+          for (var x = 0; x < src.w; x++) {
+            var xx = src.x + x;
+            if (xx < 0 || xx >= W) continue;
+            var c2 = pixelAt(src.data, y * src.w + x, bg);
+            blendNormal(out, (yy * W + xx) * 4, c2[0], c2[1], c2[2], c2[3], opacity);
+          }
+        }
+      });
+      for (var row = 0; row < H; row++) {
+        sheet.data.set(out.subarray(row * W * 4, (row + 1) * W * 4), (row * sheet.w + fi * W) * 4);
+      }
+    });
+    if (diagonal) notes.push({ cls: 'warn', text: 'Some tiles are rotated (diagonal flip), which Canvas draws unrotated.' });
+
+    var ase = {
+      frames: frames.map(function (fr, i) { return { x: i * W, y: 0, w: W, h: H, ox: 0, oy: 0, cw: W, ch: H, ms: fr.ms }; }),
+      tags: tags, hasTagList: true, cw: W, ch: H, image: null, slices: slices,
+      layers: layers.filter(function (L, i) { return shown[i]; }).map(function (L) { return L.name; })
+    };
+    return { ase: ase, sheet: sheet, notes: notes,
+             mode: depth === 32 ? 'RGBA' : depth === 16 ? 'Grayscale' : 'Indexed' };
+  });
+}
+
+// Read and analyse a file the way an import does.
+function analyseAseFile(file) {
+  return file.arrayBuffer().then(function (buf) { return parseAsepriteFile(buf, file.name); }).then(function (r) {
+    var base = cName(file.name.replace(/\.(aseprite|ase)$/i, ''));
+    var an = analyseImport(r.ase, r.sheet, base);
+    an.notes = r.notes.concat(an.notes);
+    return an;
+  });
+}
+
+/* ---- links ---- */
+var links = {};                       // objId -> { handle, name, last, size, state, msg, at }
+var LINK_DB = 'fantoma:' + TOOL_ID + ':links';
+var linkDb = null;
+
+function linkStore(mode) {
+  if (!linkDb) {
+    linkDb = new Promise(function (resolve, reject) {
+      var rq = indexedDB.open(LINK_DB, 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('links', { keyPath: 'obj' }); };
+      rq.onsuccess = function () { resolve(rq.result); };
+      rq.onerror = function () { reject(rq.error); };
+    });
+  }
+  return linkDb.then(function (db) { return db.transaction('links', mode).objectStore('links'); });
+}
+function saveLink(objId, handle) {
+  return linkStore('readwrite').then(function (st) { st.put({ obj: objId, handle: handle, name: handle.name }); });
+}
+function dropLink(objId) {
+  delete links[objId];
+  return linkStore('readwrite').then(function (st) { st['delete'](objId); }).catch(function () {});
+}
+function canLink() { return typeof window.showOpenFilePicker === 'function'; }
+
+function loadLinks() {
+  if (!window.indexedDB || !canLink()) return;
+  linkStore('readonly').then(function (st) {
+    var rq = st.getAll();
+    rq.onsuccess = function () {
+      (rq.result || []).forEach(function (rec) {
+        links[rec.obj] = { handle: rec.handle, name: rec.name, last: 0, size: -1, state: 'checking', msg: '' };
+        rec.handle.queryPermission({ mode: 'read' }).then(function (perm) {
+          var L = links[rec.obj];
+          if (!L) return;
+          L.state = perm === 'granted' ? 'ok' : 'prompt';
+          // The project already holds what was last read; reload only on a
+          // real change since, so stamp the current file first.
+          if (L.state === 'ok') return rec.handle.getFile().then(function (fl) { L.last = fl.lastModified; L.size = fl.size; });
+        }).catch(function () { var L2 = links[rec.obj]; if (L2) L2.state = 'missing'; })
+          .then(function () { renderLinkUi(); });
+      });
+      renderLinkUi();
+    };
+  }).catch(function (e) { console.warn('[canvas] links unavailable', e); });
+}
+
+function reconnectLinks() {
+  var ids = Object.keys(links).filter(function (id) { return links[id].state === 'prompt'; });
+  ids.reduce(function (chain, id) {
+    return chain.then(function () {
+      var L = links[id];
+      return L.handle.requestPermission({ mode: 'read' }).then(function (perm) {
+        L.state = perm === 'granted' ? 'ok' : 'prompt';
+        L.last = 0; L.size = -1;                // read it now: it may have changed while away
+      });
+    });
+  }, Promise.resolve()).catch(function () {}).then(renderLinkUi);
+}
+
+// Pick files to link. Each goes through the import dialog once; the object
+// it lands in is then linked to that file.
+function linkAseprite() {
+  if (!canLink()) { importAsepriteFile(); return; }
+  window.showOpenFilePicker({
+    multiple: true, excludeAcceptAllOption: false,
+    types: [{ description: 'Aseprite files', accept: { 'application/octet-stream': ['.aseprite', '.ase'] } }]
+  }).then(function (handles) {
+    return handles.reduce(function (chain, h) {
+      return chain.then(function () {
+        return h.getFile().then(function (file) {
+          return analyseAseFile(file).then(function (an) {
+            return new Promise(function (done) {
+              showImport(an, file.name, file.name + ' (linked: reloads when saved)', function (o) {
+                links[o.id] = { handle: h, name: file.name, last: file.lastModified, size: file.size, state: 'ok', msg: '', at: Date.now() };
+                saveLink(o.id, h).then(renderLinkUi);
+                done();
+              }, done);
+            });
+          });
+        });
+      });
+    }, Promise.resolve());
+  }).catch(function (err) {
+    if (err && err.name === 'AbortError') return;             // the picker was closed
+    toast(err && err.message ? err.message : 'Could not link that file');
+  });
+}
+
+// Without the File System Access API (Firefox): a one-off import, no link.
+function importAsepriteFile() {
+  var input = document.createElement('input');
+  input.type = 'file'; input.multiple = true; input.accept = '.aseprite,.ase';
+  input.onchange = function () {
+    var files = Array.prototype.slice.call(input.files || []);
+    files.reduce(function (chain, file) {
+      return chain.then(function () {
+        return analyseAseFile(file).then(function (an) {
+          return new Promise(function (done) { showImport(an, file.name, file.name, function () { done(); }, done); });
+        });
+      });
+    }, Promise.resolve()).catch(function (err) { toast(err && err.message ? err.message : 'Could not read that file'); });
+  };
+  input.click();
+  toast('This browser cannot keep a link, so this is a one-off import. Chrome or Edge can link.');
+}
+
+// A linked file changed: update its object in place, quietly.
+function reloadLinked(objId, file) {
+  var L = links[objId], o = findObject(objId);
+  if (!o) return Promise.resolve();
+  return analyseAseFile(file).then(function (an) {
+    var pal = findPalette(o.palette);
+    if (!pal) { L.state = 'review'; L.msg = 'The object has no palette; review the import.'; L.pending = an; return; }
+    var miss = paletteMissing(pal, an.colours);
+    var others = objectsUsing(pal.id).filter(function (x) { return x !== o; });
+    if (miss.length && others.length) {
+      // Growing a shared palette changes other objects: that is a decision.
+      L.state = 'review'; L.pending = an;
+      L.msg = miss.length + ' new colour' + (miss.length === 1 ? '' : 's') + ', and “' + pal.name + '” is shared with '
+        + others.map(function (x) { return x.name; }).join(', ') + '.';
+      toast(o.name + ': ' + L.msg + ' Review it in the Objects tab.');
+      return;
+    }
+    var slots = pal.colors.length + miss.length + (an.transparent ? 1 : 0);
+    if (!bppFor(slots)) { L.state = 'error'; L.msg = slots + ' palette slots: more than 256.'; return; }
+    commitImport(an, { pal: pal.id, target: 'update' }, o, file.name, true);
+    L.state = 'ok'; L.msg = ''; L.pending = null; L.at = Date.now();
+    toast('Reloaded ' + o.name + ' from ' + file.name + (miss.length ? ' (+' + miss.length + ' colour' + (miss.length === 1 ? '' : 's') + ')' : ''));
+  });
+}
+
+var linkBusy = false;
+function pollLinks() {
+  if (linkBusy || document.visibilityState !== 'visible') return;
+  var ids = Object.keys(links).filter(function (id) { return links[id].state === 'ok' && findObject(id); });
+  if (!ids.length) return;
+  linkBusy = true;
+  ids.reduce(function (chain, id) {
+    return chain.then(function () {
+      var L = links[id];
+      return L.handle.getFile().then(function (file) {
+        if (file.lastModified === L.last && file.size === L.size) return;
+        return reloadLinked(id, file).then(function () {
+          L.last = file.lastModified; L.size = file.size; L.fails = 0;
+        }, function (err) {
+          // Often a file caught half-written: try again next tick, and only
+          // complain if it keeps failing.
+          L.fails = (L.fails || 0) + 1;
+          if (L.fails >= 3) { L.state = 'error'; L.msg = err && err.message ? err.message : 'Could not read it.'; L.last = file.lastModified; L.size = file.size; }
+        });
+      }, function (err) {
+        L.state = err && err.name === 'NotAllowedError' ? 'prompt' : 'missing';
+        L.msg = L.state === 'missing' ? 'The file was moved or deleted.' : '';
+      });
+    });
+  }, Promise.resolve()).then(function () { linkBusy = false; renderLinkUi(); }, function () { linkBusy = false; });
+}
+setInterval(pollLinks, 1000);
+
+function linkStateText(L) {
+  if (L.state === 'ok') return 'watching' + (L.at ? ' · reloaded ' + new Date(L.at).toLocaleTimeString() : '');
+  if (L.state === 'prompt') return 'needs permission again (browser restart)';
+  if (L.state === 'missing') return L.msg || 'file not found';
+  if (L.state === 'review') return L.msg;
+  if (L.state === 'error') return L.msg;
+  return 'checking…';
+}
+
+// The link block in the object inspector, and the reconnect button.
+function renderLinkUi() {
+  var waiting = Object.keys(links).filter(function (id) { return links[id].state === 'prompt' && findObject(id); }).length;
+  var rb = $('objReconnect');
+  if (rb) { rb.hidden = !waiting; rb.textContent = 'Reconnect ' + waiting + ' linked file' + (waiting === 1 ? '' : 's'); }
+  var box = $('objLink');
+  if (!box) return;
+  box.innerHTML = '';
+  var o = currentObject();
+  if (!o || !links[o.id]) return;
+  var L = links[o.id];
+  box.appendChild(el('span', 'lbl', 'Linked file'));
+  box.appendChild(el('p', 'note mono', L.name));
+  box.appendChild(el('p', 'note ' + (L.state === 'ok' ? '' : L.state === 'prompt' ? 'warn' : 'bad'), linkStateText(L)));
+  var br = el('div', 'btnrow');
+  function btn(label, fn, cls) { var b = el('button', 'chip' + (cls ? ' ' + cls : ''), label); b.type = 'button'; b.onclick = fn; br.appendChild(b); }
+  if (L.state === 'prompt') btn('Reconnect', reconnectLinks, 'primary');
+  if (L.state === 'review' && L.pending) btn('Review…', function () {
+    showImport(L.pending, L.name, L.name + ' (linked)', function () { L.state = 'ok'; L.msg = ''; L.pending = null; L.at = Date.now(); renderLinkUi(); });
+  }, 'primary');
+  if (L.state === 'ok' || L.state === 'error') btn('Reload now', function () { L.last = 0; L.size = -1; L.state = 'ok'; pollLinks(); });
+  btn('Unlink', function () { dropLink(o.id).then(renderLinkUi); toast('Unlinked ' + o.name + '; its art stays.'); });
+  box.appendChild(br);
+}
+$('objLinkBtn').onclick = linkAseprite;
+$('objReconnect').onclick = reconnectLinks;
 $('modal').onclick = function (e) { if (e.target === $('modal')) closeModal(); };
 
 
@@ -4370,6 +4863,7 @@ if (!findPalette(ui.pal)) ui.pal = project.palettes.length ? project.palettes[0]
 if (!findObject(ui.obj)) { ui.obj = null; ui.state = null; }
 checkWidth();
 renderAll();
+loadLinks();
 
 FantomaApp.init({
   toolId: TOOL_ID,
