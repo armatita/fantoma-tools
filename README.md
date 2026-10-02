@@ -798,10 +798,52 @@ every overlapping pixel, a changed tileset re-tiled the painted ground, and a
 fast stroke, a rectangle, erasing and undo were driven by real pointer and key
 events.
 
+**Phase 9 is built**: camera follow and parallax, as **experiments** -- Pedro's
+reasoning (2026-10-02): if it does not work in Canvas it will not work better
+on the panel, and Canvas iterates in seconds where the device needs a compile
+and a flash. At 64×64 everything moves in whole-pixel steps; with a still
+camera only sprites step, with a moving one the whole screen does, so how
+evenly the steps arrive is what reads as smooth or jerky.
+
+- **Follow** (Scene, left panel): the camera tracks a placed instance --
+  **Locked** (centred every tick), **Dead zone** (moves only when the target
+  leaves a central box, and only as far as needed) or **Dead zone + landing
+  snap** (vertically it eases back to centre at 1 px a tick once the target
+  has landed). The camera is simulated tick by tick from the start, always on
+  a whole pixel (the engine's Camera is int16), clamped to the scene; the
+  camera fields are its start. "Landed" means no vertical movement for two
+  ticks *after moving down*: without the direction, the top of a jump --
+  where floored positions hold one row for three ticks -- passed for a
+  landing and the camera began re-centring on the apex (found by tracing).
+- **Speed against the tick**: a followed object's segment speeds are checked
+  -- 50 px/s is a pixel every 1.25 ticks and steps unevenly, 62.5 px/s is one
+  a tick, 31.25 one every two. With a following camera that unevenness is the
+  whole screen's.
+- **Parallax (a proposal)**: a factor per band, x and y.
+  `screen x = floor(x) - floor(camera x × factor)` gives exactly today's
+  behaviour for factor 1 and for 0 (what `OBJ_FIXED` does). Each band shows
+  its step pattern (1/2 steps `0·1·0·1`, 0.3 steps `0·0·0·1·0·0` -- warned) and
+  how much of it can ever be seen, so a slow backdrop is drawn wide enough and
+  no wider. Tile layers, painting and path handles follow their band's shift.
+- The camera view now sizes itself from the panel (whole-number scale), so
+  widening the right panel enlarges it: 4× at the default width, 9× at 640 px.
+
+**How it was proven** (2026-10-02): with follow off and every factor 1, phase
+4's engine comparison scene matched `scene_render()` with **0 pixels
+different**. Against hand-worked numbers: a hero at 50 px/s put the locked
+camera at 60 and the dead-zone camera at 49 at 1.6 s, and never left the dead
+zone in 251 ticks; landing snap rose 4 px for a 16 px jump, held at the apex,
+and eased back a pixel a tick, and on a hop to a higher ledge settled centred
+on it; a backdrop cloud at 1/2 with the camera at 60 drew all 64 pixels at
+screen x 10, a tile in a 1/2 band all 60 of its pixels at x 50; painting in a
+shifted band hit the intended cell. Every tab's right panel fits at 260, 300
+and 640 px.
+
 Next: the palette draft-and-promote workflow, then a particle explorer. Open
 for tiles: a depth rule ("top lit, fading to black below" needs more than one
 tile of context) and the engine's tilemap format, including where tiles draw
-within a band.
+within a band. Open for the engine: whether to adopt parallax factors and
+which camera behaviour, once tried here and on the panel.
 
 ---
 

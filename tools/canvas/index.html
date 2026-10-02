@@ -231,7 +231,7 @@ table.cover td.plan { color: var(--ink-dim); font-family: inherit; }
 table.cover td.new { color: var(--warn); font-family: inherit; }
 canvas.tplprev { display: block; image-rendering: pixelated; margin: 8px 0 4px; border: 1px solid var(--line); }
 ul.warns li canvas.glyph { margin-right: 4px; }
-#scnViewWrap { display: flex; justify-content: center; background: #000; border-radius: 6px; padding: 8px; }
+#scnViewWrap { display: flex; justify-content: center; background: #000; border-radius: 6px; padding: 8px 0; }
 #scnView { display: block; image-rendering: pixelated; }
 /* Space reserved even while empty: text appearing as the pointer enters
    would otherwise re-wrap the toolbar and shift the canvas under it. */
@@ -241,6 +241,16 @@ ul.warns li canvas.glyph { margin-right: 4px; }
 .scrub { display: flex; align-items: center; gap: 6px; flex: none; }
 #scnPlay, #objPlay { width: 84px; text-align: center; }  /* "Play" and "Pause" differ by 10 px */
 .scrub .chip { padding: 3px 8px; }
+table.para { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; table-layout: fixed; }
+table.para th:nth-child(2), table.para th:nth-child(3) { width: 50px; }
+table.para th:nth-child(4) { width: 34%; }
+table.para td { overflow: hidden; text-overflow: ellipsis; }
+table.para th { font-weight: 400; color: var(--ink-faint); text-align: left; padding: 2px 4px 4px 0; }
+table.para td { padding: 2px 4px 2px 0; white-space: nowrap; }
+table.para td.even { color: var(--ink-dim); font-family: var(--mono); }
+table.para td.odd { color: var(--warn); font-family: var(--mono); }
+input.fac { width: 44px; padding: 3px 4px; }
+#camFollowBox .field select { flex: none; }
 .loopbox { display: flex; align-items: center; gap: 5px; flex: none; font-size: 12px; color: var(--ink-dim); }
 .loopbox label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 #scnLoopS { width: 64px; padding: 3px 6px; }
@@ -412,6 +422,7 @@ h4.mh:first-child { margin-top: 0; }
           <span class="x">,</span>
           <input class="num" id="camY" type="number" min="0" step="1">
         </div>
+        <div id="camFollowBox"></div>
         <div class="field">
           <label for="sceneW">Scene</label>
           <input class="num" id="sceneW" type="number" min="1" max="4096" step="1">
@@ -464,6 +475,7 @@ h4.mh:first-child { margin-top: 0; }
         <div class="sect" id="scnPathSect" hidden></div>
         <div class="sect" id="scnTileSect"></div>
         <div class="sect" id="scnBandSect"></div>
+        <div class="sect" id="scnParaSect"></div>
         <div class="sect" id="scnCheckSect"></div>
       </div>
     </aside>
@@ -762,8 +774,9 @@ function bytesLabel(b) { return b >= 10240 ? (b / 1024).toFixed(1) + ' KB' : b +
 function blankProject() {
   return {
     format: FORMAT, version: VERSION, name: 'untitled',
-    camera: { w: 64, h: 64, x: 0, y: 0 },
-    scene: { w: 64, h: 64, bg: '#000000', instances: [], tilemaps: [], loop: { on: false, ms: 5000 } },
+    camera: { w: 64, h: 64, x: 0, y: 0, follow: { target: null, mode: 'zone', zw: 24, zh: 24 } },
+    scene: { w: 64, h: 64, bg: '#000000', instances: [], tilemaps: [], loop: { on: false, ms: 5000 },
+             parallax: { x: [1, 1, 1, 1, 1, 1], y: [1, 1, 1, 1, 1, 1] } },
     include: DEFAULT_INCLUDE,
     palettes: [],
     objects: [],
@@ -793,9 +806,17 @@ function normProject(raw) {
     h: Math.max(p.camera.h, intIn(sc.h, 1, MAX_SCENE, p.camera.h)),
     bg: normHex(sc.bg) || '#000000',       // bg_color; black is an unlit panel
     loop: { on: !!(sc.loop && sc.loop.on), ms: intIn(sc.loop && sc.loop.ms, 100, 600000, 5000) },
+    parallax: (function (P) {
+      function arr(a) { return [0, 1, 2, 3, 4, 5].map(function (i) { var v = Array.isArray(a) ? Number(a[i]) : 1; return isFinite(v) ? Math.min(4, Math.max(0, v)) : 1; }); }
+      return { x: arr(P && P.x), y: arr(P && P.y) };
+    })(sc.parallax),
     instances: []
   };
   p.camera.x = intIn(cam.x, 0, p.scene.w - p.camera.w, 0);
+  var fo = isObj(cam.follow) ? cam.follow : {};
+  p.camera.follow = { target: typeof fo.target === 'string' ? fo.target : null,
+                      mode: ['lock', 'zone', 'snap'].indexOf(fo.mode) >= 0 ? fo.mode : 'zone',
+                      zw: intIn(fo.zw, 1, p.camera.w, Math.min(24, p.camera.w)), zh: intIn(fo.zh, 1, p.camera.h, Math.min(24, p.camera.h)) };
   p.camera.y = intIn(cam.y, 0, p.scene.h - p.camera.h, 0);
 
   p.include = (typeof raw.include === 'string' && !includeProblem(raw.include.trim()))
@@ -1657,7 +1678,7 @@ function objColours32(o) {
 
 // Where the instance's cell sits in the world: a fixed one rides the camera.
 function instWorld(inst) {
-  var c = project.camera;
+  var c = scnCam || project.camera;
   return inst.fixed ? { x: c.x + inst.x, y: c.y + inst.y } : { x: inst.x, y: inst.y };
 }
 
@@ -1704,7 +1725,8 @@ function composite(buf, bw, bh, ox, oy, elapsed, skipBand) {
   }
   for (var b = 0; b < BANDS.length; b++) {
     if (!(skipBand && skipBand[b])) {
-      tileLayers().forEach(function (tm) { if (tm.band === b && !tm.hidden) drawTileLayer(buf, bw, bh, ox, oy, tm); });
+      var tsh = bandShift(b);
+      tileLayers().forEach(function (tm) { if (tm.band === b && !tm.hidden) drawTileLayer(buf, bw, bh, ox - tsh.x, oy - tsh.y, tm); });
     }
     scnInstances().forEach(function (inst) { if (inst.band === b) drawOne(inst); });
   }
@@ -1742,7 +1764,7 @@ function drawScene() {
   g.fillStyle = '#101015';
   g.fillRect(0, 0, W, H);
 
-  var sw = project.scene.w, sh = project.scene.h, cam = project.camera, now = scnElapsed();
+  var sw = project.scene.w, sh = project.scene.h, now = scnElapsed(), cam = syncCam(now);
   function X(x) { return gm.ox + x * k; }
   function Y(y) { return gm.oy + y * k; }
 
@@ -1835,7 +1857,7 @@ function drawScene() {
 }
 
 function camTab(gm) {
-  var cam = project.camera, text = 'camera ' + cam.x + ',' + cam.y;
+  var cam = scnCam || project.camera, text = 'camera ' + cam.x + ',' + cam.y + (followTarget() ? ' · following' : '');
   var g = sceneCv.getContext('2d');
   g.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
   var w = Math.ceil(g.measureText(text).width) + 12;
@@ -1844,23 +1866,25 @@ function camTab(gm) {
 
 // The camera view: exactly the panel's pixels, at a whole-number scale.
 function drawCamView() {
-  var cam = project.camera, cv = $('scnView');
-  var k = Math.min(256 / cam.w, 256 / cam.h);
+  var el1 = scnElapsed(), cam = syncCam(el1), cv = $('scnView');
+  // As large as the panel allows, at a whole-number scale: widening the
+  // panel enlarges the camera view. (A fixed 256 px overflowed a narrow one.)
+  var wrap = $('scnViewWrap'), room = wrap.clientWidth || 256;
+  var k = Math.min(room / cam.w, Math.max(256, room) / cam.h);
   k = k >= 1 ? Math.floor(k) : k;
-  var el1 = scnElapsed();
   blit(scnOff, cam.w, cam.h, function (buf) { composite(buf, cam.w, cam.h, cam.x, cam.y, el1, null); });
   cv.width = Math.round(cam.w * k); cv.height = Math.round(cam.h * k);
   var g = cv.getContext('2d');
   g.imageSmoothingEnabled = false;
   g.drawImage(scnOff, 0, 0, cv.width, cv.height);
   $('scnViewNote').textContent = cam.w + '×' + cam.h + ' at ' + (k >= 1 ? k : k.toFixed(2)) + '×, camera at ('
-    + cam.x + ', ' + cam.y + '). Every band, as the device draws it, whatever the editor hides.';
+    + cam.x + ', ' + cam.y + ')' + (followTarget() ? ', following ' + instLabel(followTarget().inst) : '') + '. Every band, as the device draws it, whatever the editor hides.';
 }
 
 /* ---- playback ---- */
 function scnSignature() {
-  var el2 = scnElapsed();
-  return scnInstances().map(function (inst) {
+  var el2 = scnElapsed(), c2 = syncCam(el2);
+  return c2.x + ',' + c2.y + '|' + scnInstances().map(function (inst) {
     var at = instNow(inst, el2);
     return at.st ? [instFrame(at.st, el2 - at.animStart), at.x, at.y, at.flipX ? 1 : 0].join(':') : '';
   }).join(',');
@@ -1967,6 +1991,24 @@ function sceneChecks() {
     if (!findPalette(o.palette)) bad.push(o.name + ' has no palette, so it cannot be drawn.');
     if (o.box.x || o.box.y) warns.push(o.name + '’s box is drawn offset in the Objects tab; the engine, and this scene, put it at the top-left.');
   });
+  var FT = followTarget();
+  if (project.camera.follow.target && !FT) warns.push('The camera is set to follow something no longer in the scene (or fixed to the screen), so it stays put.');
+  if (FT && FT.inst.path) FT.inst.path.segs.forEach(function (sg, k) {
+    if (sg.cx !== null) return;
+    var p0 = segFrom(FT.inst.path, k);
+    [Math.abs(sg.x - p0.x), Math.abs(sg.y - p0.y)].forEach(function (d, ax) {
+      if (!d) return;
+      var n = tickSpeedNote(d / sg.ms * 1000);
+      if (n) warns.push(instLabel(FT.inst) + ', segment ' + (k + 1) + (ax ? ' (up/down)' : '') + ': ' + n + ' The camera follows it, so the whole screen steps that way.');
+    });
+  });
+  for (var pb = 0; pb < BANDS.length; pb++) {
+    ['x', 'y'].forEach(function (ax) {
+      var fv = project.scene.parallax[ax][pb];
+      if (!factorEven(fv)) infos.push('Band ' + BANDS[pb].name + ' scrolls at ' + fv + ' (' + ax + '), which steps unevenly: '
+        + stepPattern(fv).join('·') + '. Next to bands at other rhythms it can shimmer; 1/2, 1/3, 1/4… step evenly.');
+    });
+  }
   var usedTs = {};
   tileLayers().forEach(function (tm) {
     var ts = findTileset(tm.tileset);
@@ -2283,6 +2325,8 @@ function renderScene() {
   renderScnPath();
   renderScnTiles();
   renderScnBands();
+  renderParallax();
+  renderFollow();
   Array.prototype.forEach.call(document.querySelectorAll('#scnToolSw button'), function (b) { b.classList.toggle('on', b.getAttribute('data-t') === ui.scnTool); });
   $('scnMarks').checked = ui.scnMarks;
   renderScnChecks();
@@ -2313,6 +2357,7 @@ $('scnGrid').onchange = function () { ui.scnGrid = this.checked; saveUi(); drawS
 // Topmost first: an opaque pixel wins over a transparent corner of a
 // sprite drawn later, so small sprites stay clickable in a crowd.
 function hitInstance(wx, wy) {
+  syncCam(scnElapsed());
   var order = drawOrder().reverse(), el3 = scnElapsed(), hide = ui.scnHide || {}, fx = Math.floor(wx), fy = Math.floor(wy);
   var cellHit = null;
   for (var i = 0; i < order.length; i++) {
@@ -2338,6 +2383,7 @@ sceneCv.addEventListener('pointerdown', function (e) {
   sceneCv.setPointerCapture(e.pointerId);
   if (e.button === 1) { scnDrag = { kind: 'pan', mx: mx, my: my, gm: gm }; e.preventDefault(); return; }
   if (e.altKey || (mx >= tab.x && mx < tab.x + tab.w && my >= tab.y && my < tab.y + tab.h)) {
+    if (followTarget()) { toast('The camera is following ' + instLabel(followTarget().inst) + '. Its start is set in the Camera at fields; Follow: nothing frees it.'); return; }
     scnDrag = { kind: 'camera', wx: w.x, wy: w.y, x: cam.x, y: cam.y, moved: false };
     return;
   }
@@ -2632,7 +2678,15 @@ function segSpeed(path, k) {
 
 /* Where an instance is, what it shows and since when, at scene time
    `elapsed`. Without a path that is simply where it was placed. */
-function instNow(inst, elapsed) {
+// Where it is drawn: the raw position, shifted by its band's parallax.
+function instNow(inst, elapsed, raw) {
+  var a = instNowRaw(inst, elapsed);
+  if (raw || inst.fixed) return a;
+  var sh = bandShift(inst.band);
+  a.x += sh.x; a.y += sh.y;
+  return a;
+}
+function instNowRaw(inst, elapsed) {
   var o = findObject(inst.obj), base = instWorld(inst);
   var st0 = o ? instState(inst, o) : null;
   var out = { x: base.x, y: base.y, st: st0, flipX: inst.flipX, flipY: inst.flipY, animStart: 0 };
@@ -2685,8 +2739,8 @@ function pathEditing() {
 // is where the eye puts "the sprite", while the numbers stay the top-left
 // offsets the engine would move by.
 function pathScreenPts(inst, gm) {
-  var o = findObject(inst.obj), base = instWorld(inst);
-  var ox = base.x + o.w / 2, oy = base.y + o.h / 2;
+  var o = findObject(inst.obj), base = instWorld(inst), psh = inst.fixed ? { x: 0, y: 0 } : bandShift(inst.band);
+  var ox = base.x + psh.x + o.w / 2, oy = base.y + psh.y + o.h / 2;
   function S(x, y) { return { x: gm.ox + (ox + x) * gm.k, y: gm.oy + (oy + y) * gm.k }; }
   var pts = [S(0, 0)], ctl = [];
   inst.path.segs.forEach(function (s, k) {
@@ -2759,7 +2813,8 @@ function pathHandleAt(gm, mx, my) {
 // A world point (where the pointer is) as a path offset for this instance.
 function pathOffset(inst, wx, wy, round) {
   var o = findObject(inst.obj), base = instWorld(inst), f = round ? Math.round : Math.floor;
-  return { x: f(wx - o.w / 2) - base.x, y: f(wy - o.h / 2) - base.y };
+  var psh = inst.fixed ? { x: 0, y: 0 } : bandShift(inst.band);
+  return { x: f(wx - o.w / 2) - base.x - psh.x, y: f(wy - o.h / 2) - base.y - psh.y };
 }
 
 // A new segment keeps the pace of the one before it, so a patrol drawn
@@ -5878,7 +5933,8 @@ function drawTileLayer(buf, bw, bh, ox, oy, tm) {
 function tmCellAt(tm, wx, wy) {
   var ts = findTileset(tm.tileset);
   if (!ts) return null;
-  var x = Math.floor(wx / ts.tw), y = Math.floor(wy / ts.th);
+  var sh = bandShift(tm.band);
+  var x = Math.floor((wx - sh.x) / ts.tw), y = Math.floor((wy - sh.y) / ts.th);
   return x >= 0 && y >= 0 && x < tm.cols && y < tm.rows ? { x: x, y: y } : null;
 }
 function setCells(tm, list, val) {
@@ -5932,12 +5988,12 @@ function drawTileOverlays(g, gm) {
   tileLayers().forEach(function (tm) {
     var ts = findTileset(tm.tileset), T = tmTiled(tm);
     if (!ts || !T || tm.hidden || hide[tm.band]) return;
-    var tw = ts.tw, th = ts.th;
+    var tw = ts.tw, th = ts.th, sh = bandShift(tm.band);
     if (ui.scnMarks) {                  // a stand-in tile: the closest drawn situation, not its own
       g.fillStyle = '#ff3ea5';
       T.tiles.forEach(function (t, i) {
         if (!t || t.exact) return;
-        var x = X((i % tm.cols) * tw), y = Y(Math.floor(i / tm.cols) * th), s = Math.max(3, tw * k / 4);
+        var x = X((i % tm.cols) * tw + sh.x), y = Y(Math.floor(i / tm.cols) * th + sh.y), s = Math.max(3, tw * k / 4);
         g.beginPath(); g.moveTo(x, y); g.lineTo(x + s, y); g.lineTo(x, y + s); g.fill();
       });
     }
@@ -5947,7 +6003,7 @@ function drawTileOverlays(g, gm) {
       for (var cy = 0; cy < tm.rows; cy++) for (var cx = 0; cx < tm.cols; cx++) {
         if (tm.cells.charAt(cy * tm.cols + cx) !== '1') continue;
         var on = function (x, y) { return x >= 0 && y >= 0 && x < tm.cols && y < tm.rows && tm.cells.charAt(y * tm.cols + x) === '1'; };
-        var x0 = X(cx * tw) + 0.5, y0 = Y(cy * th) + 0.5, x1 = X((cx + 1) * tw) - 0.5, y1 = Y((cy + 1) * th) - 0.5;
+        var x0 = X(cx * tw + sh.x) + 0.5, y0 = Y(cy * th + sh.y) + 0.5, x1 = X((cx + 1) * tw + sh.x) - 0.5, y1 = Y((cy + 1) * th + sh.y) - 0.5;
         if (!on(cx, cy - 1)) { g.moveTo(x0, y0); g.lineTo(x1, y0); }
         if (!on(cx, cy + 1)) { g.moveTo(x0, y1); g.lineTo(x1, y1); }
         if (!on(cx - 1, cy)) { g.moveTo(x0, y0); g.lineTo(x0, y1); }
@@ -6099,6 +6155,212 @@ function renderTileLayerPanel(box, tm) {
   box.appendChild(br);
 }
 $('scnMarks').onchange = function () { ui.scnMarks = this.checked; saveUi(); drawScene(); };
+
+/* --------------------------------------------------------------------------
+   Camera follow and parallax (phase 9) -- experiments, not engine features
+   --------------------------------------------------------------------------
+   At 64x64 everything moves in whole-pixel steps, and what reads as smooth
+   or jerky is how evenly those steps arrive. A still camera hides most of
+   it; a moving camera makes the WHOLE SCREEN step. These previews exist to
+   try camera behaviours and parallax factors before the engine commits to
+   any, with the same arithmetic as the rest of the scene: the camera is
+   always on a whole pixel (the engine's Camera is int16), time is sampled on
+   the 16 ms tick, positions are floored.
+
+   Follow: the camera is SIMULATED tick by tick from the scene's start, so
+   a dead zone remembers where the camera was. Locked centres on the target
+   every tick; Dead zone moves only as far as needed to keep the target in a
+   central box; Landing snap does the same sideways, and vertically eases
+   back to centre at 1 px per tick once the target stops moving vertically
+   -- the stand-in for "has landed", since paths have no physics.
+
+   Parallax is a PROPOSAL: the engine has only factor 1 (normal) and factor
+   0 (OBJ_FIXED, "parallax, free"). The arithmetic proposed, per band,
+       screen x = floor(x) - floor(camera x * factor)
+   gives exactly today's behaviour for both, and whole-pixel steps whose
+   rhythm is the factor's: 1/2 steps 1-0-1-0, 0.3 steps irregularly.
+   -------------------------------------------------------------------------- */
+var scnCam = null;                 // where the camera is NOW (set before drawing)
+var camSim = null;                 // the follow simulation, carried forward tick by tick
+
+function clampCam(x, y) {
+  var c = project.camera;
+  return { x: Math.min(Math.max(0, x), project.scene.w - c.w), y: Math.min(Math.max(0, y), project.scene.h - c.h) };
+}
+function followTarget() {
+  var f = project.camera.follow, inst = f.target && findInst(f.target), o = inst && findObject(inst.obj);
+  return inst && o && !inst.fixed ? { inst: inst, o: o } : null;
+}
+function camNow(t) {
+  var c = project.camera, base = { x: c.x, y: c.y, w: c.w, h: c.h };
+  var T = followTarget();
+  if (!T) { camSim = null; return base; }
+  var f = c.follow;
+  var key = JSON.stringify([f, c.x, c.y, c.w, c.h, project.scene.w, project.scene.h, T.inst.x, T.inst.y, T.inst.state, T.inst.path, T.inst.band]);
+  function centre(tt) {
+    var p = instNow(T.inst, tt, true);
+    return { x: p.x + Math.floor(T.o.w / 2), y: p.y + Math.floor(T.o.h / 2), py: p.y };
+  }
+  if (!camSim || camSim.key !== key || camSim.t > t) {
+    var p0 = centre(0), s0 = clampCam(p0.x - Math.floor(c.w / 2), p0.y - Math.floor(c.h / 2));
+    camSim = { key: key, t: 0, x: s0.x, y: s0.y, lastY: p0.py, still: 0, dir: 0 };
+  }
+  var S = camSim;
+  while (S.t + TICK_MS <= t) {
+    S.t += TICK_MS;
+    var p = centre(S.t), nx = S.x, ny = S.y;
+    if (f.mode === 'lock') {
+      nx = p.x - Math.floor(c.w / 2); ny = p.y - Math.floor(c.h / 2);
+    } else {
+      var zl = S.x + Math.floor((c.w - f.zw) / 2), zr = zl + f.zw - 1;
+      var zt = S.y + Math.floor((c.h - f.zh) / 2), zb = zt + f.zh - 1;
+      if (p.x < zl) nx -= zl - p.x; else if (p.x > zr) nx += p.x - zr;
+      if (p.y < zt) ny -= zt - p.y; else if (p.y > zb) ny += p.y - zb;
+      if (f.mode === 'snap') {
+        // "Landed" = no vertical movement for two ticks AFTER moving down (or
+        // never having moved). Without the direction, the top of a jump --
+        // where floored positions hold one row for a few ticks -- passes for
+        // a landing, and the camera starts re-centring on the apex.
+        if (p.py !== S.lastY) { S.dir = p.py > S.lastY ? 1 : -1; S.still = 0; } else S.still++;
+        S.lastY = p.py;
+        var want = p.y - Math.floor(c.h / 2);
+        if (S.still >= 2 && S.dir >= 0 && ny === S.y && want !== S.y) ny = S.y + (want > S.y ? 1 : -1);   // landed: ease back, a pixel a tick
+      }
+    }
+    var cl = clampCam(nx, ny);
+    S.x = cl.x; S.y = cl.y;
+  }
+  return { x: S.x, y: S.y, w: c.w, h: c.h };
+}
+function syncCam(t) { scnCam = camNow(t); return scnCam; }
+
+/* ---- parallax ---- */
+function bandFactor(b) { var P = project.scene.parallax; return { x: P.x[b], y: P.y[b] }; }
+function bandShift(b) {
+  var cam = scnCam || project.camera, f = bandFactor(b);
+  return { x: cam.x - Math.floor(cam.x * f.x), y: cam.y - Math.floor(cam.y * f.y) };
+}
+function stepPattern(f, n) {
+  var out = [];
+  for (var c = 1; c <= (n || 8); c++) out.push(Math.floor(c * f) - Math.floor((c - 1) * f));
+  return out;
+}
+function factorEven(f) {
+  if (f === 0 || f === 1) return true;
+  var inv = 1 / f;
+  return Math.abs(inv - Math.round(inv)) < 1e-9 || Math.abs(f - Math.round(f)) < 1e-9;
+}
+function parseFactor(v) {
+  var s = String(v).trim(), m = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(s);
+  var n = m ? parseFloat(m[1]) / parseFloat(m[2]) : parseFloat(s);
+  return isFinite(n) ? Math.min(4, Math.max(0, Math.round(n * 10000) / 10000)) : null;
+}
+function factorLabel(f) {
+  if (f === 0 || f === 1) return String(f);
+  var inv = 1 / f;
+  if (Math.abs(inv - Math.round(inv)) < 1e-9) return '1/' + Math.round(inv);
+  return String(f);
+}
+
+function renderParallax() {
+  var box = $('scnParaSect');
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Parallax (proposal)'));
+  box.appendChild(el('p', 'note', 'How fast each band scrolls with the camera: 1 is normal, 0 does not move (what OBJ_FIXED does today), '
+    + '1/2 moves half as far. The engine has only 1 and 0; this is to try factors before proposing any. Write 1/2, 0.25…'));
+  var t = el('table', 'para'), hr = el('tr');
+  ['band', 'x', 'y', 'steps (x)'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+  t.appendChild(hr);
+  var P = project.scene.parallax, c = project.camera;
+  for (var b = BANDS.length - 1; b >= 0; b--) {
+    (function (b) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, b + ' ' + BANDS[b].name));
+      ['x', 'y'].forEach(function (ax) {
+        var td = el('td'), inp = document.createElement('input');
+        inp.className = 'num fac'; inp.value = factorLabel(P[ax][b]); inp.spellcheck = false;
+        inp.onchange = function () {
+          var v = parseFactor(inp.value);
+          if (v === null) { toast('A factor is a number or a fraction: 1, 0.5, 1/4'); inp.value = factorLabel(P[ax][b]); return; }
+          if (v === P[ax][b]) { inp.value = factorLabel(v); return; }
+          snapshot(); P[ax][b] = v; changed(); renderScene();
+        };
+        inp.onkeydown = function (e) { if (e.key === 'Enter') inp.blur(); };
+        td.appendChild(inp); tr.appendChild(td);
+      });
+      var f = P.x[b], st = el('td', factorEven(f) ? 'even' : 'odd', f === 1 ? 'every px' : f === 0 ? 'still' : stepPattern(f, 6).join('·'));
+      st.title = factorEven(f) ? 'Steps at an even rhythm' : 'Steps unevenly: next to bands at other rhythms, this can shimmer';
+      tr.appendChild(st);
+      t.appendChild(tr);
+    })(b);
+  }
+  box.appendChild(t);
+  // How much of each slowed band can ever be seen, so a backdrop is drawn wide enough and no wider.
+  var notes = [];
+  for (var b2 = 0; b2 < BANDS.length; b2++) {
+    var fx = P.x[b2], fy = P.y[b2];
+    if (fx === 1 && fy === 1) continue;
+    var needW = Math.floor((project.scene.w - c.w) * fx) + c.w, needH = Math.floor((project.scene.h - c.h) * fy) + c.h;
+    notes.push(BANDS[b2].name + ': content from 0,0 to ' + needW + '×' + needH + ' px is all that can be seen');
+  }
+  if (notes.length) box.appendChild(el('p', 'note', notes.join('; ') + '.'));
+}
+
+/* ---- follow, in the left panel ---- */
+function renderFollow() {
+  var box = $('camFollowBox'), f = project.camera.follow;
+  box.innerHTML = '';
+  var row = el('div', 'field');
+  row.appendChild(el('label', null, 'Follow'));
+  var sel = document.createElement('select'); sel.className = 'sel2'; sel.style.width = '160px';
+  var none = el('option', null, '— nothing —'); none.value = ''; sel.appendChild(none);
+  scnInstances().forEach(function (inst) {
+    if (inst.fixed || !findObject(inst.obj)) return;
+    var op = el('option', null, instLabel(inst) + (inst.path ? ' (path)' : '')); op.value = inst.id; sel.appendChild(op);
+  });
+  sel.value = f.target && findInst(f.target) ? f.target : '';
+  sel.onchange = function () { snapshot(); f.target = sel.value || null; changed(); renderScene(); };
+  row.appendChild(sel);
+  box.appendChild(row);
+  if (!f.target) return;
+  var r2 = el('div', 'field');
+  r2.appendChild(el('label', null, 'Mode'));
+  var ms = document.createElement('select'); ms.className = 'sel2'; ms.style.width = '160px';
+  [['lock', 'Locked on it'], ['zone', 'Dead zone'], ['snap', 'Dead zone + landing snap']].forEach(function (p) {
+    var op = el('option', null, p[1]); op.value = p[0]; ms.appendChild(op);
+  });
+  ms.value = f.mode;
+  ms.onchange = function () { snapshot(); f.mode = ms.value; changed(); renderScene(); };
+  r2.appendChild(ms);
+  box.appendChild(r2);
+  if (f.mode !== 'lock') {
+    var r3 = el('div', 'field');
+    r3.appendChild(el('label', null, 'Dead zone'));
+    r3.appendChild(numInput(f.zw, 1, project.camera.w, function (i) { var v = intIn(i.value, 1, project.camera.w, f.zw); if (v !== f.zw) { snapshot(); f.zw = v; changed(); renderScene(); } }));
+    r3.appendChild(el('span', 'x', '×'));
+    r3.appendChild(numInput(f.zh, 1, project.camera.h, function (i) { var v = intIn(i.value, 1, project.camera.h, f.zh); if (v !== f.zh) { snapshot(); f.zh = v; changed(); renderScene(); } }));
+    box.appendChild(r3);
+  }
+  box.appendChild(el('p', 'note', {
+    lock: 'The camera centres on it every tick: it stays still, the world moves — the most demanding case at this resolution.',
+    zone: 'The camera moves only when it leaves the central box, and only as far as needed.',
+    snap: 'Sideways as Dead zone. Vertically the camera eases back to centre, a pixel a tick, once it stops moving up or down (paths have no physics, so that stands in for landing).'
+  }[f.mode] + ' The camera fields above are where it starts.'));
+}
+
+// Speeds the tick can step evenly: 62.5 px/s is 1 px a tick, 31.25 is 1 px every 2.
+function tickSpeedNote(v) {
+  var ppt = v * TICK_MS / 1000;
+  if (ppt <= 0) return null;
+  var even = (ppt >= 1 && Math.abs(ppt - Math.round(ppt)) < 0.02) || (ppt < 1 && Math.abs(1 / ppt - Math.round(1 / ppt)) < 0.02);
+  if (even) return null;
+  var cands = [];
+  for (var n = 1; n <= 16; n++) { cands.push(1000 / TICK_MS / n); cands.push(1000 / TICK_MS * n); }
+  var best = cands.sort(function (a, b) { return Math.abs(a - v) - Math.abs(b - v); })[0];
+  var per = ppt < 1 ? '1 px every ' + (1 / ppt).toFixed(2) + ' ticks' : ppt.toFixed(2) + ' px a tick';
+  var bper = best * TICK_MS / 1000 < 1 ? '1 px every ' + Math.round(1000 / TICK_MS / best) + ' ticks' : Math.round(best * TICK_MS / 1000) + ' px a tick';
+  return v.toFixed(1) + ' px/s is ' + per + ', so its steps come unevenly; ' + (Math.round(best * 100) / 100) + ' px/s would be ' + bper + '.';
+}
 $('scnLoopOn').onchange = function () { snapshot(); project.scene.loop.on = this.checked; changed(); renderScene(); };
 $('scnLoopS').onchange = function () {
   var ms = intIn(Math.round(parseFloat(this.value) * 1000), 100, 600000, project.scene.loop.ms);
