@@ -839,6 +839,40 @@ screen x 10, a tile in a 1/2 band all 60 of its pixels at x 50; painting in a
 shifted band hit the intended cell. Every tab's right panel fits at 260, 300
 and 640 px.
 
+**Tile situations, counted in 47** (2026-10-03). Eight neighbours make 256
+patterns, but only 47 can look different: a diagonal neighbour matters only
+when both sides beside it are filled -- otherwise that corner is an open edge
+anyway. Repeating a tile in a situation the template already has teaches the
+rules nothing; covering more situations does. So:
+
+- **Lookup order**: a tile drawn for the exact pattern; else one drawn for a
+  pattern that is the same situation counted the 47 way (no magenta corner:
+  it is not a stand-in); else the closest situation, now measured the 47 way
+  so a diagonal that cannot show costs nothing. The exact pattern still comes
+  first because a template may tell diagonals apart on purpose: the brick
+  platformer does (6 conflicts if reduced), and the grass file draws lone
+  tiles four ways by their diagonal neighbours. The Checks list such
+  situations as information, not conflicts.
+- **Coverage**: the Tiles tab's Checks show the 47 as small pictures --
+  drawn (green), planned in the template (amber), not in the template
+  (faded) -- and "N of 47". The stand-in tables group by situation.
+- **Starter**: "All 47 situations" is now the default template: 73 places in
+  11 × 10 with every situation at least once (found by a search -- not proven
+  the smallest). Where a situation repeats, place the tile already drawn.
+  The dialog says how many of the 47 any template, including one from a
+  picture, has places for.
+
+**How it was proven** (2026-10-03): the rule functions were lifted from the
+page and run outside the browser on the grass file's template (dumped
+read-only): 39 patterns, 0 conflicts, **22 of 47** situations drawn, 1 more
+planned (the starter platformer layout holds 23 of 47 even fully drawn). On
+120 random levels, all 16,018 cells tiled exactly before are unchanged; of
+7,582 stand-ins, 5,130 are now the same situation, 306 of them with a better
+tile -- e.g. a top-right corner with ground to the south-west was given tile
+9 (drawn for an *empty* south-west, picked by a tie) and now gets 16, the
+plain corner. The 47 template filled with one tile per situation tiled
+42,706 random-level cells with 0 stand-ins and 0 wrong tiles.
+
 Next: the palette draft-and-promote workflow, then a particle explorer. Open
 for tiles: a depth rule ("top lit, fading to black below" needs more than one
 tile of context) and the engine's tilemap format, including where tiles draw

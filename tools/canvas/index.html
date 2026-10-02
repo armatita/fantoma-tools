@@ -231,6 +231,10 @@ table.cover td.plan { color: var(--ink-dim); font-family: inherit; }
 table.cover td.new { color: var(--warn); font-family: inherit; }
 canvas.tplprev { display: block; image-rendering: pixelated; margin: 8px 0 4px; border: 1px solid var(--line); }
 ul.warns li canvas.glyph { margin-right: 4px; }
+.sitgrid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.sitgrid canvas.glyph.drawn { border-color: var(--ok); }
+.sitgrid canvas.glyph.plan { border-color: var(--warn); }
+.sitgrid canvas.glyph.none { opacity: 0.3; }
 #scnViewWrap { display: flex; justify-content: center; background: #000; border-radius: 6px; padding: 8px 0; }
 #scnView { display: block; image-rendering: pixelated; }
 /* Space reserved even while empty: text appearing as the pointer enters
@@ -4987,10 +4991,17 @@ $('objLinkBtn').onclick = linkAseprite;
    picture of every place a tile can stand. The template is the rule set --
    no rules are written by hand. For each template cell its eight
    neighbours, filled or empty, describe the situation that tile was drawn
-   for; the tilemap says which tile was drawn there. Pedro's platformer
-   template, read this literal way, has no conflicts (measured 2026-10-01;
-   the usual shortcut of ignoring a diagonal unless both sides beside it are
-   filled gives six), so the literal reading is the one used.
+   for; the tilemap says which tile was drawn there.
+
+   Of the 256 neighbour patterns only 47 can look different: a diagonal
+   neighbour matters only when both sides beside it are filled -- otherwise
+   that corner is an open edge already. So a cell is tiled by (1) a tile
+   drawn for its exact pattern, else (2) one drawn for a pattern that is the
+   same situation counted the 47 way, else (3) the closest drawn situation.
+   Looking up the exact pattern first keeps a template that DOES tell
+   diagonals apart (Pedro's grass file draws lone tiles four ways by their
+   diagonal neighbours, measured 2026-10-02) working as drawn; the 47 count
+   is what coverage is measured in.
 
    The template comes from a layer named "template" when there is one, so a
    cell that has no tile yet is "not drawn yet" rather than empty space --
@@ -5008,6 +5019,8 @@ $('objLinkBtn').onclick = linkAseprite;
 var NB = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];   // N NE E SE S SW W NW
 var NB_NAMES = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 var TILE_X = 1, TILE_Y = 2, TILE_D = 4;                    // flip bits as stored here
+// Every one of the 47 situations at least once, in few places (found by search, 2026-10-02).
+var TEMPLATE_47 = [".##.###.#..", "#####.##.#.", ".#.#.#####.", "###########", "##..##.###.", ".#...####..", "###..#.###.", ".#.####.##.", "#########..", ".##.#.#.##."];
 var TEMPLATE_BASIC = ["###.###.#.##..#.", "....###...###..#", "##..###.#..##.#.", ".##.....#......#",
                       "....###.....#...", ".#..#.#..#.###..", "###.###.##..#..."];
 
@@ -5024,6 +5037,23 @@ function maskAt(occ, w, h, x, y, clamp) {
     if (xx >= 0 && yy >= 0 && xx < w && yy < h && occ[yy * w + xx]) m |= 1 << i;
   }
   return m;
+}
+// The same situation counted the 47 way: drop each diagonal whose two
+// sides are not both filled.
+function reduceMask(m) {
+  for (var i = 1; i < 8; i += 2) if (!(m & (1 << (i - 1))) || !(m & (1 << ((i + 1) % 8)))) m &= ~(1 << i);
+  return m;
+}
+var SITUATIONS = (function () {                 // the 47, fewest sides first
+  var seen = {}, out = [];
+  for (var m = 0; m < 256; m++) { var r = reduceMask(m); if (!seen[r]) { seen[r] = true; out.push(r); } }
+  function bits(m) { var c = 0; while (m) { c += m & 1; m >>= 1; } return c; }
+  return out.sort(function (a, b) { return bits(a & 0x55) - bits(b & 0x55) || (a & 0x55) - (b & 0x55) || bits(a) - bits(b) || a - b; });
+}());
+function templateSituations(occ, w, h) {        // which of the 47 a template has places for
+  var got = {};
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) if (occ[y * w + x]) got[reduceMask(maskAt(occ, w, h, x, y))] = true;
+  return got;
 }
 function maskName(m) {
   var out = NB_NAMES.filter(function (_, i) { return m & (1 << i); });
@@ -5190,9 +5220,19 @@ function tilesetRules(ts) {
     rules[k] = ch[0];
     if (ch.length > 1) conflicts.push({ mask: e.mask, choices: ch });
   });
-  var planned = {};
-  undrawn.forEach(function (c) { planned[maskAt(ts.occ, w, h, c.x, c.y)] = true; });
-  return { rules: rules, masks: Object.keys(rules).map(Number), conflicts: conflicts, undrawn: undrawn, outside: outside, used: used, planned: planned };
+  // Grouped the 47 way: which situations are drawn, and where a template
+  // draws one situation differently by a diagonal.
+  var byR = {}, split = [];
+  Object.keys(rules).forEach(function (k) { var r = reduceMask(+k); (byR[r] = byR[r] || []).push(+k); });
+  Object.keys(byR).forEach(function (r) {
+    var kinds = {};
+    byR[r].forEach(function (k) { kinds[rules[k].id + ':' + rules[k].flip] = true; });
+    if (Object.keys(kinds).length > 1) split.push({ mask: +r, masks: byR[r] });
+  });
+  var planned = {};                               // keyed the 47 way
+  undrawn.forEach(function (c) { planned[reduceMask(maskAt(ts.occ, w, h, c.x, c.y))] = true; });
+  return { rules: rules, masks: Object.keys(rules).map(Number), conflicts: conflicts, undrawn: undrawn, outside: outside, used: used,
+           planned: planned, byR: byR, split: split };
 }
 
 // Closest drawn situation: a side neighbour weighs four times a diagonal.
@@ -5201,6 +5241,17 @@ function maskCost(a, b) {
   for (var i = 0; i < 8; i++) if (d & (1 << i)) c += (i % 2 === 0) ? 4 : 1;
   return c;
 }
+// Not drawn exactly: the same situation counted the 47 way if one is drawn
+// (nearest pattern among them), else the closest situation -- measured the
+// 47 way, so a diagonal that cannot show costs nothing.
+function nearestRule(R, m) {
+  var rm = reduceMask(m), best = -1, bc = Infinity, bl = Infinity;
+  R.masks.forEach(function (k) {
+    var c = maskCost(rm, reduceMask(k)), l = maskCost(m, k);
+    if (c < bc || (c === bc && (l < bl || (l === bl && k < best)))) { bc = c; bl = l; best = k; }
+  });
+  return { via: best, same: bc === 0 };
+}
 function autotile(level, R, clamp) {
   var w = level.w, h = level.h, out = new Array(w * h), missing = {};
   var near = {};
@@ -5208,17 +5259,13 @@ function autotile(level, R, clamp) {
     for (var x = 0; x < w; x++) {
       var i = y * w + x;
       if (!level.cells[i]) { out[i] = null; continue; }
-      var m = maskAt(level.cells, w, h, x, y, clamp), r = R.rules[m];
-      if (r) { out[i] = { id: r.id, flip: r.flip, mask: m, exact: true }; continue; }
-      if (!(m in near)) {
-        var best = -1, bc = Infinity;
-        R.masks.forEach(function (k) { var c = maskCost(m, k); if (c < bc || (c === bc && k < best)) { bc = c; best = k; } });
-        near[m] = best;
-      }
-      var rb = near[m] >= 0 ? R.rules[near[m]] : null;
-      out[i] = { id: rb ? rb.id : 0, flip: rb ? rb.flip : 0, mask: m, exact: false, via: near[m] };
-      (missing[m] = missing[m] || { mask: m, count: 0, cells: [], via: near[m] }).count++;
-      missing[m].cells.push(i);
+      var m = maskAt(level.cells, w, h, x, y, clamp), r = R.rules[m], rm = reduceMask(m);
+      if (r) { out[i] = { id: r.id, flip: r.flip, mask: m, rmask: rm, exact: true }; continue; }
+      var n = near[m] || (near[m] = nearestRule(R, m)), rb = n.via >= 0 ? R.rules[n.via] : null;
+      out[i] = { id: rb ? rb.id : 0, flip: rb ? rb.flip : 0, mask: m, rmask: rm, exact: n.same, same: n.same, via: n.via };
+      if (n.same) continue;
+      (missing[rm] = missing[rm] || { mask: rm, count: 0, cells: [], via: n.via }).count++;
+      missing[rm].cells.push(i);
     }
   }
   return { tiles: out, missing: Object.keys(missing).map(function (k) { return missing[k]; }).sort(function (a, b) { return b.count - a.count; }) };
@@ -5380,7 +5427,7 @@ function drawTiles() {
     tsTiled.tiles.forEach(function (t, i) {
       if (!t || t.exact) return;
       var q = cellRect(i % gw, Math.floor(i / gw));
-      var hi = ui.tsHi === t.mask;
+      var hi = ui.tsHi === t.rmask;
       g.fillStyle = hi ? '#ffd166' : '#ff3ea5';
       g.beginPath(); g.moveTo(q[0], q[1]); g.lineTo(q[0] + Math.max(4, q[2] / 3), q[1]); g.lineTo(q[0], q[1] + Math.max(4, q[3] / 3)); g.fill();
       if (hi) { g.strokeStyle = '#ffd166'; g.lineWidth = 2; g.strokeRect(q[0] + 1, q[1] + 1, q[2] - 2, q[3] - 2); g.lineWidth = 1; }
@@ -5513,8 +5560,36 @@ function renderTsChecks() {
   if (unused.length) li('info', 'Tile' + (unused.length === 1 ? ' ' : 's ') + unused.join(', ') + (unused.length === 1 ? ' is' : ' are') + ' in the tileset but placed nowhere.');
   var flipped = ts.map.flips.filter(Boolean).length;
   if (flipped) li('info', flipped + ' cell' + (flipped === 1 ? ' uses a' : 's use') + ' flipped tile' + (flipped === 1 ? '' : 's') + ' (marked ′). Whether the engine’s tilemap will flip tiles is not decided.');
-  li('info', R.masks.length + ' situation' + (R.masks.length === 1 ? '' : 's') + ' drawn, of 256 possible.');
+  R.split.forEach(function (sp) {
+    var s = el('span');
+    s.appendChild(maskGlyph(sp.mask));
+    s.appendChild(document.createTextNode(' One situation counted the 47 way, drawn as tiles '
+      + sp.masks.map(function (k) { return R.rules[k].id + (R.rules[k].flip ? '′' : '') + ' (' + maskName(k) + ')'; }).join(', ')
+      + ': told apart by diagonals. Each pattern keeps its own tile; any other pattern of it takes the nearest.'));
+    li('info', s);
+  });
   box.appendChild(ul);
+
+  // Coverage, counted in the 47 situations that can look different.
+  var nDrawn = 0, nPlan = 0;
+  SITUATIONS.forEach(function (m) { if (R.byR[m]) nDrawn++; else if (R.planned[m]) nPlan++; });
+  var nNone = 47 - nDrawn - nPlan;
+  box.appendChild(el('span', 'lbl', 'Situations'));
+  box.appendChild(el('p', 'note' + (nNone ? ' warn' : ''), nDrawn + ' of 47 drawn'
+    + (nPlan ? ', ' + nPlan + ' planned (in the template, no tile yet)' : '')
+    + (nNone ? ', ' + nNone + ' not in the template at all (faded)' : '') + '.'));
+  var grid = el('div', 'sitgrid');
+  SITUATIONS.forEach(function (m) {
+    var g = maskGlyph(m, 5), st = R.byR[m] ? 'drawn' : R.planned[m] ? 'plan' : 'none';
+    g.classList.add(st);
+    g.title = maskName(m) + ' — ' + (st === 'drawn'
+      ? 'tile ' + R.byR[m].map(function (k) { return R.rules[k].id + (R.rules[k].flip ? '′' : ''); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ')
+      : st === 'plan' ? 'planned: the template has a place for it, not drawn yet' : 'not in the template');
+    grid.appendChild(g);
+  });
+  box.appendChild(grid);
+  box.appendChild(el('p', 'note', 'Purple is the tile, grey its filled neighbours. A diagonal counts only when both sides beside it are filled; '
+    + 'otherwise that corner is an open edge anyway, which is why 256 patterns make 47 situations. Green: drawn. Amber: planned.'));
 }
 
 function renderTsLevel() {
@@ -5622,7 +5697,7 @@ tsCv.addEventListener('pointermove', function (e) {
   var i = y * gw + x, txt = 'cell ' + x + ', ' + y;
   if (level) {
     var t = tsTiled.tiles[i];
-    if (t) txt += ' · ' + maskName(t.mask) + ' · tile ' + t.id + (t.exact ? '' : ' (closest)');
+    if (t) txt += ' · ' + maskName(t.mask) + ' · tile ' + t.id + (t.same ? ' (same situation, drawn for ' + maskName(t.via) + ')' : t.exact ? '' : ' (closest)');
   } else if (ts.occ[i] || ts.map.ids[i]) {
     txt += ' · ' + maskName(maskAt(ts.occ, gw, gh, x, y)) + (ts.map.ids[i] ? ' · tile ' + ts.map.ids[i] : ' · not drawn yet');
   }
@@ -5775,8 +5850,12 @@ function templateFromPicture(img, cell) {
 function showStarter() {
   openModal('New tileset starter file');
   var body = $('modalBody'), foot = $('modalFoot');
-  var st = { tpl: { occ: [], w: TEMPLATE_BASIC[0].length, h: TEMPLATE_BASIC.length }, T: ui.tsTile || 8, name: 'tileset' };
-  TEMPLATE_BASIC.forEach(function (r) { for (var i = 0; i < r.length; i++) st.tpl.occ.push(r[i] === '#' ? 1 : 0); });
+  function fromRows(rows) {
+    var t = { occ: [], w: rows[0].length, h: rows.length };
+    rows.forEach(function (r) { for (var i = 0; i < r.length; i++) t.occ.push(r[i] === '#' ? 1 : 0); });
+    return t;
+  }
+  var st = { tpl: fromRows(TEMPLATE_47), T: ui.tsTile || 8, name: 'tileset' };
   body.appendChild(el('p', 'note', 'Canvas writes an Aseprite file: your template as a locked layer, and an empty tilemap layer over it '
     + 'at the tile size below. Draw tiles on “tiles”; where the same tile belongs twice, place it again from the tileset rather than redrawing it.'));
   body.appendChild(el('h4', 'mh', 'Template'));
@@ -5788,11 +5867,15 @@ function showStarter() {
     g.fillStyle = '#c8c8cd';
     for (var y = 0; y < st.tpl.h; y++) for (var x = 0; x < st.tpl.w; x++) if (st.tpl.occ[y * st.tpl.w + x]) g.fillRect(x * s, y * s, s - 1, s - 1);
     var n = st.tpl.occ.filter(Boolean).length;
-    info.textContent = st.tpl.w + ' × ' + st.tpl.h + ' cells, ' + n + ' places → a ' + (st.tpl.w * st.T) + ' × ' + (st.tpl.h * st.T) + ' px file.';
+    var cov = Object.keys(templateSituations(st.tpl.occ, st.tpl.w, st.tpl.h)).length;
+    info.textContent = st.tpl.w + ' × ' + st.tpl.h + ' cells, ' + n + ' places → a ' + (st.tpl.w * st.T) + ' × ' + (st.tpl.h * st.T) + ' px file. '
+      + 'It has places for ' + cov + ' of the 47 situations' + (cov < 47 ? '; the others will take the closest one drawn.' : '.');
   }
   var r1 = el('div', 'btnrow');
-  var b1 = el('button', 'chip', 'Platformer (built in)'); b1.type = 'button';
-  b1.onclick = function () { st.tpl = { occ: [], w: TEMPLATE_BASIC[0].length, h: TEMPLATE_BASIC.length }; TEMPLATE_BASIC.forEach(function (r) { for (var i = 0; i < r.length; i++) st.tpl.occ.push(r[i] === '#' ? 1 : 0); }); draw(); };
+  var b0 = el('button', 'chip', 'All 47 situations'); b0.type = 'button';
+  b0.onclick = function () { st.tpl = fromRows(TEMPLATE_47); draw(); };
+  var b1 = el('button', 'chip', 'Platformer (smaller)'); b1.type = 'button';
+  b1.onclick = function () { st.tpl = fromRows(TEMPLATE_BASIC); draw(); };
   var b2 = el('button', 'chip', 'From a picture…'); b2.type = 'button';
   b2.onclick = function () {
     var input = document.createElement('input'); input.type = 'file'; input.accept = 'image/png,image/*';
@@ -5808,7 +5891,7 @@ function showStarter() {
     };
     input.click();
   };
-  r1.appendChild(b1); r1.appendChild(b2);
+  r1.appendChild(b0); r1.appendChild(b1); r1.appendChild(b2);
   body.appendChild(r1); body.appendChild(prev); body.appendChild(info);
   body.appendChild(el('h4', 'mh', 'Tile size'));
   var tr = el('div', 'pickrow');
@@ -6014,12 +6097,12 @@ function drawTileOverlays(g, gm) {
   });
   var tm = currentTm(), ts = tm && findTileset(tm.tileset);
   if (tm && ts && ui.scnTmHi !== null && ui.scnTmHi !== undefined) {
-    var TH = tmTiled(tm);
+    var TH = tmTiled(tm), hsh = bandShift(tm.band);
     if (TH) {
       g.strokeStyle = '#ffd166'; g.lineWidth = 2;
       TH.tiles.forEach(function (t, i) {
-        if (!t || t.exact || t.mask !== ui.scnTmHi) return;
-        g.strokeRect(X((i % tm.cols) * ts.tw) + 1, Y(Math.floor(i / tm.cols) * ts.th) + 1, ts.tw * k - 2, ts.th * k - 2);
+        if (!t || t.exact || t.rmask !== ui.scnTmHi) return;
+        g.strokeRect(X((i % tm.cols) * ts.tw + hsh.x) + 1, Y(Math.floor(i / tm.cols) * ts.th + hsh.y) + 1, ts.tw * k - 2, ts.th * k - 2);
       });
       g.lineWidth = 1;
     }
