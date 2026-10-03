@@ -5026,8 +5026,42 @@ $('objLinkBtn').onclick = linkAseprite;
 var NB = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];   // N NE E SE S SW W NW
 var NB_NAMES = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 var TILE_X = 1, TILE_Y = 2, TILE_D = 4;                    // flip bits as stored here
-// Every one of the 47 situations at least once, in few places (found by search, 2026-10-02).
-var TEMPLATE_47 = [".##.###.#..", "#####.##.#.", ".#.#.#####.", "###########", "##..##.###.", ".#...####..", "###..#.###.", ".#.####.##.", "#########..", ".##.#.#.##."];
+// Pedro's 47-tile catalogue (his sheet of 2026-10-03), built in: tile k
+// sits in row (k-1)/10, column 2*((k-1)%10) + row%2, and these are the
+// situations decoded from his markings, tile 1 to 47.
+var CATALOGUE_47 = [0, 4, 16, 64, 1, 28, 112, 7, 193, 124, 241, 199, 31, 85, 93, 117, 213, 87, 215, 125, 95, 245, 253, 247, 223, 127, 20, 80, 5, 65, 84, 81, 69, 21, 92, 113, 197, 23, 116, 209, 71, 29, 119, 221, 17, 68, 255];
+var DIGITS_3X5 = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001',
+                  '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111'];
+// The catalogue as Canvas draws it: his fills and markings on 30 px cells
+// (6 px strips), each tile's number in a 3x5 font at double size -- small
+// enough that the cell's fill stays its commonest colour, so the picture
+// reads back as the same catalogue.
+function builtinCatalogue() {
+  var C = 30, B = 6, mw = 20, mh = 5, W = mw * C, H = mh * C;
+  var data = new Uint8ClampedArray(W * H * 4), occ = new Array(mw * mh).fill(0), sit = new Array(mw * mh).fill(0);
+  function put(x, y, c) { var o = (y * W + x) * 4; data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 255; }
+  CATALOGUE_47.forEach(function (m, k) {
+    var r = Math.floor(k / 10), cx = 2 * (k % 10) + r % 2;
+    occ[r * mw + cx] = 1; sit[r * mw + cx] = m;
+    var fill = r % 2 ? [53, 55, 63] : [63, 66, 75], mark = [112, 126, 143];
+    for (var y = 0; y < C; y++) for (var x = 0; x < C; x++) {
+      var n = y < B, s = y >= C - B, w = x < B, e = x >= C - B;
+      var on = (n && !(m & 1)) || (e && !(m & 4)) || (s && !(m & 16)) || (w && !(m & 64))
+        || (n && e && (m & 5) === 5 && !(m & 2)) || (s && e && (m & 20) === 20 && !(m & 8))
+        || (s && w && (m & 80) === 80 && !(m & 32)) || (n && w && (m & 65) === 65 && !(m & 128));
+      put(cx * C + x, r * C + y, on ? mark : fill);
+    }
+    var txt = String(k + 1), tw = txt.length * 7 - 1, x0 = cx * C + Math.floor((C - tw) / 2), y0 = r * C + 10;
+    for (var d = 0; d < txt.length; d++) {
+      var gl = DIGITS_3X5[+txt.charAt(d)];
+      for (var gy = 0; gy < 5; gy++) for (var gx = 0; gx < 3; gx++) {
+        if (gl.charAt(gy * 3 + gx) !== '1') continue;
+        for (var sy = 0; sy < 2; sy++) for (var sx = 0; sx < 2; sx++) put(x0 + d * 7 + gx * 2 + sx, y0 + gy * 2 + sy, [153, 153, 153]);
+      }
+    }
+  });
+  return { occ: occ, w: mw, h: mh, cell: C, sit: sit, unclear: [], img: { w: W, h: H, data: data }, builtin: true };
+}
 var TEMPLATE_BASIC = ["###.###.#.##..#.", "....###...###..#", "##..###.#..##.#.", ".##.....#......#",
                       "....###.....#...", ".#..#.#..#.###..", "###.###.##..#..."];
 
@@ -5999,9 +6033,10 @@ function showStarter() {
     rows.forEach(function (r) { for (var i = 0; i < r.length; i++) t.occ.push(r[i] === '#' ? 1 : 0); });
     return t;
   }
-  var st = { tpl: fromRows(TEMPLATE_47), T: ui.tsTile || 8, name: 'tileset' };
+  var st = { tpl: builtinCatalogue(), T: ui.tsTile || 8, name: 'tileset' };
   body.appendChild(el('p', 'note', 'Canvas writes an Aseprite file: your template as a locked layer, and an empty tilemap layer over it '
-    + 'at the tile size below. Draw tiles on “tiles”; where the same tile belongs twice, place it again from the tileset rather than redrawing it.'));
+    + 'at the tile size below. Draw tiles on “tiles”. In a catalogue, draw each tile once over its number; in a template read by neighbours, '
+    + 'where the same tile belongs twice, place it again from the tileset rather than redrawing it.'));
   body.appendChild(el('h4', 'mh', 'Template'));
   var prev = document.createElement('canvas'); prev.className = 'tplprev';
   var info = el('p', 'note');
@@ -6026,7 +6061,7 @@ function showStarter() {
       var got = {}, dup = 0;
       st.tpl.occ.forEach(function (o, i) { if (!o) return; var r = reduceMask(st.tpl.sit[i]); if (got[r]) dup++; got[r] = true; });
       var cv = Object.keys(got).length;
-      info.textContent = 'Read as a catalogue: ' + n + ' places on ' + st.tpl.w + ' × ' + st.tpl.h + ' cells of ' + st.tpl.cell + ' px, labelled by their markings, '
+      info.textContent = (st.tpl.builtin ? 'The 47-tile catalogue, built in: ' : 'Read as a catalogue: ') + n + ' places on ' + st.tpl.w + ' × ' + st.tpl.h + ' cells of ' + st.tpl.cell + ' px, labelled by their markings, '
         + cv + ' of the 47 situations' + (dup ? ' (' + dup + ' place' + (dup === 1 ? '' : 's') + ' repeat a situation)' : '')
         + (st.tpl.unclear && st.tpl.unclear.length ? '; ' + st.tpl.unclear.length + ' with a side only partly marked' : '')
         + '. The file: ' + (st.tpl.w * st.T) + ' × ' + (st.tpl.h * st.T) + ' px, the picture kept as a reference layer for its numbers.';
@@ -6037,9 +6072,9 @@ function showStarter() {
       + 'It has places for ' + cov + ' of the 47 situations' + (cov < 47 ? '; the others will take the closest one drawn.' : '.');
   }
   var r1 = el('div', 'btnrow');
-  var b0 = el('button', 'chip', 'All 47 situations'); b0.type = 'button';
-  b0.onclick = function () { st.tpl = fromRows(TEMPLATE_47); draw(); };
-  var b1 = el('button', 'chip', 'Platformer (smaller)'); b1.type = 'button';
+  var b0 = el('button', 'chip', '47-tile catalogue'); b0.type = 'button';
+  b0.onclick = function () { st.tpl = builtinCatalogue(); st.name = 'tileset'; draw(); };
+  var b1 = el('button', 'chip', 'Platformer (by neighbours)'); b1.type = 'button';
   b1.onclick = function () { st.tpl = fromRows(TEMPLATE_BASIC); draw(); };
   var b2 = el('button', 'chip', 'From a picture…'); b2.type = 'button';
   b2.onclick = function () {

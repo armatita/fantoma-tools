@@ -856,9 +856,11 @@ rules nothing; covering more situations does. So:
 - **Coverage**: the Tiles tab's Checks show the 47 as small pictures --
   drawn (green), planned in the template (amber), not in the template
   (faded) -- and "N of 47". The stand-in tables group by situation.
-- **Starter**: "All 47 situations" is now the default template: 73 places in
+- **Starter**: "All 47 situations" became the default template: 73 places in
   11 × 10 with every situation at least once (found by a search -- not proven
-  the smallest). Where a situation repeats, place the tile already drawn.
+  the smallest). The same day it was **replaced by the built-in 47-tile
+  catalogue** (below), which needs each tile drawn once rather than placed
+  among the right neighbours. Where a situation repeats, place the tile already drawn.
   The dialog says how many of the 47 any template, including one from a
   picture, has places for.
 
@@ -894,6 +896,13 @@ markings at all is the interior tile, ground all round.
   layer** `numbers` scaled exactly onto the grid (Aseprite's precise cel
   bounds), and an empty `tiles` tilemap. Draw each tile once, over its number.
 - The Tiles tab shows a catalogue's markings under places not drawn yet.
+- **Built in**: the starter's default is Pedro's catalogue itself -- his
+  layout and numbering, the 47 situations decoded from his sheet stored in
+  the page, and the picture drawn by Canvas (30 px cells, numbers in a 3×5
+  pixel font at double size, small enough that each cell's fill stays its
+  commonest colour). Proven: the stored situations equal his sheet's tile by
+  tile, the drawn picture reads back through "From a picture" as the same
+  catalogue, and Aseprite opens the starter it makes.
 
 **How it was proven** (2026-10-03, outside the browser, with the page's own
 functions run under Node): Pedro's sheet (500 × 125, 25 px cells) read as
