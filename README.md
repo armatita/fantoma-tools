@@ -873,6 +873,41 @@ tile -- e.g. a top-right corner with ground to the south-west was given tile
 plain corner. The 47 template filled with one tile per situation tiled
 42,706 random-level cells with 0 stand-ins and 0 wrong tiles.
 
+**Catalogue templates** (2026-10-03). A neighbour template has to place
+every tile among exactly the right neighbours (hence the odd 73-place blob).
+A **catalogue** labels each tile instead, so the places can sit anywhere --
+Pedro's 47-tile sheet is a checkerboard of numbered cells. The markings: a
+strip along a side means that side is **open** (the ground ends there); a
+block in a corner whose two sides are closed means an **inner notch**; no
+markings at all is the interior tile, ground all round.
+
+- A layer named **`catalogue`** is read by its markings; a layer named
+  `template` keeps the neighbour reading (and Canvas says so if it looks
+  marked). A marking is any colour other than the cell's fill, which is
+  taken from the cell's inner square, so a wide strip or a number in the
+  middle does not fool it. Each side is sampled at three points: a side with
+  only one or two marked is reported as unclear. Two places with the same
+  markings are reported too.
+- **Starter from a picture**: a picture whose cells carry different markings
+  is read as a catalogue. The file written has the markings redrawn at the
+  tile size on `catalogue` (locked), the picture itself as a **reference
+  layer** `numbers` scaled exactly onto the grid (Aseprite's precise cel
+  bounds), and an empty `tiles` tilemap. Draw each tile once, over its number.
+- The Tiles tab shows a catalogue's markings under places not drawn yet.
+
+**How it was proven** (2026-10-03, outside the browser, with the page's own
+functions run under Node): Pedro's sheet (500 × 125, 25 px cells) read as
+47 places, 47 different situations covering all 47, none unclear; tile 6 is
+the top-left corner, 14 the four-notch cross, 47 the interior. The starters
+written at 8 and 16 px were opened by Aseprite 1.3.17 (`catalogue` locked,
+`numbers` a reference layer, its 500 × 125 picture shown at 160 × 40, an 8 px
+tilemap) and saved again by it; Canvas read its own files and Aseprite's
+copies back with identical situations. Aseprite then drew a distinct tile at
+each numbered place: Canvas read 47 rules, 0 conflicts, 47 of 47, and tiled
+42,706 random-level cells with 0 stand-ins and none given a tile labelled
+for another situation. The grass file reads identically to before (11,800
+level cells unchanged) and the plain starter's bytes are unchanged.
+
 Next: the palette draft-and-promote workflow, then a particle explorer. Open
 for tiles: a depth rule ("top lit, fading to black below" needs more than one
 tile of context) and the engine's tilemap format, including where tiles draw

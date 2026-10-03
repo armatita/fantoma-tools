@@ -5003,6 +5003,13 @@ $('objLinkBtn').onclick = linkAseprite;
    diagonal neighbours, measured 2026-10-02) working as drawn; the 47 count
    is what coverage is measured in.
 
+   A CATALOGUE is the other way to say what each tile is for: one place per
+   tile, anywhere, labelled by markings instead of by its neighbours -- a
+   strip along a side means that side is open, a block in a corner whose
+   two sides are closed means an inner notch (Pedro's 47-tile sheet,
+   2026-10-03). A layer named "catalogue" is read this way; a layer named
+   "template" keeps the neighbour reading.
+
    The template comes from a layer named "template" when there is one, so a
    cell that has no tile yet is "not drawn yet" rather than empty space --
    otherwise every neighbour of an undrawn cell would be judged against the
@@ -5055,6 +5062,58 @@ function templateSituations(occ, w, h) {        // which of the 47 a template ha
   for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) if (occ[y * w + x]) got[reduceMask(maskAt(occ, w, h, x, y))] = true;
   return got;
 }
+// A catalogue place's markings -> its situation (a mask counted the 47 way).
+// px(x, y) gives [r, g, b, a]. The cell's fill is the commonest colour of
+// its inner square, so wide strips or a number in the middle do not fool
+// it; a marking is any other opaque colour, sampled at three points along
+// each edge band and at each corner.
+function readMarks(px, x0, y0, T) {
+  function key(c) { return c[3] < 128 ? null : c[0] + ',' + c[1] + ',' + c[2]; }
+  var a = Math.floor(T / 4), count = {}, fill = null, fn = 0;
+  for (var y = a; y < T - a; y++) for (var x = a; x < T - a; x++) {
+    var k = key(px(x0 + x, y0 + y));
+    if (k === null) continue;
+    count[k] = (count[k] || 0) + 1;
+    if (count[k] > fn) { fn = count[k]; fill = k; }
+  }
+  if (fill === null) return null;
+  function mk(x, y) { var k = key(px(x0 + x, y0 + y)); return k !== null && k !== fill; }
+  var b = Math.floor(T / 10), e = T - 1 - b, q = [a, Math.floor(T / 2), T - 1 - a], unclear = false;
+  function side(f) {
+    var n = 0;
+    q.forEach(function (t) { if (f(t)) n++; });
+    if (n === 1 || n === 2) unclear = true;
+    return n >= 2;
+  }
+  var open = [side(function (t) { return mk(t, b); }), side(function (t) { return mk(e, t); }),
+              side(function (t) { return mk(t, e); }), side(function (t) { return mk(b, t); })];   // N E S W
+  var notch = [mk(e, b), mk(e, e), mk(b, e), mk(b, b)];                                            // NE SE SW NW
+  var m = 0;
+  for (var i = 0; i < 4; i++) {
+    if (!open[i]) m |= 1 << (2 * i);
+    if (!open[i] && !open[(i + 1) % 4] && !notch[i]) m |= 1 << (2 * i + 1);
+  }
+  return { mask: m, unclear: unclear };
+}
+// A whole picture or layer read as a catalogue: cells with a fill, and
+// their situations.
+function readCatalogue(px, mw, mh, T) {
+  var occ = new Array(mw * mh).fill(0), sit = new Array(mw * mh).fill(0), unclear = [];
+  for (var cy = 0; cy < mh; cy++) for (var cx = 0; cx < mw; cx++) {
+    var r = readMarks(px, cx * T, cy * T, T);
+    if (!r) continue;
+    occ[cy * mw + cx] = 1; sit[cy * mw + cx] = r.mask;
+    if (r.unclear) unclear.push([cx, cy]);
+  }
+  var kinds = {};
+  occ.forEach(function (o, i) { if (o) kinds[sit[i]] = true; });
+  return { occ: occ, sit: sit, unclear: unclear, kinds: Object.keys(kinds).length };
+}
+// A template cell's situation: its markings in a catalogue, else its
+// neighbours.
+function cellSit(ts, x, y) {
+  return ts.sit ? ts.sit[y * ts.map.w + x] : maskAt(ts.occ, ts.map.w, ts.map.h, x, y);
+}
 function maskName(m) {
   var out = NB_NAMES.filter(function (_, i) { return m & (1 << i); });
   return out.length ? out.join(' ') : 'alone';
@@ -5106,10 +5165,33 @@ function analyseTilesetFile(file) {
     }
     // The template: a layer named "template", any visibility. A cell counts
     // as part of the shape when over half of it is drawn.
-    var occ = new Array(mw * mh).fill(0), tplIdx = -1;
-    raw.layers.forEach(function (x, i) { if (tplIdx < 0 && x.type === 0 && /template/i.test(x.name)) tplIdx = i; });
-    var tcel = tplIdx >= 0 ? raw.celFor(0, tplIdx) : null;
-    if (tcel) {
+    var occ = new Array(mw * mh).fill(0), tplIdx = -1, catIdx = -1, cat = null;
+    raw.layers.forEach(function (x, i) {
+      if (x.type !== 0 || x.reference) return;
+      if (catIdx < 0 && /catalog/i.test(x.name)) catIdx = i;
+      if (tplIdx < 0 && /template/i.test(x.name)) tplIdx = i;
+    });
+    function celPx(c) {                  // sprite coordinates -> the cel's pixel, clear outside it
+      return function (x, y) {
+        var lx = x - c.x, ly = y - c.y;
+        return lx < 0 || ly < 0 || lx >= c.w || ly >= c.h ? [0, 0, 0, 0] : raw.pixelAt(c.data, ly * c.w + lx, false);
+      };
+    }
+    var ccel = catIdx >= 0 ? raw.celFor(0, catIdx) : null;
+    var tcel = !ccel && tplIdx >= 0 ? raw.celFor(0, tplIdx) : null;
+    if (ccel) {
+      if (tw !== th) throw new Error('A catalogue needs square tiles; these are ' + tw + '×' + th + '.');
+      cat = readCatalogue(celPx(ccel), mw, mh, tw);
+      occ = cat.occ;
+      if (cat.unclear.length) notes.push({ cls: 'warn', text: cat.unclear.length + ' catalogue place' + (cat.unclear.length === 1 ? ' has' : 's have')
+        + ' a side only partly marked (' + cat.unclear.slice(0, 4).map(function (c) { return c[0] + ',' + c[1]; }).join('; ')
+        + (cat.unclear.length > 4 ? '…' : '') + '); read as open where two of three points are marked.' });
+    } else if (tcel) {
+      if (tw === th) {
+        var look = readCatalogue(celPx(tcel), mw, mh, tw);
+        if (look.kinds > 1) notes.push({ cls: 'info', text: 'The “' + raw.layers[tplIdx].name + '” layer has markings that differ from place to place. '
+          + 'It is read by neighbours; to read the markings instead, rename the layer “catalogue”.' });
+      }
       var count = new Array(mw * mh).fill(0);
       for (var y = 0; y < tcel.h; y++) {
         for (var x = 0; x < tcel.w; x++) {
@@ -5136,7 +5218,7 @@ function analyseTilesetFile(file) {
     return { base: cName(file.name.replace(/\.(aseprite|ase)$/i, '')), tw: tw, th: th, mw: mw, mh: mh,
              tiles: tiles, ids: ids, flips: flips, occ: occ, colours: colours, transparent: transparent,
              notes: r.notes.filter(function (n) { return !/Hidden layers|Reference layers/.test(n.text); }).concat(notes),
-             template: tcel ? 'layer' : 'tiles' };
+             template: cat ? 'catalogue' : tcel ? 'layer' : 'tiles', sit: cat ? cat.sit : null, unclear: cat ? cat.unclear : [] };
   });
 }
 
@@ -5165,6 +5247,8 @@ function commitTileset(an, palId, existing, fileName, quiet) {
   ts.map = { w: an.mw, h: an.mh, ids: an.ids.slice(), flips: an.flips.slice() };
   ts.occ = an.occ.slice();
   ts.template = an.template;
+  ts.sit = an.sit ? an.sit.slice() : null;
+  ts.unclear = (an.unclear || []).slice();
   if (!existing) project.tilesets.push(ts);
   changed();
   if (quiet) { renderAll(); return ts; }
@@ -5187,7 +5271,7 @@ function normTileset(raw, taken, palIds) {
   t.tw = intIn(raw.tw, 1, 256, 8); t.th = intIn(raw.th, 1, 256, 8);
   t.palette = (typeof raw.palette === 'string' && palIds[raw.palette]) ? raw.palette : null;
   t.source = typeof raw.source === 'string' ? raw.source : '';
-  t.template = raw.template === 'tiles' ? 'tiles' : 'layer';
+  t.template = raw.template === 'tiles' || raw.template === 'catalogue' ? raw.template : 'layer';
   var need = t.tw * t.th;
   t.tiles = (Array.isArray(raw.tiles) ? raw.tiles : []).filter(function (f) {
     try { return typeof f === 'string' && decodeFrame(f).length === need; } catch (e) { return false; }
@@ -5197,6 +5281,9 @@ function normTileset(raw, taken, palIds) {
   function arr(a, max) { return (Array.isArray(a) ? a : []).slice(0, n).map(function (v) { return intIn(v, 0, max, 0); }).concat(new Array(Math.max(0, n - (Array.isArray(a) ? a.length : 0))).fill(0)).slice(0, n); }
   t.map = { w: w, h: h, ids: arr(m.ids, t.tiles.length).map(function (v) { return v <= t.tiles.length ? v : 0; }), flips: arr(m.flips, 7) };
   t.occ = arr(raw.occ, 1);
+  t.sit = t.template === 'catalogue' ? arr(raw.sit, 255) : null;
+  t.unclear = (Array.isArray(raw.unclear) ? raw.unclear : []).filter(function (c) { return Array.isArray(c) && c.length === 2; })
+    .map(function (c) { return [intIn(c[0], 0, w - 1, 0), intIn(c[1], 0, h - 1, 0)]; });
   return t;
 }
 
@@ -5209,7 +5296,7 @@ function tilesetRules(ts) {
       if (id) used[id] = (used[id] || 0) + 1;
       if (!ts.occ[i]) { if (id) outside.push({ x: x, y: y }); continue; }
       if (!id) { undrawn.push({ x: x, y: y }); continue; }
-      var m = maskAt(ts.occ, w, h, x, y), key = id + ':' + ts.map.flips[i];
+      var m = cellSit(ts, x, y), key = id + ':' + ts.map.flips[i];
       var e = byMask[m] || (byMask[m] = { mask: m, choices: {} });
       (e.choices[key] = e.choices[key] || { id: id, flip: ts.map.flips[i], cells: [] }).cells.push({ x: x, y: y });
     }
@@ -5230,7 +5317,7 @@ function tilesetRules(ts) {
     if (Object.keys(kinds).length > 1) split.push({ mask: +r, masks: byR[r] });
   });
   var planned = {};                               // keyed the 47 way
-  undrawn.forEach(function (c) { planned[reduceMask(maskAt(ts.occ, w, h, c.x, c.y))] = true; });
+  undrawn.forEach(function (c) { planned[reduceMask(cellSit(ts, c.x, c.y))] = true; });
   return { rules: rules, masks: Object.keys(rules).map(Number), conflicts: conflicts, undrawn: undrawn, outside: outside, used: used,
            planned: planned, byR: byR, split: split };
 }
@@ -5390,6 +5477,22 @@ function drawTiles() {
     for (var y0 = 0; y0 < gh; y0++) for (var x0 = 0; x0 < gw; x0++) {
       if (ts.occ[y0 * gw + x0]) g.fillRect(gm.ox + x0 * tw * k, gm.oy + y0 * th * k, tw * k, th * k);
     }
+    if (ts.sit) {
+      g.fillStyle = '#707e8f';
+      var mw0 = Math.max(2, Math.round(tw * k / 6));
+      for (var y2 = 0; y2 < gh; y2++) for (var x2 = 0; x2 < gw; x2++) {
+        if (!ts.occ[y2 * gw + x2]) continue;
+        var m2 = ts.sit[y2 * gw + x2], X0 = gm.ox + x2 * tw * k, Y0 = gm.oy + y2 * th * k, S0 = tw * k;
+        if (!(m2 & 1)) g.fillRect(X0, Y0, S0, mw0);
+        if (!(m2 & 4)) g.fillRect(X0 + S0 - mw0, Y0, mw0, S0);
+        if (!(m2 & 16)) g.fillRect(X0, Y0 + S0 - mw0, S0, mw0);
+        if (!(m2 & 64)) g.fillRect(X0, Y0, mw0, S0);
+        [[2, 1, 0], [8, 1, 1], [32, 0, 1], [128, 0, 0]].forEach(function (c) {    // notches: both sides closed, diagonal open
+          var sides = c[0] === 2 ? 1 | 4 : c[0] === 8 ? 4 | 16 : c[0] === 32 ? 16 | 64 : 64 | 1;
+          if ((m2 & sides) === sides && !(m2 & c[0])) g.fillRect(X0 + c[1] * (S0 - mw0), Y0 + c[2] * (S0 - mw0), mw0, mw0);
+        });
+      }
+    }
   }
   g.imageSmoothingEnabled = false;
   g.drawImage(tsOff, gm.ox, gm.oy, gw * tw * k, gh * th * k);
@@ -5480,7 +5583,7 @@ function renderTsInfo() {
   var t = el('table', 'kv');
   function kv(a, b) { var tr = el('tr'); tr.appendChild(el('td', null, a)); tr.appendChild(el('td', null, b)); t.appendChild(tr); }
   kv('Tiles', ts.tiles.length + ' of ' + ts.tw + ' × ' + ts.th + ' px');
-  kv('Template', ts.map.w + ' × ' + ts.map.h + ' cells' + (ts.template === 'tiles' ? ' (from the tiles)' : ''));
+  kv('Template', ts.map.w + ' × ' + ts.map.h + ' cells' + (ts.template === 'tiles' ? ' (from the tiles)' : ts.template === 'catalogue' ? ', a catalogue (read by markings)' : ''));
   if (ts.source) kv('From', ts.source);
   box.appendChild(t);
   box.appendChild(tsLinkBlock(ts));
@@ -5549,6 +5652,21 @@ function renderTsChecks() {
       + cf.choices.map(function (c) { return c.id + (c.flip ? '′' : ''); }).join(' and ') + ' (outlined orange). One rule needs one tile.'));
     li('bad', s);
   });
+  if (ts.sit) {
+    var bySit = {};
+    ts.occ.forEach(function (o, i) { if (o) (bySit[ts.sit[i]] = bySit[ts.sit[i]] || []).push(i); });
+    Object.keys(bySit).forEach(function (k) {
+      if (bySit[k].length < 2) return;
+      var s2 = el('span');
+      s2.appendChild(maskGlyph(+k));
+      s2.appendChild(document.createTextNode(' ' + bySit[k].length + ' catalogue places carry the same markings ('
+        + bySit[k].map(function (i) { return (i % ts.map.w) + ',' + Math.floor(i / ts.map.w); }).join('; ') + '). One would do.'));
+      li('warn', s2);
+    });
+    if (ts.unclear && ts.unclear.length) li('warn', ts.unclear.length + ' catalogue place' + (ts.unclear.length === 1 ? ' has' : 's have')
+      + ' a side only partly marked (' + ts.unclear.slice(0, 4).map(function (c) { return c[0] + ',' + c[1]; }).join('; ') + (ts.unclear.length > 4 ? '…' : '')
+      + '): read as open where two of three points are marked.');
+  }
   if (R.undrawn.length) li('info', R.undrawn.length + ' template place' + (R.undrawn.length === 1 ? ' has' : 's have') + ' no tile yet (hatched).');
   if (R.outside.length) li('warn', R.outside.length + ' tile' + (R.outside.length === 1 ? ' sits' : 's sit') + ' outside the template (outlined red), so ' + (R.outside.length === 1 ? 'it makes' : 'they make') + ' no rule.');
   tileTwins(ts).forEach(function (p) {
@@ -5697,9 +5815,9 @@ tsCv.addEventListener('pointermove', function (e) {
   var i = y * gw + x, txt = 'cell ' + x + ', ' + y;
   if (level) {
     var t = tsTiled.tiles[i];
-    if (t) txt += ' · ' + maskName(t.mask) + ' · tile ' + t.id + (t.same ? ' (same situation, drawn for ' + maskName(t.via) + ')' : t.exact ? '' : ' (closest)');
+    if (t) txt += ' · ' + maskName(t.mask) + ' · tile ' + t.id + (t.same && !ts.sit ? ' (same situation, drawn for ' + maskName(t.via) + ')' : t.exact ? '' : ' (closest)');
   } else if (ts.occ[i] || ts.map.ids[i]) {
-    txt += ' · ' + maskName(maskAt(ts.occ, gw, gh, x, y)) + (ts.map.ids[i] ? ' · tile ' + ts.map.ids[i] : ' · not drawn yet');
+    txt += ' · ' + maskName(cellSit(ts, x, y)) + (ts.map.ids[i] ? ' · tile ' + ts.map.ids[i] : ' · not drawn yet');
   }
   $('tsReadout').textContent = txt;
 });
@@ -5780,17 +5898,32 @@ function aseDeflate(bytes) {
   var cs = new CompressionStream('deflate');
   return new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer().then(function (b) { return new Uint8Array(b); });
 }
-function writeStarterAse(occ, mw, mh, T) {
+// A catalogue (cat = { sit, img, cell }) is written with its markings redrawn
+// at the tile size on a layer named "catalogue", and the picture itself as
+// a reference layer scaled onto the grid, so its numbers stay readable.
+function writeStarterAse(occ, mw, mh, T, cat) {
   var W = mw * T, H = mh * T;
-  var tpl = new Uint8Array(W * H * 4);
+  var tpl = new Uint8Array(W * H * 4), sw = Math.max(1, Math.round(T / 8));
   for (var cy = 0; cy < mh; cy++) for (var cx = 0; cx < mw; cx++) {
     if (!occ[cy * mw + cx]) continue;
+    var m = cat ? cat.sit[cy * mw + cx] : 0, dark = (cx + cy) % 2;
     for (var y = 0; y < T; y++) for (var x = 0; x < T; x++) {
-      var e = x === 0 || y === 0 || x === T - 1 || y === T - 1, o = ((cy * T + y) * W + cx * T + x) * 4;
-      tpl[o] = e ? 150 : 200; tpl[o + 1] = e ? 150 : 200; tpl[o + 2] = e ? 160 : 205; tpl[o + 3] = 255;
+      var e, o = ((cy * T + y) * W + cx * T + x) * 4;
+      if (cat) {
+        var n = y < sw, s2 = y >= T - sw, w2 = x < sw, e2 = x >= T - sw;
+        e = (n && !(m & 1)) || (e2 && !(m & 4)) || (s2 && !(m & 16)) || (w2 && !(m & 64))
+          || (n && e2 && (m & 5) === 5 && !(m & 2)) || (s2 && e2 && (m & 20) === 20 && !(m & 8))
+          || (s2 && w2 && (m & 80) === 80 && !(m & 32)) || (n && w2 && (m & 65) === 65 && !(m & 128));
+        var c = e ? [112, 126, 143] : dark ? [53, 55, 63] : [63, 66, 75];
+        tpl[o] = c[0]; tpl[o + 1] = c[1]; tpl[o + 2] = c[2]; tpl[o + 3] = 255;
+      } else {
+        e = x === 0 || y === 0 || x === T - 1 || y === T - 1;
+        tpl[o] = e ? 150 : 200; tpl[o + 1] = e ? 150 : 200; tpl[o + 2] = e ? 160 : 205; tpl[o + 3] = 255;
+      }
     }
   }
-  return Promise.all([aseDeflate(tpl), aseDeflate(new Uint8Array(T * T * 4)), aseDeflate(new Uint8Array(mw * mh * 4))]).then(function (z) {
+  var refPx = cat ? new Uint8Array(cat.img.data.buffer.slice(0)) : new Uint8Array(0);
+  return Promise.all([aseDeflate(tpl), aseDeflate(new Uint8Array(T * T * 4)), aseDeflate(new Uint8Array(mw * mh * 4)), aseDeflate(refPx)]).then(function (z) {
     var parts = [];
     function B(n) { parts.push(Uint8Array.of(n & 255)); }
     function Wd(n) { parts.push(Uint8Array.of(n & 255, (n >> 8) & 255)); }
@@ -5803,11 +5936,19 @@ function writeStarterAse(occ, mw, mh, T) {
     n += chunk(0x2023, function () {                                                                 // tileset: tile 0 empty
       D(0); D(2 | 4); D(1); Wd(T); Wd(T); Wd(1); Z(14); S('tiles'); D(z[1].length); parts.push(z[1]);
     });
-    n += chunk(0x2004, function () { Wd(1); Wd(0); Wd(0); Wd(0); Wd(0); Wd(0); B(255); Z(3); S('template'); });   // visible, locked
+    n += chunk(0x2004, function () { Wd(1); Wd(0); Wd(0); Wd(0); Wd(0); Wd(0); B(255); Z(3); S(cat ? 'catalogue' : 'template'); });   // visible, locked
+    if (cat) n += chunk(0x2004, function () { Wd(1 | 64); Wd(0); Wd(0); Wd(0); Wd(0); Wd(0); B(255); Z(3); S('numbers'); });   // a reference layer
+    var tl = cat ? 2 : 1;
     n += chunk(0x2004, function () { Wd(3); Wd(2); Wd(0); Wd(0); Wd(0); Wd(0); B(255); Z(3); S('tiles'); D(0); });
     n += chunk(0x2005, function () { Wd(0); Wd(0); Wd(0); B(255); Wd(2); Wd(0); Z(5); Wd(W); Wd(H); parts.push(z[0]); });
+    if (cat) {
+      n += chunk(0x2005, function () { Wd(1); Wd(0); Wd(0); B(255); Wd(2); Wd(0); Z(5); Wd(cat.img.w); Wd(cat.img.h); parts.push(z[3]); });
+      n += chunk(0x2006, function () {            // the picture's precise bounds: scaled so a cell lands on a tile
+        D(1); D(0); D(0); D(Math.round(cat.img.w * T / cat.cell * 65536)); D(Math.round(cat.img.h * T / cat.cell * 65536)); Z(16);
+      });
+    }
     n += chunk(0x2005, function () {
-      Wd(1); Wd(0); Wd(0); B(255); Wd(3); Wd(0); Z(5); Wd(mw); Wd(mh); Wd(32);
+      Wd(tl); Wd(0); Wd(0); B(255); Wd(3); Wd(0); Z(5); Wd(mw); Wd(mh); Wd(32);
       D(0x1fffffff); D(0x80000000); D(0x40000000); D(0x20000000); Z(10); parts.push(z[2]);
     });
     var body = 0; parts.forEach(function (p) { body += p.length; });
@@ -5844,7 +5985,10 @@ function templateFromPicture(img, cell) {
     for (var yy = 0; yy < cell; yy++) for (var xx = 0; xx < cell; xx++) if (ink(((cy * cell + yy) * img.w + cx * cell + xx) * 4)) n++;
     occ[cy * mw + cx] = n * 2 > cell * cell ? 1 : 0;
   }
-  return { occ: occ, w: mw, h: mh, cell: cell };
+  var t = { occ: occ, w: mw, h: mh, cell: cell, sit: null };
+  var cat = readCatalogue(function (x, y) { var k = (y * img.w + x) * 4, d = img.data; return [d[k], d[k + 1], d[k + 2], d[k + 3]]; }, mw, mh, cell);
+  if (cat.kinds > 1) { t.occ = cat.occ; t.sit = cat.sit; t.unclear = cat.unclear; t.kinds = cat.kinds; t.img = img; }
+  return t;
 }
 
 function showStarter() {
@@ -5866,7 +6010,28 @@ function showStarter() {
     var g = prev.getContext('2d'); g.fillStyle = '#14141a'; g.fillRect(0, 0, prev.width, prev.height);
     g.fillStyle = '#c8c8cd';
     for (var y = 0; y < st.tpl.h; y++) for (var x = 0; x < st.tpl.w; x++) if (st.tpl.occ[y * st.tpl.w + x]) g.fillRect(x * s, y * s, s - 1, s - 1);
+    if (st.tpl.sit) {
+      g.fillStyle = '#5a6a80';
+      for (var y3 = 0; y3 < st.tpl.h; y3++) for (var x3 = 0; x3 < st.tpl.w; x3++) {
+        if (!st.tpl.occ[y3 * st.tpl.w + x3]) continue;
+        var m3 = st.tpl.sit[y3 * st.tpl.w + x3];
+        if (!(m3 & 1)) g.fillRect(x3 * s, y3 * s, s - 1, 1);
+        if (!(m3 & 4)) g.fillRect(x3 * s + s - 2, y3 * s, 1, s - 1);
+        if (!(m3 & 16)) g.fillRect(x3 * s, y3 * s + s - 2, s - 1, 1);
+        if (!(m3 & 64)) g.fillRect(x3 * s, y3 * s, 1, s - 1);
+      }
+    }
     var n = st.tpl.occ.filter(Boolean).length;
+    if (st.tpl.sit) {
+      var got = {}, dup = 0;
+      st.tpl.occ.forEach(function (o, i) { if (!o) return; var r = reduceMask(st.tpl.sit[i]); if (got[r]) dup++; got[r] = true; });
+      var cv = Object.keys(got).length;
+      info.textContent = 'Read as a catalogue: ' + n + ' places on ' + st.tpl.w + ' × ' + st.tpl.h + ' cells of ' + st.tpl.cell + ' px, labelled by their markings, '
+        + cv + ' of the 47 situations' + (dup ? ' (' + dup + ' place' + (dup === 1 ? '' : 's') + ' repeat a situation)' : '')
+        + (st.tpl.unclear && st.tpl.unclear.length ? '; ' + st.tpl.unclear.length + ' with a side only partly marked' : '')
+        + '. The file: ' + (st.tpl.w * st.T) + ' × ' + (st.tpl.h * st.T) + ' px, the picture kept as a reference layer for its numbers.';
+      return;
+    }
     var cov = Object.keys(templateSituations(st.tpl.occ, st.tpl.w, st.tpl.h)).length;
     info.textContent = st.tpl.w + ' × ' + st.tpl.h + ' cells, ' + n + ' places → a ' + (st.tpl.w * st.T) + ' × ' + (st.tpl.h * st.T) + ' px file. '
       + 'It has places for ' + cov + ' of the 47 situations' + (cov < 47 ? '; the others will take the closest one drawn.' : '.');
@@ -5886,7 +6051,7 @@ function showStarter() {
         var t = templateFromPicture(img, 0);
         st.tpl = t; st.name = cName(f.name.replace(/\.[^.]+$/, ''));
         draw();
-        toast('Read ' + f.name + ' as ' + t.w + ' × ' + t.h + ' cells of ' + t.cell + ' px');
+        toast('Read ' + f.name + ' as ' + t.w + ' × ' + t.h + ' cells of ' + t.cell + ' px' + (t.sit ? ', a catalogue' : ''));
       }).catch(function () { toast('Could not read that picture'); });
     };
     input.click();
@@ -5903,7 +6068,7 @@ function showStarter() {
   var go = el('button', 'chip primary', 'Download starter'); go.type = 'button';
   go.onclick = function () {
     ui.tsTile = st.T; saveUi();
-    writeStarterAse(st.tpl.occ, st.tpl.w, st.tpl.h, st.T).then(function (bytes) {
+    writeStarterAse(st.tpl.occ, st.tpl.w, st.tpl.h, st.T, st.tpl.sit ? { sit: st.tpl.sit, img: st.tpl.img, cell: st.tpl.cell } : null).then(function (bytes) {
       var name = st.name + '_' + st.T + 'px.aseprite';
       var blob = new Blob([bytes], { type: 'application/octet-stream' }), url = URL.createObjectURL(blob);
       var a = document.createElement('a'); a.href = url; a.download = name;
@@ -5967,7 +6132,7 @@ var tmCache = {};
 function tmTiled(tm) {
   var ts = findTileset(tm.tileset);
   if (!ts || tm.cells.length !== tm.cols * tm.rows) return null;
-  var key = [tm.cells, tm.cols, tm.edges, ts.tiles.length, ts.map.ids.join(), ts.map.flips.join(), ts.occ.join()].join('|');
+  var key = [tm.cells, tm.cols, tm.edges, ts.tiles.length, ts.map.ids.join(), ts.map.flips.join(), ts.occ.join(), ts.sit ? ts.sit.join() : ''].join('|');
   var c = tmCache[tm.id];
   if (c && c.key === key) return c.val;
   var occ = new Array(tm.cells.length);
