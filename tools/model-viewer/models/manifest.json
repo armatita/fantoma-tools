@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-03 00:23 UTC",
+  "generated": "2026-10-03 11:06 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -27,7 +27,7 @@
   "bounds": {
     "width": 216.0,
     "depth": 210.0,
-    "height": 250.72114697368073
+    "height": 253.72114697368073
   },
   "layout": {
     "panel": {
@@ -373,13 +373,13 @@
         {
           "id": "shell-wall-left",
           "name": "Side wall (left)",
-          "note": "One closed profile swept sideways \u2014 this is the whole silhouette of the machine. Now with its screw holes, the intake vents and the bezel's three bosses.",
+          "note": "One closed profile swept sideways \u2014 this is the whole silhouette of the machine. Now with its screw holes, the intake vents, the bezel's three bosses and the roof's boss at the top front.",
           "versions": [
             {
               "id": "shell-wall-left",
               "label": "Side wall (left)",
               "file": "shell-wall-left.stl",
-              "bytes": 128484,
+              "bytes": 137584,
               "matrix": [
                 0.0,
                 0.0,
@@ -415,7 +415,7 @@
               "id": "shell-wall-right",
               "label": "Side wall (right)",
               "file": "shell-wall-right.stl",
-              "bytes": 128484,
+              "bytes": 137584,
               "matrix": [
                 0.0,
                 0.0,
@@ -661,13 +661,13 @@
         {
           "id": "corner-post-left-5",
           "name": "Corner post left \u2014 segment 5 of 5",
-          "note": "The top segment. Its lug also takes the screen bracket's tie: two inserts in the lug's inner face.",
+          "note": "The top segment. Its lug takes the screen bracket's tie, and its top 10 mm are solid: the roof's two inserts, and counterbores for the rods' top nuts.",
           "versions": [
             {
               "id": "corner-post-left-5",
               "label": "Corner post left \u2014 segment 5 of 5",
               "file": "corner-post-left-5.stl",
-              "bytes": 77084,
+              "bytes": 110484,
               "matrix": [
                 1.0,
                 0.0,
@@ -841,13 +841,13 @@
         {
           "id": "corner-post-right-5",
           "name": "Corner post right \u2014 segment 5 of 5",
-          "note": "The top segment. Its lug also takes the screen bracket's tie: two inserts in the lug's inner face.",
+          "note": "The top segment. Its lug takes the screen bracket's tie, and its top 10 mm are solid: the roof's two inserts, and counterbores for the rods' top nuts.",
           "versions": [
             {
               "id": "corner-post-right-5",
               "label": "Corner post right \u2014 segment 5 of 5",
               "file": "corner-post-right-5.stl",
-              "bytes": 77084,
+              "bytes": 110484,
               "matrix": [
                 1.0,
                 0.0,
@@ -1049,6 +1049,42 @@
             }
           ],
           "defaultVersion": "shell-back-panel",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": true
+        },
+        {
+          "id": "shell-roof",
+          "name": "Roof",
+          "note": "A 3 mm plate on top of everything. Six countersunk M3 x 8: two into each rear post's cap, one into each side wall.",
+          "versions": [
+            {
+              "id": "shell-roof",
+              "label": "Roof",
+              "file": "shell-roof.stl",
+              "bytes": 107884,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                -0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                210.0,
+                253.721147,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "shell-roof",
           "visible": true,
           "template": null,
           "when": null,
@@ -1525,29 +1561,29 @@
         {
           "id": "bezel",
           "name": "Bezel",
-          "note": "The frame round the screen. Six countersunk M3 x 16 from the front, into the side walls' bosses.",
+          "note": "The frame round the screen, and the sill that closes the gap to the control panel. Six countersunk M3 x 16 from the front, into the side walls' bosses.",
           "versions": [
             {
               "id": "bezel",
               "label": "Bezel",
               "file": "bezel.stl",
-              "bytes": 104484,
+              "bytes": 104884,
               "matrix": [
                 1.0,
                 0.0,
                 0.0,
                 0.0,
                 0.0,
-                -0.207912,
-                -0.978148,
-                0.0,
-                0.0,
+                0.207912,
                 0.978148,
-                -0.207912,
                 0.0,
                 0.0,
-                151.8614,
-                250.721147,
+                -0.978148,
+                0.207912,
+                0.0,
+                0.0,
+                111.999175,
+                48.75492,
                 1.0
               ]
             }
@@ -1717,22 +1753,22 @@
               "id": "io-clamp",
               "label": "I/O clamp bar",
               "file": "io-clamp.stl",
-              "bytes": 28284,
+              "bytes": 31484,
               "matrix": [
                 1.0,
                 0.0,
                 0.0,
                 0.0,
                 0.0,
-                -1.0,
-                -0.0,
-                0.0,
-                0.0,
                 0.0,
                 -1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
                 0.0,
                 39.6,
-                210.0,
+                197.0,
                 52.544229,
                 1.0
               ]
