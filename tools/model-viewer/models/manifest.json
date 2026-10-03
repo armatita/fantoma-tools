@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-15 09:27 UTC",
+  "generated": "2026-10-03 00:23 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -373,13 +373,13 @@
         {
           "id": "shell-wall-left",
           "name": "Side wall (left)",
-          "note": "One closed profile swept sideways \u2014 this is the whole silhouette of the machine.",
+          "note": "One closed profile swept sideways \u2014 this is the whole silhouette of the machine. Now with its screw holes, the intake vents and the bezel's three bosses.",
           "versions": [
             {
               "id": "shell-wall-left",
               "label": "Side wall (left)",
               "file": "shell-wall-left.stl",
-              "bytes": 21484,
+              "bytes": 128484,
               "matrix": [
                 0.0,
                 0.0,
@@ -403,18 +403,19 @@
           "defaultVersion": "shell-wall-left",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "shell-wall-right",
           "name": "Side wall (right)",
-          "note": "The left wall MIRRORED \u2014 no longer the same STL.",
+          "note": "The left wall MIRRORED \u2014 no longer the same STL. Holes, vents and bezel bosses as on the left.",
           "versions": [
             {
               "id": "shell-wall-right",
               "label": "Side wall (right)",
               "file": "shell-wall-right.stl",
-              "bytes": 21484,
+              "bytes": 128484,
               "matrix": [
                 0.0,
                 0.0,
@@ -438,18 +439,19 @@
           "defaultVersion": "shell-wall-right",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "matrix-bracket-left",
           "name": "Screen bracket (left)",
-          "note": "A strip lying against the BACK of the LED panel, running up its 12 degree lean, turning into a foot that bolts to the base.",
+          "note": "A ribbed strip against the BACK of the LED panel, with a foot bolted to the base and a tab screwed to the rear post's top lug. REPRINT \u2014 the printed ones have neither.",
           "versions": [
             {
               "id": "matrix-bracket-left",
               "label": "Screen bracket (left)",
               "file": "matrix-bracket-left.stl",
-              "bytes": 37684,
+              "bytes": 56284,
               "matrix": [
                 1.0,
                 0.0,
@@ -464,8 +466,8 @@
                 -0.207912,
                 0.0,
                 10.0,
-                173.437466,
-                231.985202,
+                174.318356,
+                236.129461,
                 1.0
               ]
             }
@@ -473,18 +475,19 @@
           "defaultVersion": "matrix-bracket-left",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "matrix-bracket-right",
           "name": "Screen bracket (right)",
-          "note": "The same part on the other side. Identical, not mirrored.",
+          "note": "The right-hand bracket. A handed pair now \u2014 download both.",
           "versions": [
             {
               "id": "matrix-bracket-right",
               "label": "Screen bracket (right)",
               "file": "matrix-bracket-right.stl",
-              "bytes": 37684,
+              "bytes": 56284,
               "matrix": [
                 1.0,
                 0.0,
@@ -499,8 +502,8 @@
                 -0.207912,
                 0.0,
                 184.0,
-                173.437466,
-                231.985202,
+                174.318356,
+                236.129461,
                 1.0
               ]
             }
@@ -508,7 +511,8 @@
           "defaultVersion": "matrix-bracket-right",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-left-1",
@@ -543,7 +547,8 @@
           "defaultVersion": "corner-post-left-1",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-left-2",
@@ -578,7 +583,8 @@
           "defaultVersion": "corner-post-left-2",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-left-3",
@@ -613,7 +619,8 @@
           "defaultVersion": "corner-post-left-3",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-left-4",
@@ -648,18 +655,19 @@
           "defaultVersion": "corner-post-left-4",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-left-5",
           "name": "Corner post left \u2014 segment 5 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "note": "The top segment. Its lug also takes the screen bracket's tie: two inserts in the lug's inner face.",
           "versions": [
             {
               "id": "corner-post-left-5",
               "label": "Corner post left \u2014 segment 5 of 5",
               "file": "corner-post-left-5.stl",
-              "bytes": 60284,
+              "bytes": 77084,
               "matrix": [
                 1.0,
                 0.0,
@@ -683,7 +691,8 @@
           "defaultVersion": "corner-post-left-5",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-right-1",
@@ -718,7 +727,8 @@
           "defaultVersion": "corner-post-right-1",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-right-2",
@@ -753,7 +763,8 @@
           "defaultVersion": "corner-post-right-2",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-right-3",
@@ -788,7 +799,8 @@
           "defaultVersion": "corner-post-right-3",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-right-4",
@@ -823,18 +835,19 @@
           "defaultVersion": "corner-post-right-4",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "corner-post-right-5",
           "name": "Corner post right \u2014 segment 5 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "note": "The top segment. Its lug also takes the screen bracket's tie: two inserts in the lug's inner face.",
           "versions": [
             {
               "id": "corner-post-right-5",
               "label": "Corner post right \u2014 segment 5 of 5",
               "file": "corner-post-right-5.stl",
-              "bytes": 60284,
+              "bytes": 77084,
               "matrix": [
                 1.0,
                 0.0,
@@ -858,7 +871,8 @@
           "defaultVersion": "corner-post-right-5",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "front-post-left",
@@ -893,7 +907,8 @@
           "defaultVersion": "front-post-left",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "front-post-right",
@@ -928,7 +943,8 @@
           "defaultVersion": "front-post-right",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "shell-base",
@@ -963,7 +979,8 @@
           "defaultVersion": "shell-base",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "shell-front",
@@ -974,7 +991,7 @@
               "id": "shell-front",
               "label": "Front wall",
               "file": "shell-front.stl",
-              "bytes": 1484,
+              "bytes": 35884,
               "matrix": [
                 1.0,
                 0.0,
@@ -998,18 +1015,19 @@
           "defaultVersion": "shell-front",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
-          "id": "shell-back",
-          "name": "Back wall",
-          "note": "Full height. Will gain the switch and socket openings.",
+          "id": "shell-back-panel",
+          "name": "Back access panel",
+          "note": "The back wall above the I/O strip. Comes off for flashing; carries the exhaust vents.",
           "versions": [
             {
-              "id": "shell-back",
-              "label": "Back wall",
-              "file": "shell-back.stl",
-              "bytes": 684,
+              "id": "shell-back-panel",
+              "label": "Back access panel",
+              "file": "shell-back-panel.stl",
+              "bytes": 125884,
               "matrix": [
                 1.0,
                 0.0,
@@ -1017,23 +1035,24 @@
                 0.0,
                 0.0,
                 0.0,
-                -1.0,
-                0.0,
-                0.0,
                 1.0,
                 0.0,
                 0.0,
+                -1.0,
+                0.0,
+                0.0,
                 31.0,
-                207.0,
-                250.721147,
+                210.0,
+                52.544229,
                 1.0
               ]
             }
           ],
-          "defaultVersion": "shell-back",
+          "defaultVersion": "shell-back-panel",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "shell-panel-rail",
@@ -1068,7 +1087,8 @@
           "defaultVersion": "shell-panel-rail",
           "visible": true,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         }
       ]
     },
@@ -1111,7 +1131,8 @@
           "template": "panel_template.svg",
           "when": {
             "panel": "modular"
-          }
+          },
+          "print": true
         },
         {
           "id": "module-joystick",
@@ -1196,7 +1217,8 @@
           "template": null,
           "when": {
             "panel": "modular"
-          }
+          },
+          "print": true
         },
         {
           "id": "module-buttons",
@@ -1281,7 +1303,8 @@
           "template": null,
           "when": {
             "panel": "modular"
-          }
+          },
+          "print": true
         },
         {
           "id": "module-aux",
@@ -1366,7 +1389,8 @@
           "template": null,
           "when": {
             "panel": "modular"
-          }
+          },
+          "print": true
         },
         {
           "id": "module-buzzer",
@@ -1451,7 +1475,8 @@
           "template": null,
           "when": {
             "panel": "modular"
-          }
+          },
+          "print": true
         },
         {
           "id": "control-panel",
@@ -1488,22 +1513,245 @@
           "template": "panel_template.svg",
           "when": {
             "panel": "mono"
-          }
+          },
+          "print": true
         }
       ]
     },
     {
-      "id": "io-plate",
-      "name": "I/O Plate",
+      "id": "screen",
+      "name": "Screen",
       "parts": [
         {
+          "id": "bezel",
+          "name": "Bezel",
+          "note": "The frame round the screen. Six countersunk M3 x 16 from the front, into the side walls' bosses.",
+          "versions": [
+            {
+              "id": "bezel",
+              "label": "Bezel",
+              "file": "bezel.stl",
+              "bytes": 104484,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.207912,
+                -0.978148,
+                0.0,
+                0.0,
+                0.978148,
+                -0.207912,
+                0.0,
+                0.0,
+                151.8614,
+                250.721147,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "bezel",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": true
+        },
+        {
+          "id": "ref-acrylic",
+          "name": "Acrylic (reference \u2014 cut, not printed)",
+          "note": "200 x 200 x 3 mm, a plain rectangle.",
+          "versions": [
+            {
+              "id": "ref-acrylic",
+              "label": "Acrylic (reference \u2014 cut, not printed)",
+              "file": "ref-acrylic.stl",
+              "bytes": 684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.207912,
+                -0.978148,
+                0.0,
+                0.0,
+                0.978148,
+                -0.207912,
+                0.0,
+                8.0,
+                154.41316,
+                248.297031,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "ref-acrylic",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": false
+        },
+        {
+          "id": "ref-grid",
+          "name": "Diffuser grid (reference \u2014 envelope only)",
+          "note": "200 x 200 x 5 mm. The real part is Pedro's downloaded grid; this block only shows where it sits.",
+          "versions": [
+            {
+              "id": "ref-grid",
+              "label": "Diffuser grid (reference \u2014 envelope only)",
+              "file": "ref-grid.stl",
+              "bytes": 684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.207912,
+                -0.978148,
+                0.0,
+                0.0,
+                0.978148,
+                -0.207912,
+                0.0,
+                8.0,
+                157.347602,
+                247.673296,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "ref-grid",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": false
+        },
+        {
+          "id": "ref-matrix",
+          "name": "LED matrix (reference)",
+          "note": "The 64 x 64 P3 panel, as a plain block.",
+          "versions": [
+            {
+              "id": "ref-matrix",
+              "label": "LED matrix (reference)",
+              "file": "ref-matrix.stl",
+              "bytes": 684,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.207912,
+                -0.978148,
+                0.0,
+                0.0,
+                0.978148,
+                -0.207912,
+                0.0,
+                12.0,
+                161.406694,
+                242.721147,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "ref-matrix",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": false
+        }
+      ]
+    },
+    {
+      "id": "rear",
+      "name": "Rear I/O",
+      "parts": [
+        {
+          "id": "back-strip",
+          "name": "I/O strip",
+          "note": "The bottom of the back wall. Holds the switch and the DC jack, and never comes off.",
+          "versions": [
+            {
+              "id": "back-strip",
+              "label": "I/O strip",
+              "file": "back-strip.stl",
+              "bytes": 54084,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                0.0,
+                31.0,
+                210.0,
+                3.0,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "back-strip",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": true
+        },
+        {
+          "id": "io-clamp",
+          "name": "I/O clamp bar",
+          "note": "Closes the strip's notches. Screwed from outside into three inserts.",
+          "versions": [
+            {
+              "id": "io-clamp",
+              "label": "I/O clamp bar",
+              "file": "io-clamp.stl",
+              "bytes": 28284,
+              "matrix": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                -0.0,
+                0.0,
+                0.0,
+                0.0,
+                -1.0,
+                0.0,
+                39.6,
+                210.0,
+                52.544229,
+                1.0
+              ]
+            }
+          ],
+          "defaultVersion": "io-clamp",
+          "visible": true,
+          "template": null,
+          "when": null,
+          "print": true
+        },
+        {
           "id": "io-plate",
-          "name": "I/O plate",
-          "note": "Carries the DC socket and the rocker switch, built at the bench and bolted on. Position on the wall is a PLACEHOLDER.",
+          "name": "I/O plate (superseded)",
+          "note": "SUPERSEDED. Replaced by the I/O strip and its clamp bar. Hidden by default.",
           "versions": [
             {
               "id": "io-plate",
-              "label": "I/O plate",
+              "label": "I/O plate (superseded)",
               "file": "io-plate.stl",
               "bytes": 54284,
               "matrix": [
@@ -1527,9 +1775,10 @@
             }
           ],
           "defaultVersion": "io-plate",
-          "visible": true,
+          "visible": false,
           "template": "io_plate_template.svg",
-          "when": null
+          "when": null,
+          "print": false
         }
       ]
     },
@@ -1618,7 +1867,8 @@
           "defaultVersion": "joystick-module-14mm",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "button-module",
@@ -1701,7 +1951,8 @@
           "defaultVersion": "button-module-5mm",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "aux-module",
@@ -1784,7 +2035,8 @@
           "defaultVersion": "aux-module-5mm",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "buzzer-module",
@@ -1867,7 +2119,8 @@
           "defaultVersion": "buzzer-module-10mm",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "rebate-frame",
@@ -1902,7 +2155,8 @@
           "defaultVersion": "rebate-frame",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "rebate-module",
@@ -1937,7 +2191,8 @@
           "defaultVersion": "rebate-module-5mm",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         },
         {
           "id": "panel-coupon",
@@ -1972,7 +2227,8 @@
           "defaultVersion": "panel-coupon",
           "visible": false,
           "template": null,
-          "when": null
+          "when": null,
+          "print": true
         }
       ]
     }
