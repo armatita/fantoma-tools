@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-03 11:06 UTC",
+  "generated": "2026-10-04 10:01 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -374,6 +374,7 @@
           "id": "shell-wall-left",
           "name": "Side wall (left)",
           "note": "One closed profile swept sideways \u2014 this is the whole silhouette of the machine. Now with its screw holes, the intake vents, the bezel's three bosses and the roof's boss at the top front.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-wall-left",
@@ -410,6 +411,7 @@
           "id": "shell-wall-right",
           "name": "Side wall (right)",
           "note": "The left wall MIRRORED \u2014 no longer the same STL. Holes, vents and bezel bosses as on the left.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-wall-right",
@@ -446,6 +448,7 @@
           "id": "matrix-bracket-left",
           "name": "Screen bracket (left)",
           "note": "A ribbed strip against the BACK of the LED panel, with a foot bolted to the base and a tab screwed to the rear post's top lug. REPRINT \u2014 the printed ones have neither.",
+          "supports": false,
           "versions": [
             {
               "id": "matrix-bracket-left",
@@ -482,6 +485,7 @@
           "id": "matrix-bracket-right",
           "name": "Screen bracket (right)",
           "note": "The right-hand bracket. A handed pair now \u2014 download both.",
+          "supports": false,
           "versions": [
             {
               "id": "matrix-bracket-right",
@@ -517,7 +521,8 @@
         {
           "id": "corner-post-left-1",
           "name": "Corner post left \u2014 segment 1 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "supports": true,
           "versions": [
             {
               "id": "corner-post-left-1",
@@ -554,6 +559,7 @@
           "id": "corner-post-left-2",
           "name": "Corner post left \u2014 segment 2 of 5",
           "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "supports": false,
           "versions": [
             {
               "id": "corner-post-left-2",
@@ -589,7 +595,8 @@
         {
           "id": "corner-post-left-3",
           "name": "Corner post left \u2014 segment 3 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "supports": true,
           "versions": [
             {
               "id": "corner-post-left-3",
@@ -626,6 +633,7 @@
           "id": "corner-post-left-4",
           "name": "Corner post left \u2014 segment 4 of 5",
           "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "supports": false,
           "versions": [
             {
               "id": "corner-post-left-4",
@@ -661,7 +669,8 @@
         {
           "id": "corner-post-left-5",
           "name": "Corner post left \u2014 segment 5 of 5",
-          "note": "The top segment. Its lug takes the screen bracket's tie, and its top 10 mm are solid: the roof's two inserts, and counterbores for the rods' top nuts.",
+          "note": "The top segment. Its lug takes the screen bracket's tie, and its top 10 mm are solid: the roof's two inserts, and counterbores for the rods' top nuts. PRINT WITH SUPPORTS: under the top lug and under the solid cap, whose underside is a 28 mm flat ceiling inside the corner.",
+          "supports": true,
           "versions": [
             {
               "id": "corner-post-left-5",
@@ -697,7 +706,8 @@
         {
           "id": "corner-post-right-1",
           "name": "Corner post right \u2014 segment 1 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "supports": true,
           "versions": [
             {
               "id": "corner-post-right-1",
@@ -734,6 +744,7 @@
           "id": "corner-post-right-2",
           "name": "Corner post right \u2014 segment 2 of 5",
           "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "supports": false,
           "versions": [
             {
               "id": "corner-post-right-2",
@@ -769,7 +780,8 @@
         {
           "id": "corner-post-right-3",
           "name": "Corner post right \u2014 segment 3 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "supports": true,
           "versions": [
             {
               "id": "corner-post-right-3",
@@ -806,6 +818,7 @@
           "id": "corner-post-right-4",
           "name": "Corner post right \u2014 segment 4 of 5",
           "note": "One of five stacked segments, threaded onto two steel dowels.",
+          "supports": false,
           "versions": [
             {
               "id": "corner-post-right-4",
@@ -841,7 +854,8 @@
         {
           "id": "corner-post-right-5",
           "name": "Corner post right \u2014 segment 5 of 5",
-          "note": "The top segment. Its lug takes the screen bracket's tie, and its top 10 mm are solid: the roof's two inserts, and counterbores for the rods' top nuts.",
+          "note": "The top segment. Its lug takes the screen bracket's tie, and its top 10 mm are solid: the roof's two inserts, and counterbores for the rods' top nuts. PRINT WITH SUPPORTS: under the top lug and under the solid cap, whose underside is a 28 mm flat ceiling inside the corner.",
+          "supports": true,
           "versions": [
             {
               "id": "corner-post-right-5",
@@ -878,6 +892,7 @@
           "id": "front-post-left",
           "name": "Front corner post (left)",
           "note": "Short, and cut off along the panel's slope.",
+          "supports": false,
           "versions": [
             {
               "id": "front-post-left",
@@ -914,6 +929,7 @@
           "id": "front-post-right",
           "name": "Front corner post (right)",
           "note": "The same part, mirrored.",
+          "supports": false,
           "versions": [
             {
               "id": "front-post-right",
@@ -950,6 +966,7 @@
           "id": "shell-base",
           "name": "Base",
           "note": "The floor, spanning between the walls.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-base",
@@ -986,6 +1003,7 @@
           "id": "shell-front",
           "name": "Front wall",
           "note": "Only 20 mm tall \u2014 above that the control panel is the front of the machine.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-front",
@@ -1022,6 +1040,7 @@
           "id": "shell-back-panel",
           "name": "Back access panel",
           "note": "The back wall above the I/O strip. Comes off for flashing; carries the exhaust vents.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-back-panel",
@@ -1058,6 +1077,7 @@
           "id": "shell-roof",
           "name": "Roof",
           "note": "A 3 mm plate on top of everything. Six countersunk M3 x 8: two into each rear post's cap, one into each side wall.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-roof",
@@ -1094,6 +1114,7 @@
           "id": "shell-panel-rail",
           "name": "Panel rail",
           "note": "The cross rail under the control panel's back edge, with a 12 mm downstand.",
+          "supports": false,
           "versions": [
             {
               "id": "shell-panel-rail",
@@ -1136,6 +1157,7 @@
           "id": "panel-frame",
           "name": "Panel frame",
           "note": "The panel with its controls taken out: outline, four rebated openings, and ribs underneath.",
+          "supports": false,
           "versions": [
             {
               "id": "panel-frame",
@@ -1174,6 +1196,7 @@
           "id": "module-joystick",
           "name": "Joystick module",
           "note": "Drops into the frame's joystick opening.",
+          "supports": false,
           "versions": [
             {
               "id": "module-joystick-13mm",
@@ -1260,6 +1283,7 @@
           "id": "module-buttons",
           "name": "Action buttons module",
           "note": "Drops into the frame's button opening.",
+          "supports": false,
           "versions": [
             {
               "id": "module-buttons-4mm",
@@ -1346,6 +1370,7 @@
           "id": "module-aux",
           "name": "Options strip module",
           "note": "Six screws, not four \u2014 it is 94 mm long and would flex in the middle.",
+          "supports": false,
           "versions": [
             {
               "id": "module-aux-4mm",
@@ -1432,6 +1457,7 @@
           "id": "module-buzzer",
           "name": "Buzzer module",
           "note": "Three pocket walls stop the board pivoting on its single screw.",
+          "supports": false,
           "versions": [
             {
               "id": "module-buzzer-9mm",
@@ -1518,6 +1544,7 @@
           "id": "control-panel",
           "name": "Control panel (one piece)",
           "note": "The whole panel as one print, controls and all.",
+          "supports": false,
           "versions": [
             {
               "id": "control-panel",
@@ -1562,6 +1589,7 @@
           "id": "bezel",
           "name": "Bezel",
           "note": "The frame round the screen, and the sill that closes the gap to the control panel. Six countersunk M3 x 16 from the front, into the side walls' bosses.",
+          "supports": false,
           "versions": [
             {
               "id": "bezel",
@@ -1598,6 +1626,7 @@
           "id": "ref-acrylic",
           "name": "Acrylic (reference \u2014 cut, not printed)",
           "note": "200 x 200 x 3 mm, a plain rectangle.",
+          "supports": false,
           "versions": [
             {
               "id": "ref-acrylic",
@@ -1634,6 +1663,7 @@
           "id": "ref-grid",
           "name": "Diffuser grid (reference \u2014 envelope only)",
           "note": "200 x 200 x 5 mm. The real part is Pedro's downloaded grid; this block only shows where it sits.",
+          "supports": false,
           "versions": [
             {
               "id": "ref-grid",
@@ -1670,6 +1700,7 @@
           "id": "ref-matrix",
           "name": "LED matrix (reference)",
           "note": "The 64 x 64 P3 panel, as a plain block.",
+          "supports": false,
           "versions": [
             {
               "id": "ref-matrix",
@@ -1711,7 +1742,8 @@
         {
           "id": "back-strip",
           "name": "I/O strip",
-          "note": "The bottom of the back wall. Holds the switch and the DC jack, and never comes off.",
+          "note": "The bottom of the back wall. Holds the switch and the DC jack, and never comes off. PRINT WITH SUPPORTS: under the lip only. Its top 5 mm stand past the strip's top edge, 3 mm off the bed, with nothing below. 'On build plate only' finds just that; the face it touches is hidden inside the machine.",
+          "supports": true,
           "versions": [
             {
               "id": "back-strip",
@@ -1748,6 +1780,7 @@
           "id": "io-clamp",
           "name": "I/O clamp bar",
           "note": "Closes the strip's notches. Screwed from outside into three inserts.",
+          "supports": false,
           "versions": [
             {
               "id": "io-clamp",
@@ -1760,15 +1793,15 @@
                 0.0,
                 0.0,
                 0.0,
+                -1.0,
+                -0.0,
+                0.0,
+                0.0,
                 0.0,
                 -1.0,
                 0.0,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
                 39.6,
-                197.0,
+                210.0,
                 52.544229,
                 1.0
               ]
@@ -1784,6 +1817,7 @@
           "id": "io-plate",
           "name": "I/O plate (superseded)",
           "note": "SUPERSEDED. Replaced by the I/O strip and its clamp bar. Hidden by default.",
+          "supports": false,
           "versions": [
             {
               "id": "io-plate",
@@ -1826,6 +1860,7 @@
           "id": "joystick-module",
           "name": "Joystick mount (test)",
           "note": "Standoff sets how far the stick sits below the panel \u2014 the one dimension no caliper reaches once assembled.",
+          "supports": false,
           "versions": [
             {
               "id": "joystick-module-13mm",
@@ -1910,6 +1945,7 @@
           "id": "button-module",
           "name": "Action buttons (test)",
           "note": "Also checks the 3.5 mm hole-pattern offset lands the screws on the perfboard.",
+          "supports": false,
           "versions": [
             {
               "id": "button-module-4mm",
@@ -1994,6 +2030,7 @@
           "id": "aux-module",
           "name": "Options button strip (test)",
           "note": "Carries only the options button now the buzzer has moved off it, so it takes the same standoff as the action row.",
+          "supports": false,
           "versions": [
             {
               "id": "aux-module-4mm",
@@ -2078,6 +2115,7 @@
           "id": "buzzer-module",
           "name": "Buzzer module (test)",
           "note": "Three pocket walls stop the board pivoting on its single screw. Grille must land inside the 12 mm sounder.",
+          "supports": false,
           "versions": [
             {
               "id": "buzzer-module-9mm",
@@ -2162,6 +2200,7 @@
           "id": "rebate-frame",
           "name": "Rebate test \u2014 frame corner",
           "note": "One opening with its rebate. Prints with the module below; they must fit each other.",
+          "supports": false,
           "versions": [
             {
               "id": "rebate-frame",
@@ -2198,6 +2237,7 @@
           "id": "rebate-module",
           "name": "Rebate test \u2014 button module",
           "note": "Drops into the frame corner. The action buttons are used because they are the ones a hand pushes, so this is the only piece that tests the ledge under load.",
+          "supports": false,
           "versions": [
             {
               "id": "rebate-module-5mm",
@@ -2234,6 +2274,7 @@
           "id": "panel-coupon",
           "name": "Fit coupon",
           "note": "Strip for checking hole sizes against real parts in the hand. Never part of the machine.",
+          "supports": false,
           "versions": [
             {
               "id": "panel-coupon",
