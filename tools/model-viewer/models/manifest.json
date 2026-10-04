@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-04 10:01 UTC",
+  "generated": "2026-10-04 12:21 UTC",
   "units": "mm",
   "upAxis": "Z",
   "source": "fantoma/python/case/export_viewer.py from case_params.py",
@@ -521,14 +521,14 @@
         {
           "id": "corner-post-left-1",
           "name": "Corner post left \u2014 segment 1 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs and the two tongues that reach out from them. All are flat underneath \u2014 the tongues' old 45 degree slope left their inserts 0.3 mm from breaking out, and the lugs needed support anyway.",
           "supports": true,
           "versions": [
             {
               "id": "corner-post-left-1",
               "label": "Corner post left \u2014 segment 1 of 5",
               "file": "corner-post-left-1.stl",
-              "bytes": 107284,
+              "bytes": 107084,
               "matrix": [
                 1.0,
                 0.0,
@@ -595,14 +595,14 @@
         {
           "id": "corner-post-left-3",
           "name": "Corner post left \u2014 segment 3 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs and the two tongues that reach out from them. All are flat underneath \u2014 the tongues' old 45 degree slope left their inserts 0.3 mm from breaking out, and the lugs needed support anyway.",
           "supports": true,
           "versions": [
             {
               "id": "corner-post-left-3",
               "label": "Corner post left \u2014 segment 3 of 5",
               "file": "corner-post-left-3.stl",
-              "bytes": 77684,
+              "bytes": 77484,
               "matrix": [
                 1.0,
                 0.0,
@@ -706,14 +706,14 @@
         {
           "id": "corner-post-right-1",
           "name": "Corner post right \u2014 segment 1 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs and the two tongues that reach out from them. All are flat underneath \u2014 the tongues' old 45 degree slope left their inserts 0.3 mm from breaking out, and the lugs needed support anyway.",
           "supports": true,
           "versions": [
             {
               "id": "corner-post-right-1",
               "label": "Corner post right \u2014 segment 1 of 5",
               "file": "corner-post-right-1.stl",
-              "bytes": 107284,
+              "bytes": 107084,
               "matrix": [
                 1.0,
                 0.0,
@@ -780,14 +780,14 @@
         {
           "id": "corner-post-right-3",
           "name": "Corner post right \u2014 segment 3 of 5",
-          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs. Their undersides reach 10 mm out from the skin, past the 4 mm a cantilever holds.",
+          "note": "One of five stacked segments, threaded onto two steel dowels. PRINT WITH SUPPORTS: under the lugs and the two tongues that reach out from them. All are flat underneath \u2014 the tongues' old 45 degree slope left their inserts 0.3 mm from breaking out, and the lugs needed support anyway.",
           "supports": true,
           "versions": [
             {
               "id": "corner-post-right-3",
               "label": "Corner post right \u2014 segment 3 of 5",
               "file": "corner-post-right-3.stl",
-              "bytes": 77684,
+              "bytes": 77484,
               "matrix": [
                 1.0,
                 0.0,
