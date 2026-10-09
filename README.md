@@ -730,10 +730,9 @@ stand -- and the template is the rule set: no rules are written by hand.
   platformer, or read from a picture of yours -- cell size found from where
   the ink starts and stops) as a locked layer, an empty tilemap layer over
   it, and an **editable tile size** (8 by default).
-- **No export yet**: the engine has no tilemap (the workbench builds ground
-  from one object per tile, and its pool holds at most 255), so the flash
-  cost shown is what the tiles would cost as images. The format is for the
-  engine session to settle first, as `image-format.md` was.
+- **No export yet** (until 2026-10-09: see "Tiles out" below): the engine had
+  no tilemap then (the workbench built ground from one object per tile, and
+  its pool holds at most 255).
 
 **How it was proven** (2026-10-01), on Pedro's `tileset_grass_set.aseprite`
 (read from a copy, never written): the counts were worked out first in Python
@@ -916,6 +915,36 @@ each numbered place: Canvas read 47 rules, 0 conflicts, 47 of 47, and tiled
 42,706 random-level cells with 0 stand-ins and none given a tile labelled
 for another situation. The grass file reads identically to before (11,800
 level cells unchanged) and the plain starter's bytes are unchanged.
+
+**Tiles out, and play-once** (2026-10-09), for the engine's tilemap
+(`cpp/refactor/engine/tilemap.h`) and Pedro's stress-test scene:
+
+- **Tileset** (Tiles tab → Export): ONE Image, frame n-1 = tile n, frame_ms 0,
+  `IMAGE_HAS_TRANSPARENT` only when a tile really has empty pixels (an opaque
+  set takes the engine's faster path). Same packing and self-check as objects.
+- **Tile layer** (Scene → the layer → Export): `<tileset>_map_cells[ROWS *
+  COLS]`, one byte a cell, row 0 at the top, 0 empty, n = frame n-1, with
+  `_COLS`, `_ROWS` and `_BAND`. The cells are taken from `tmTiled()`, the
+  function the preview draws from: rules, edge setting and stand-ins
+  included, so what the preview shows is what the board draws. Flipped
+  tiles are refused (the engine's tilemap has none). The comment names the
+  draw order among the band's tile layers. Data only: solid or not is the
+  game's call.
+- **Play-once**: a state that does not loop is written with
+  `IMAGE_PLAY_ONCE`, and the previews hold its last frame as `image_frame_at()`
+  does. An Aseprite Repeat above 1 is noted at import: the engine plays it once.
+- `check_header.py` reads OR-ed flags, and accepts many frames at frame_ms 0
+  in a tileset header.
+
+**How it was proven** (2026-10-09): Canvas's own functions, pulled from the
+page and run under Node on Pedro's `canvas_scene.json`, wrote the 11 headers
+(7 objects, 2 tilesets, 2 maps). `check_header.py` passed all 9 images. With
+the engine's `image.h` and `tilemap.h` they compiled together -- and beside
+`hero_sprites.h` -- as C99 and C++17 under `-Wall -Wextra -Werror`.
+`tilemap_draw` then drew both 24 × 24 maps into a 192 × 192 frame over two
+different sentinel colours, and the result was compared with Canvas's
+`drawTileLayer` of the same layer: 13,068 and 6,400 pixels drawn by both,
+**0 different**, in place or colour.
 
 Next: the palette draft-and-promote workflow, then a particle explorer. Open
 for tiles: a depth rule ("top lit, fading to black below" needs more than one

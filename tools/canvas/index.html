@@ -1664,10 +1664,12 @@ function scnElapsed() {
   if (L.on && L.ms > 0) t = t % L.ms;             // the scene restarts: every clock back to 0
   return Math.floor(t / TICK_MS) * TICK_MS;
 }
+// image_frame_at(): a play-once state (IMAGE_PLAY_ONCE) holds its last frame.
 function instFrame(st, elapsed) {
   var order = playOrder(st);
   if (order.length <= 1 || !st.ms) return order[0] || 0;
-  return order[Math.floor(elapsed / st.ms) % order.length];
+  var n = Math.floor(elapsed / st.ms);
+  return order[st.loop ? n % order.length : Math.min(n, order.length - 1)];
 }
 
 // Palette index -> packed RGBA, in the colour the panel receives.
@@ -3295,7 +3297,8 @@ function frameAt(st) {
   if (ui.hold >= 0 && ui.hold < st.frames.length) return ui.hold;
   if (order.length <= 1 || !st.ms) return order[0] || 0;
   var elapsed = Math.floor((performance.now() - animStart) / TICK_MS) * TICK_MS;
-  return order[Math.floor(elapsed / st.ms) % order.length];
+  var n = Math.floor(elapsed / st.ms);
+  return order[st.loop ? n % order.length : Math.min(n, order.length - 1)];   // play once: hold the last frame
 }
 
 function frameImage(o, px) {
@@ -3605,8 +3608,8 @@ function renderStateSect() {
     lp.appendChild(cb); lp.appendChild(document.createTextNode('Loop'));
     box.appendChild(lp);
     if (!st.loop) {
-      box.appendChild(el('p', 'note warn', 'The engine has no play-once yet (no ANIM_ONCE), so on the '
-        + 'device this loops — and so does this preview. Kept so the export can follow when it lands.'));
+      box.appendChild(el('p', 'note', 'Plays once and holds its last frame (IMAGE_PLAY_ONCE in the header); '
+        + 'game code can ask image_anim_done() when it has finished. Play restarts it here.'));
     }
   }
 
@@ -3681,7 +3684,7 @@ var INCLUDE_PRESETS = [
 // What image.h itself defines. Every exported header includes it, so a name
 // that lands on one of these breaks the build: an object "image" with a
 // state "row" would redefine image_row().
-var IMAGE_H_SYMBOLS = ['Image', 'IMAGE_H', 'IMAGE_HAS_TRANSPARENT', 'rgb565', 'rgb565_r8', 'rgb565_g8',
+var IMAGE_H_SYMBOLS = ['Image', 'IMAGE_H', 'IMAGE_HAS_TRANSPARENT', 'IMAGE_PLAY_ONCE', 'image_anim_done', 'rgb565', 'rgb565_r8', 'rgb565_g8',
   'rgb565_b8', 'image_init', 'image_set_transparent', 'image_frame_bytes', 'image_row', 'image_frame_at',
   'image_pixel', 'image_color', 'image_pixel_transparent', 'image_decode_row_idx', 'image_decode_row'];
 
@@ -3776,7 +3779,6 @@ function exportChecks(o) {
     var n = playOrder(st).length;
     if (n > 1 && st.ms === 0) warns.push(st.name + ': frame_ms 0 means a still image; only the first frame shows.');
     else if (n > 1 && st.ms < 17) warns.push(st.name + ': ' + st.ms + ' ms is under the ~16 ms display tick, so some frames may never be seen.');
-    if (n > 1 && !st.loop) warns.push(st.name + ': tagged to play once, but the engine has no ANIM_ONCE yet, so it loops.');
     var distinct = st.frameMs.filter(function (v, i, a) { return a.indexOf(v) === i; });
     if (distinct.length > 1) warns.push(st.name + ': frames had different durations (' + distinct.join(', ') + ' ms); every frame uses ' + st.ms + ' ms.');
   });
@@ -3887,9 +3889,13 @@ function buildHeader(o) {
       }
     });
 
-    var ms = n > 1 ? st.ms : 0;
+    var ms = n > 1 ? st.ms : 0, once = n > 1 && !st.loop;
     var what = n === 1 ? '1 frame, still (frame_ms = 0)'
-      : n + ' frames at ' + ms + ' ms' + (n !== st.frames.length ? ', ' + st.direction + ' expanded from ' + st.frames.length : '');
+      : n + ' frames at ' + ms + ' ms' + (n !== st.frames.length ? ', ' + st.direction + ' expanded from ' + st.frames.length : '')
+        + (once ? ', plays once' : '');
+    var flags = [];
+    if (d.t) flags.push('IMAGE_HAS_TRANSPARENT');
+    if (once) flags.push('IMAGE_PLAY_ONCE');
     blocks.push(
       '/* ' + asciiOnly(st.name + ': ' + what) + ' */\n' +
       'static const uint8_t ' + N + '_' + st.name + '_data[' + data.length + '] = {\n' +
@@ -3902,7 +3908,7 @@ function buildHeader(o) {
       '    .frames   = ' + n + ',\n' +
       '    .stride   = ' + stride + ',\n' +
       '    .log2_bpp = ' + l2 + ',\n' +
-      '    .flags    = ' + (d.t ? 'IMAGE_HAS_TRANSPARENT' : '0') + ',\n' +
+      '    .flags    = ' + (flags.join(' | ') || '0') + ',\n' +
       '    .transparent = 0,\n' +
       '    .frame_ms = ' + ms + ',\n' +
       '};\n');
@@ -3956,6 +3962,171 @@ function buildHeader(o) {
     '#define ' + U + '_BOX_H  ' + o.box.h + '\n\n' +
     '#endif /* ' + guard + ' */\n';
   return { text: text, bytes: totalPixels + paletteBytes(bpp), warns: chk.warns };
+}
+
+/* ---- tilesets and tile layers, out (2026-10-09) ----
+   The engine's tilemap (cpp/refactor/engine/tilemap.h): ONE Image is the
+   tileset, frame n-1 is tile n; a map is cols * rows bytes, row-major, 0
+   empty. The map holds the tiles Canvas DRAWS -- its rules, its edge
+   setting and its closest-situation stand-ins -- taken from tmTiled(), the
+   function the preview draws from, so the two cannot disagree. Data only:
+   whether a map is solid is a game decision. */
+function tilesetHeaderName(ts) { return ts.name + '.h'; }
+function buildTilesetHeader(ts) {
+  var errors = [], include = project.include, pal = findPalette(ts.palette);
+  if (includeProblem(include)) errors.push('#include path (Sprites → Export): ' + includeProblem(include));
+  if (!pal) errors.push('Choose a palette for the tileset.');
+  if (!ts.tiles.length) errors.push('The tileset has no tiles.');
+  if (ts.tiles.length > 255) errors.push(ts.tiles.length + ' tiles: a map cell is one byte, so 255 is the most.');
+  if (ts.tw > 128) errors.push('Tiles wider than 128 px are skipped by tilemap_draw (RF_MAX_SPRITE_W).');
+  var px = ts.tiles.map(decodeFrame), t = false, top = -1;
+  px.forEach(function (f) { f.forEach(function (v) { if (v === TRANSPARENT) t = true; else if (v > top) top = v; }); });
+  if (pal && top >= pal.colors.length) errors.push('The tiles use colour ' + top + ', which “' + pal.name + '” does not have.');
+  var bpp = pal ? bppFor(pal.colors.length + (t ? 1 : 0)) : 0;
+  if (pal && !bpp) errors.push((pal.colors.length + (t ? 1 : 0)) + ' palette slots: 256 is the most an image has.');
+  var N = ts.name, mine = ['CANVAS_' + N.toUpperCase() + '_H', N, N + '_data', N + '_palette'];
+  var eng = IMAGE_H_SYMBOLS.filter(function (x) { return mine.indexOf(x) >= 0; });
+  if (eng.length) errors.push(someNames(eng) + ' already exists in image.h. Rename the tileset.');
+  project.objects.forEach(function (o) {
+    var hit = objSymbols(o).filter(function (x) { return mine.indexOf(x) >= 0; });
+    if (hit.length) errors.push('This tileset and the object “' + o.name + '” would both define ' + someNames(hit) + '.');
+  });
+  if (errors.length) return { errors: errors };
+
+  var l2 = [1, 2, 4, 8].indexOf(bpp), shift = t ? 1 : 0, w = ts.tw, h = ts.th, stride = (w * bpp + 7) >> 3, fb = stride * h;
+  var palette = [];
+  for (var i = 0; i < (1 << bpp); i++) palette.push(0);
+  var c565 = pal.colors.map(function (hex) { return panelOf(hex).c565; });
+  c565.forEach(function (c, k) { palette[k + shift] = c; });
+  function map(v) { return v === TRANSPARENT ? 0 : v + shift; }
+  var data = new Uint8Array(fb * px.length);
+  px.forEach(function (f, k) { data.set(packFrame(f, w, h, bpp, map), k * fb); });
+  px.forEach(function (f, k) {                      // the self-check, as for objects
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var idx = readIndex(data, stride, h, l2, k, x, y), src = f[y * w + x];
+      var ok = src === TRANSPARENT ? (t && idx === 0) : (!(t && idx === 0) && palette[idx] === c565[src]);
+      if (!ok) throw new Error('Self-check failed: tile ' + (k + 1) + ' pixel (' + x + ', ' + y + ').');
+    }
+  });
+  var head = [
+    'Generated by Canvas (fantoma-tools) from project "' + project.name + '"' + (ts.source ? ', tiles from ' + ts.source : '')
+      + '. Re-export from Canvas rather than editing.',
+    '',
+    N + ': ' + px.length + ' tile' + (px.length === 1 ? '' : 's') + ' of ' + w + 'x' + h + ' as ONE Image for tilemap.h: frame n-1 is tile n, '
+      + 'so a map cell n draws frame n-1 and 0 is empty. ' + bpp + ' bpp' + (t ? ' with index 0 transparent' : ', opaque (the faster draw path)')
+      + '. ' + data.length + ' B of pixels + ' + paletteBytes(bpp) + ' B of palette ("' + pal.name + '", ' + pal.colors.length + ' colours).'
+  ];
+  var comment = [];
+  head.forEach(function (para) {
+    if (!para) { comment.push(' *'); return; }
+    commentLines(para, 72).forEach(function (ln) { comment.push(' * ' + ln); });
+  });
+  comment[0] = '/*' + comment[0].slice(2);
+  var guard = mine[0];
+  var text =
+    comment.join('\n') + '\n */\n' +
+    '#ifndef ' + guard + '\n#define ' + guard + '\n\n' +
+    '#include "' + include + '"\n\n' +
+    'static const uint16_t ' + N + '_palette[' + palette.length + '] = {\n' + cArray(palette, 4, 8) + '\n};\n\n' +
+    'static const uint8_t ' + N + '_data[' + data.length + '] = {\n' + cArray(data, 2, 12) + '\n};\n\n' +
+    'static const Image ' + N + ' = {\n' +
+    '    .data     = ' + N + '_data,\n' +
+    '    .palette  = ' + N + '_palette,\n' +
+    '    .width    = ' + w + ',\n' +
+    '    .height   = ' + h + ',\n' +
+    '    .frames   = ' + px.length + ',\n' +
+    '    .stride   = ' + stride + ',\n' +
+    '    .log2_bpp = ' + l2 + ',\n' +
+    '    .flags    = ' + (t ? 'IMAGE_HAS_TRANSPARENT' : '0') + ',\n' +
+    '    .transparent = 0,\n' +
+    '    .frame_ms = 0,\n' +
+    '};\n\n' +
+    '#endif /* ' + guard + ' */\n';
+  return { text: text, bytes: data.length + paletteBytes(bpp) };
+}
+
+// A layer's name in C: its tileset's, plus _map; numbered when one tileset
+// paints several layers.
+function mapName(tm) {
+  var ts = findTileset(tm.tileset), same = tileLayers().filter(function (x) { return x.tileset === tm.tileset; });
+  return (ts ? ts.name : 'tiles') + '_map' + (same.length > 1 ? '_' + (same.indexOf(tm) + 1) : '');
+}
+function buildMapHeader(tm) {
+  var ts = findTileset(tm.tileset), T = tmTiled(tm);
+  if (!ts || !T) return { errors: ['This layer has no tileset.'] };
+  var errors = [], cells = [], flipped = 0, stand = 0, filled = 0;
+  T.tiles.forEach(function (t) {
+    if (t && t.flip) flipped++;
+    if (t && !t.exact) stand++;
+    if (t && t.id) filled++;
+    cells.push(t && t.id ? t.id : 0);
+  });
+  if (flipped) errors.push(flipped + ' cell' + (flipped === 1 ? ' uses a' : 's use') + ' flipped tile' + (flipped === 1 ? '' : 's') + ': the engine’s tilemap has no flips.');
+  if (ts.tiles.length > 255) errors.push(ts.tiles.length + ' tiles: a map cell is one byte, so 255 is the most.');
+  if (errors.length) return { errors: errors };
+  var N = mapName(tm), U = N.toUpperCase(), guard = 'CANVAS_' + U + '_H';
+  var inBand = tileLayers().filter(function (x) { return x.band === tm.band && !x.hidden; });
+  var k = inBand.indexOf(tm);
+  var head = [
+    'Generated by Canvas (fantoma-tools) from project "' + project.name + '". Re-export from Canvas rather than editing.',
+    '',
+    N + ': tile layer ' + (tileLayers().indexOf(tm) + 1) + ' of the scene, ' + tm.cols + ' x ' + tm.rows + ' cells of ' + ts.tw + 'x' + ts.th
+      + ', painted with the tileset ' + ts.name + ' (' + tilesetHeaderName(ts) + '): cell n draws its frame n-1, 0 is empty. '
+      + filled + ' cells filled.',
+    '',
+    'These are the tiles Canvas DRAWS: its rules, scene edges "' + tm.edges + '"'
+      + (stand ? ', and ' + stand + ' cell' + (stand === 1 ? '' : 's') + ' showing a stand-in (the closest situation the tileset has)' : '')
+      + '. Data only: whether the map is solid is the game\'s decision.',
+    '',
+    'Band ' + BANDS[tm.band].key + ': drawn before that band\'s objects'
+      + (inBand.length > 1 ? ', and ' + (k === 0 ? 'first of' : k === inBand.length - 1 ? 'last of' : 'number ' + (k + 1) + ' of')
+        + ' its ' + inBand.length + ' tile layers (' + inBand.map(mapName).join(', ') + ', in drawing order)' : '')
+      + (tm.hidden ? '. HIDDEN in Canvas, so not drawn there' : '') + '.'
+  ];
+  var comment = [];
+  head.forEach(function (para) {
+    if (!para) { comment.push(' *'); return; }
+    commentLines(para, 72).forEach(function (ln) { comment.push(' * ' + ln); });
+  });
+  comment[0] = '/*' + comment[0].slice(2);
+  var rows = [];
+  for (var y = 0; y < tm.rows; y++) {
+    rows.push('    ' + cells.slice(y * tm.cols, (y + 1) * tm.cols).map(function (v) { return ('  ' + v).slice(-3); }).join(',') + ',');
+  }
+  var text =
+    comment.join('\n') + '\n */\n' +
+    '#ifndef ' + guard + '\n#define ' + guard + '\n\n' +
+    '#include <stdint.h>\n\n' +
+    '#define ' + U + '_COLS ' + tm.cols + '\n' +
+    '#define ' + U + '_ROWS ' + tm.rows + '\n' +
+    '#define ' + U + '_BAND ' + tm.band + '   /* ' + BANDS[tm.band].key + ' */\n\n' +
+    'static const uint8_t ' + N + '_cells[' + U + '_ROWS * ' + U + '_COLS] = {\n' + rows.join('\n') + '\n};\n\n' +
+    '#endif /* ' + guard + ' */\n';
+  return { text: text, cells: cells };
+}
+
+// Download or copy what `build` returns; the same reporting as objects.
+function exportBuilt(fileName, build, how) {
+  var r;
+  try { r = build(); }
+  catch (e) { toast(e.message + ' Nothing was exported: this is a Canvas bug, please report it.'); return; }
+  if (r.errors) { toast(r.errors[0]); return; }
+  if (how === 'copy') {
+    navigator.clipboard.writeText(r.text).then(function () { toast('Copied ' + fileName); },
+      function () { toast('The clipboard refused; use Download instead.'); });
+  } else {
+    downloadText(fileName, r.text, 'text/x-c');
+    toast('Exported ' + fileName);
+  }
+}
+function exportRow(fileName, build) {
+  var br = el('div', 'btnrow');
+  var dlb = el('button', 'chip primary', 'Download ' + fileName); dlb.type = 'button';
+  dlb.onclick = function () { exportBuilt(fileName, build, 'download'); };
+  var cp = el('button', 'chip', 'Copy'); cp.type = 'button'; cp.style.flex = '0 0 64px';
+  cp.onclick = function () { exportBuilt(fileName, build, 'copy'); };
+  br.appendChild(dlb); br.appendChild(cp);
+  return br;
 }
 
 function exportHeader(o, how) {
@@ -4293,7 +4464,7 @@ function showImport(an, jsonName, pngName, onCommit, onCancel) {
     var n = [];
     if (st.renamed) n.push('was “' + st.want + '”');
     if (st.varied) n.push('durations differ; uses ' + st.ms + ' ms');
-    if (!st.loop && st.idx.length > 1) n.push('engine will loop it');
+    if (!st.loop && st.repeat > 1 && st.idx.length > 1) n.push('the engine plays it once, not ' + st.repeat + ' times');
     if (st.idx.length > 1 && st.ms < 17) n.push('under the 16 ms tick');
     tr.appendChild(el('td', 'w', n.join('; ')));
     t.appendChild(tr);
@@ -5020,8 +5191,9 @@ $('objLinkBtn').onclick = linkAseprite;
    (a side neighbour weighs four times a diagonal), marked, and listed in the
    coverage report so it is clear which shapes the template still lacks.
 
-   The engine has no tilemap yet, so nothing here is exported; the flash cost
-   shown is what the tiles would cost as images.
+   Exported for the engine's tilemap (cpp/refactor/engine/tilemap.h, 2026-10-09):
+   the tileset as one Image, each tile layer as its resolved grid -- see
+   buildTilesetHeader and buildMapHeader.
    -------------------------------------------------------------------------- */
 var NB = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];   // N NE E SE S SW W NW
 var NB_NAMES = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -5643,7 +5815,10 @@ function renderTsInfo() {
     box.appendChild(el('p', 'note', b.n + ' colour' + (b.n === 1 ? '' : 's') + (b.transparent ? ' + transparent' : '') + ' → ' + b.bpp + ' bpp: '
       + b.per + ' B a tile × ' + ts.tiles.length + ' = ' + bytesLabel(b.pixels) + ', + ' + b.pal + ' B palette = ' + bytesLabel(b.pixels + b.pal) + '.'));
   }
-  box.appendChild(el('p', 'note', 'The engine has no tilemap yet, so a tileset is a preview: it is exported once the engine and Canvas agree a tilemap format.'));
+  box.appendChild(el('span', 'lbl', 'Export'));
+  box.appendChild(el('p', 'note', 'One Image, frame n-1 = tile n, for the engine’s tilemap. The #include path is the one set under Sprites → Export ('
+    + project.include + '). The maps painted with it are exported from the Scene, per tile layer.'));
+  box.appendChild(exportRow(tilesetHeaderName(ts), function () { return buildTilesetHeader(ts); }));
   var br = el('div', 'btnrow');
   var del = el('button', 'chip danger', 'Delete tileset'); del.type = 'button';
   del.onclick = function () {
@@ -6128,9 +6303,8 @@ $('tsStarterBtn').onclick = showStarter;
 
    A layer belongs to one tileset and one band, on a grid starting at the
    scene's top-left in that tileset's tile size. Within its band it draws
-   BEFORE the band's objects: the engine has no tilemap yet, so where tiles
-   sit in the draw order is an open question for it, and this is the
-   preview's answer until then. By default ground continues past the scene's
+   BEFORE the band's objects, layers in list order -- as the engine's
+   tilemap.h draws them (2026-10-09). By default ground continues past the scene's
    edge (so ground running off the bottom has no bottom border); a layer can
    treat outside as empty instead.
 
@@ -6376,7 +6550,7 @@ function renderTileLayerPanel(box, tm) {
   bs.value = tm.band;
   bs.onchange = function () { snapshot(); tm.band = +bs.value; changed(); renderScene(); };
   box.appendChild(bs);
-  box.appendChild(el('p', 'note', 'Drawn before the band’s objects. Where tiles sit in the engine’s draw order is still open: it has no tilemap yet.'));
+  box.appendChild(el('p', 'note', 'Drawn before the band’s objects, and after the tile layers above it in the list: as the engine’s tilemap draws them.'));
 
   box.appendChild(el('span', 'lbl', 'Scene edges'));
   var es = document.createElement('select'); es.className = 'sel2';
@@ -6416,6 +6590,12 @@ function renderTileLayerPanel(box, tm) {
     }
   }
   box.appendChild(el('p', 'note', 'B paint, E erase, V select. Drag to paint; Shift-drag fills a rectangle.'));
+  if (ts) {
+    box.appendChild(el('span', 'lbl', 'Export'));
+    box.appendChild(el('p', 'note', 'The grid as drawn here, stand-ins included: one byte a cell, 0 empty, n = frame n-1 of '
+      + tilesetHeaderName(ts) + ' (exported from the Tiles tab).'));
+    box.appendChild(exportRow(mapName(tm) + '.h', function () { return buildMapHeader(tm); }));
+  }
   var br = el('div', 'btnrow');
   var fill = el('button', 'chip', 'Fill with a random level'); fill.type = 'button';
   fill.onclick = function () {

@@ -45,6 +45,7 @@ FIELDS = ["data", "palette", "width", "height", "frames", "stride",
           "log2_bpp", "flags", "transparent", "frame_ms"]
 COMPARED = FIELDS[2:]
 IMAGE_HAS_TRANSPARENT = 0x01
+IMAGE_PLAY_ONCE = 0x02
 
 ARRAY = re.compile(r"static\s+const\s+(uint8_t|uint16_t)\s+(\w+)\s*\[\s*(\w*)\s*\]\s*=\s*\{(.*?)\};", re.S)
 IMAGE = re.compile(r"static\s+const\s+Image\s+(\w+)\s*=\s*\{(.*?)\};", re.S)
@@ -57,10 +58,18 @@ def strip_comments(text):
     return re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
 
 
+FLAG_NAMES = {"IMAGE_HAS_TRANSPARENT": IMAGE_HAS_TRANSPARENT, "IMAGE_PLAY_ONCE": IMAGE_PLAY_ONCE}
+
+
 def number(tok, what):
     tok = tok.strip()
-    if tok == "IMAGE_HAS_TRANSPARENT":
-        return IMAGE_HAS_TRANSPARENT
+    if "|" in tok:                       # flags: IMAGE_HAS_TRANSPARENT | IMAGE_PLAY_ONCE
+        v = 0
+        for part in tok.split("|"):
+            v |= number(part, what)
+        return v
+    if tok in FLAG_NAMES:
+        return FLAG_NAMES[tok]
     try:
         return int(tok, 0)
     except ValueError:
@@ -74,7 +83,11 @@ class Header:
         # errors="replace": img2c.py writes its comment's em dash in the
         # Windows code page (byte 0x97), which is not UTF-8. Only comments
         # hold it, and comments are discarded.
-        text = strip_comments(open(path, encoding="utf-8", errors="replace").read())
+        raw = open(path, encoding="utf-8", errors="replace").read()
+        # A tileset for tilemap.h: frames are tiles, picked by a map cell,
+        # not by time, so frame_ms 0 with many frames is right there.
+        self.tileset = "ONE Image for tilemap.h" in re.sub(r"\s*\n\s*\*\s*", " ", raw)
+        text = strip_comments(raw)
 
         self.arrays = {}
         for kind, name, size, body in ARRAY.findall(text):
@@ -129,7 +142,7 @@ class Header:
             return None
         if len(pal) != 1 << bpp:
             self.problem(f"{name}: palette has {len(pal)} entries, image.h wants 1 << bpp = {1 << bpp}")
-        if n > 1 and img["frame_ms"] == 0:
+        if n > 1 and img["frame_ms"] == 0 and not self.tileset:
             self.problem(f"{name}: {n} frames but frame_ms 0, so only the first is ever shown")
         if n == 1 and img["frame_ms"] != 0:
             self.problem(f"{name}: one frame, so frame_ms should be 0 (it is {img['frame_ms']})")
